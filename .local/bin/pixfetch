@@ -1,0 +1,190 @@
+#!/usr/bin/env python3
+"""fastfetch with a random pixel-art logo.
+
+Kitty: crisp integer-scaled image via the graphics protocol.
+Elsewhere: truecolor half-block art, pokemon-colorscripts style.
+Extra arguments are passed through to fastfetch.
+"""
+import fcntl
+import hashlib
+import json
+import math
+import os
+import random
+import struct
+import sys
+import termios
+from pathlib import Path
+
+from PIL import Image, ImageChops
+
+HOME = Path.home()
+ART_DIR = Path(os.environ.get("PIXFETCH_DIR", HOME / "Pictures/pixel-art"))
+CACHE = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")) / "pixfetch"
+ROWS = int(os.environ.get("PIXFETCH_ROWS", 17))
+MAX_COLS = int(os.environ.get("PIXFETCH_MAX_COLS", 44))
+INFO_COLS = 28  # widest fastfetch line + logo padding is added on top
+CROP = float(os.environ.get("PIXFETCH_CROP", 0.55))  # 0 disables
+EXTS = {".png", ".gif", ".webp", ".bmp"}
+
+
+def fastfetch(*args):
+    os.execvp("fastfetch", ["fastfetch", *args, *sys.argv[1:]])
+
+
+def pick():
+    files = sorted(p for p in ART_DIR.rglob("*") if p.suffix.lower() in EXTS)
+    if not files:
+        return None
+    last = CACHE / "last"
+    prev = last.read_text() if last.exists() else ""
+    choice = random.choice([p for p in files if str(p) != prev] or files)
+    last.write_text(str(choice))
+    return choice
+
+
+def winsize():
+    """(columns, cell size in px or None)."""
+    for fd in (sys.stdout.fileno(), sys.stdin.fileno()):
+        try:
+            rows, cols, xpx, ypx = struct.unpack(
+                "HHHH", fcntl.ioctl(fd, termios.TIOCGWINSZ, b"\0" * 8))
+        except OSError:
+            continue
+        if cols and rows:
+            return cols, (xpx // cols, ypx // rows) if xpx and ypx else None
+    return 80, None
+
+
+def grid(img, axis):
+    # gcd of the positions where a column (axis 0) or row (axis 1) changes.
+    n = img.size[axis]
+    shift = (1, 0) if axis == 0 else (0, 1)
+    w, h = img.size
+    a = img.crop((shift[0], shift[1], w, h))
+    b = img.crop((0, 0, w - shift[0], h - shift[1]))
+    d = ImageChops.difference(a, b)
+    step = n
+    for i in range(n - 1):
+        box = (i, 0, i + 1, d.height) if axis == 0 else (0, i, d.width, i + 1)
+        if d.crop(box).getbbox(alpha_only=False):
+            step = math.gcd(step, i + 1)
+            if step == 1:
+                break
+    return step
+
+
+def native(img):
+    # Undo integer nearest-neighbour upscales, common in art posted online.
+    k = math.gcd(grid(img, 0), grid(img, 1))
+    if k < 2:
+        return img
+    w, h = img.size
+    return img.resize((w // k, h // k), Image.NEAREST)
+
+
+def clear_background(img):
+    # Solid backdrop (all four corners equal) -> transparent, so the art floats.
+    w, h = img.size
+    colors = {img.getpixel(c) for c in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]}
+    if len(colors) == 1 and (bg := colors.pop())[3] == 255:
+        r, g, b = ImageChops.difference(img.convert("RGB"), Image.new("RGB", img.size, bg[:3])).split()
+        keep = ImageChops.lighter(ImageChops.lighter(r, g), b).point(lambda v: 255 if v else 0)
+        img.putalpha(keep)
+    return img
+
+
+def load(path):
+    img = Image.open(path).convert("RGBA")
+    img = clear_background(native(img))
+    bbox = img.getchannel("A").getbbox()
+    return img.crop(bbox) if bbox else img
+
+
+def fit(img, max_w, max_h):
+    w, h = img.size
+    if w <= max_w and h <= max_h:
+        return img
+    if h >= 1.5 * w and CROP:
+        # Tall full-body art: keep the upper body so the face stays readable.
+        ch = round(h * CROP)
+        cw = min(w, round(ch * 0.8))
+        img = img.crop(((w - cw) // 2, 0, (w + cw) // 2, ch))
+        w, h = img.size
+    s = min(max_w / w, max_h / h)
+    return img.resize((max(1, round(w * s)), max(1, round(h * s))), Image.LANCZOS)
+
+
+def kitty(img, cw, ch, max_cols, out):
+    img = fit(img, max_cols * cw, ROWS * ch)
+    w, h = img.size
+    k = max(1, min(ROWS * ch // h, max_cols * cw // w))
+    img = img.resize((w * k, h * k), Image.NEAREST)
+    cols, rows = -(-img.width // cw), -(-img.height // ch)
+    # Pad to whole cells so the terminal never resamples (keeps pixels sharp).
+    canvas = Image.new("RGBA", (cols * cw, rows * ch))
+    canvas.paste(img, ((canvas.width - img.width) // 2, canvas.height - img.height))
+    canvas.save(out)
+    return cols, rows
+
+
+def halfblocks(img, max_cols, out):
+    img = fit(img, max_cols, ROWS * 2)
+    w, h = img.size
+    px = img.load()
+
+    def get(x, y):
+        if y >= h:
+            return None
+        r, g, b, a = px[x, y]
+        return (r, g, b) if a >= 128 else None
+
+    lines = []
+    for y in range(0, h, 2):
+        line = ""
+        for x in range(w):
+            top, bot = get(x, y), get(x, y + 1)
+            if top and bot:
+                line += "\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀" % (*top, *bot)
+            elif top:
+                line += "\x1b[49m\x1b[38;2;%d;%d;%dm▀" % top
+            elif bot:
+                line += "\x1b[49m\x1b[38;2;%d;%d;%dm▄" % bot
+            else:
+                line += "\x1b[0m "
+        lines.append(line + "\x1b[0m")
+    out.write_text("\n".join(lines) + "\n")
+
+
+def main():
+    CACHE.mkdir(parents=True, exist_ok=True)
+    path = pick()
+    if path is None:
+        fastfetch()
+
+    term_cols, cell = winsize()
+    if os.environ.get("TERM") != "xterm-kitty":
+        cell = None
+    # Lines wider than the window get re-wrapped and the text slides off the art.
+    max_cols = min(MAX_COLS, term_cols - 5 - INFO_COLS)
+    if max_cols < 10:
+        fastfetch("--logo", "none")
+    key = json.dumps([str(path), path.stat().st_mtime, cell, ROWS, max_cols, CROP])
+    base = CACHE / hashlib.sha1(key.encode()).hexdigest()[:16]
+
+    if cell:
+        out, meta = base.with_suffix(".png"), base.with_suffix(".size")
+        if not (out.exists() and meta.exists()):
+            meta.write_text("%d %d" % kitty(load(path), *cell, max_cols, out))
+        cols, rows = meta.read_text().split()
+        fastfetch("--logo-type", "kitty-direct", "--logo", str(out),
+                  "--logo-width", cols, "--logo-height", rows)
+
+    out = base.with_suffix(".txt")
+    if not out.exists():
+        halfblocks(load(path), max_cols, out)
+    fastfetch("--logo-type", "file-raw", "--logo", str(out))
+
+
+if __name__ == "__main__":
+    main()
