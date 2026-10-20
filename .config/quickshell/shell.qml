@@ -3,6 +3,7 @@ import qs.modules.bar
 import qs.modules.launcher
 import qs.modules.lyrics
 import qs.modules.osd
+import qs.modules.wallpaper
 
 ShellRoot {
     Variants {
@@ -20,4 +21,5 @@ ShellRoot {
 
     Osd {}
     Launcher {}
+    WallpaperPicker {}
 }
