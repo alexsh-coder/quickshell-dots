@@ -1,43 +1,34 @@
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Services.Pam
 import Quickshell.Wayland
+import qs.services
 
-// Session lock. `qs ipc call lock lock` snapshots every output first, so the lock can open by
-// blurring the desktop itself, then locks.
+// Session lock, opened with `qs ipc call lock lock`
 Scope {
     id: root
 
     property bool locked: false
-    property bool capturing: false
     property bool unlocking: false
     property string password: ""
     property bool failed: false
     readonly property bool busy: pam.active
-    // tmpfs: fast, and the snapshot never touches the disk
-    readonly property string shots: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-lock"
-    // Bumped every lock; part of the snapshot name so Image never reuses an old one
-    property int session: 0
     property real time: 0
+    // Decode size for the wallpaper, shared by the preload below and every LockScreen
+    // in real pixels: Qt rounds fractional scales up, so width * devicePixelRatio overshoots
+    readonly property var monitors: Hyprland.monitors.values
+    readonly property size wallSize: monitors.length
+        ? Qt.size(Math.max(...monitors.map(m => m.width)), Math.max(...monitors.map(m => m.height)))
+        : Qt.size(Math.max(...Quickshell.screens.map(s => s.width)), Math.max(...Quickshell.screens.map(s => s.height)))
 
     signal typed(real sign)
     signal rejected
 
     function lock() {
-        if (locked || capturing)
+        if (locked)
             return;
-        capturing = true;
-        session++;
-        grab.running = true;
-        grabTimeout.restart();
-    }
-
-    function engage() {
-        if (!capturing)
-            return;
-        capturing = false;
-        grabTimeout.stop();
         failed = false;
         password = "";
         unlocking = false;
@@ -90,21 +81,7 @@ Scope {
             root.locked = false;
             root.unlocking = false;
             root.password = "";
-            Quickshell.execDetached(["sh", "-c", 'rm -f -- "$1"/*.ppm', "sh", root.shots]);
         }
-    }
-
-    Process {
-        id: grab
-        command: ["sh", "-c", 'd=$1; n=$2; shift 2; mkdir -p "$d"; rm -f -- "$d"/*.ppm; for o; do grim -t ppm -o "$o" "$d/$o-$n.ppm" & done; wait', "sh", root.shots, String(root.session)].concat(Quickshell.screens.map(s => s.name))
-        onExited: root.engage()
-    }
-
-    // Never let a stuck screenshot keep the screen unlocked
-    Timer {
-        id: grabTimeout
-        interval: 800
-        onTriggered: root.engage()
     }
 
     FrameAnimation {
@@ -117,17 +94,66 @@ Scope {
 
         WlSessionLockSurface {
             id: surface
-            // Opaque while locked; see-through only once the password is accepted
-            color: root.unlocking ? "transparent" : "black"
+            // LockScreen fades in over the live desktop (misc:session_lock_xray) and covers it
+            // fully, with an opaque backdrop of its own, once it's in
+            color: "transparent"
 
             LockScreen {
                 anchors.fill: parent
                 lock: root
-                shot: name ? `file://${root.shots}/${name}-${root.session}.ppm` : ""
-                // The surface's screen doesn't expose a name, so match it by size
-                readonly property string name: surface.screen?.name ?? (Quickshell.screens.find(s => s.width === surface.width && s.height === surface.height) ?? Quickshell.screens[0])?.name ?? ""
+                wallSize: root.wallSize
+                wall: root.wall
             }
         }
+    }
+
+    // The wallpaper, cut down once to the screen size (the way awww crops it), so decoding is cheap;
+    // the original stands in until the copy exists, or if ImageMagick is missing
+    property string wall: ""
+    readonly property string wallDir: Quickshell.cachePath("lock")
+
+    function prepareWall() {
+        const src = Wallpaper.current;
+        wall = src;
+        if (!src)
+            return;
+        const size = `${wallSize.width}x${wallSize.height}`;
+        shrink.target = `${wallDir}/${Qt.md5(src)}-${size}.jpg`;
+        shrink.command = ["sh", "-c", 'mkdir -p "${3%/*}" && { [ -f "$3" ] || { magick "$1" -resize "$2^" -gravity center -extent "$2" -quality 95 "$3.tmp.jpg" && mv "$3.tmp.jpg" "$3"; }; }', "sh", src, size, shrink.target];
+        shrink.running = true;
+    }
+
+    Connections {
+        target: Wallpaper
+        function onCurrentChanged() {
+            root.prepareWall();
+        }
+    }
+
+    onWallSizeChanged: prepareWall()
+    Component.onCompleted: prepareWall()
+
+    Process {
+        id: shrink
+        property string target
+        onExited: code => {
+            if (code === 0)
+                root.wall = target;
+        }
+    }
+
+    // Keeps the wallpaper decoded at all times, so locking never waits on it
+    Image {
+        source: root.wall ? "file://" + root.wall : ""
+        sourceSize: root.wallSize
+        asynchronous: true
+    }
+
+    // Bound in Hyprland as hl.dsp.global("quickshell:lock"): no process to spawn on the hotkey
+    GlobalShortcut {
+        name: "lock"
+        description: "Lock the session"
+        onPressed: root.lock()
     }
 
     IpcHandler {

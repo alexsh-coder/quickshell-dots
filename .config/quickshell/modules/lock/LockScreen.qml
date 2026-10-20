@@ -9,22 +9,20 @@ Item {
     id: root
 
     required property var lock
-    property string shot: ""
+    property size wallSize
+    property string wall
 
     readonly property color white: Qt.rgba(1, 1, 1, 0.75)
     readonly property color warm: "#ffd38a"
     readonly property bool leaving: lock.unlocking
     readonly property color lineTint: lock.failed ? Theme.urgent : Keyboard.caps ? warm : Theme.accent
 
-    // 0 is the plain desktop, 1 is fully sunk into the lock
+    // 0 is the live desktop, 1 is fully sunk into the lock
     property real depth: 0
-    // On the way out the snapshot dissolves into the live desktop underneath (needs Hyprland's
-    // misc:session_lock_xray), so the unlock itself changes nothing on screen
-    opacity: leaving ? Math.min(1, depth / 0.15) : 1
     onLeavingChanged: if (leaving) outro.start()
 
     // The first frame draws every layer at 1/255 opacity: shaders compile and blur buffers get
-    // allocated there, under the sharp snapshot, instead of stuttering the intro one by one
+    // allocated there, while nothing is visible yet, instead of stuttering the intro one by one
     property bool primed: false
     readonly property real floor: primed ? 0 : 1 / 255
 
@@ -55,14 +53,26 @@ Item {
         easing.bezierCurve: Theme.standard
     }
 
-    // The desktop snapshot is the whole backdrop: it zooms in, blurs and darkens on the way in and
-    // does the reverse on the way out, so there's never a second image to cut to.
+    // The wallpaper fades in over the live desktop as if the windows dissolve, then zooms in,
+    // blurs and dims; the way out is the reverse, ending on the live desktop again.
     // MultiEffect's blur barely shows below ~0.6 and then rushes in, so rather than animating it,
-    // fixed blurs fade in over the sharp copy, which fades out (sharp text outweighs a blur).
-    component Snapshot: Image {
+    // fixed blurs fade in over the sharp copy, which fades out (sharp detail outweighs a blur).
+    readonly property real shown: Math.max(floor, Math.min(1, depth / 0.3))
+
+    component Wall: Image {
         anchors.fill: parent
-        source: root.shot
+        source: root.wall ? "file://" + root.wall : ""
         fillMode: Image.PreserveAspectCrop
+        sourceSize: root.wallSize
+    }
+
+    // Covers the desktop even if the wallpaper is missing. It only comes in under the soft blur,
+    // which is already opaque by then: fading it along with the wallpaper would dip to dark
+    Rectangle {
+        anchors.fill: parent
+        color: "black"
+        opacity: Math.max(0, Math.min(1, (root.depth - 0.5) / 0.2))
+        visible: opacity > 0
     }
 
     Item {
@@ -70,47 +80,53 @@ Item {
         anchors.fill: parent
         scale: 1 + 0.07 * root.depth
 
-        // Synchronous, since an async load would flash the black surface first; the name is
-        // unique per lock, so the pixmap cache decodes it once for all three copies
-        Snapshot {
-            id: desk
-            opacity: 1 - Math.min(1, root.depth / 0.3)
+        // Synchronous, so the first frame isn't empty; all three copies share one cached decode
+        Wall {
+            opacity: root.shown * (1 - Math.max(0, Math.min(1, (root.depth - 0.3) / 0.3)))
             visible: opacity > 0
         }
 
         // Two effects sharing one source item break each other's blur, so each gets its own copy
-        Snapshot {
-            id: deskSoft
+        Wall {
+            id: wallSoft
             visible: false
         }
 
-        Snapshot {
-            id: deskDeep
+        Wall {
+            id: wallDeep
             visible: false
         }
 
         MultiEffect {
             anchors.fill: parent
-            source: deskSoft
+            source: wallSoft
             visible: opacity > 0 && deep.opacity < 1
             blurEnabled: true
             blur: 1
             blurMax: 20
-            brightness: -0.12
-            opacity: Math.max(root.floor, Math.min(1, root.depth / 0.3))
+            brightness: -0.06
+            opacity: Math.max(root.floor, Math.min(1, (root.depth - 0.15) / 0.3))
         }
 
         MultiEffect {
             id: deep
             anchors.fill: parent
-            source: deskDeep
+            source: wallDeep
             visible: opacity > 0
             blurEnabled: true
             blur: 1
             blurMax: 56
-            brightness: -0.4
+            // Subtractive, so it deepens the darks and shifts hues a little; kept light on purpose
+            brightness: -0.2
             saturation: 0.1
-            opacity: Math.max(root.floor, Math.min(1, (root.depth - 0.2) / 0.4))
+            opacity: Math.max(root.floor, Math.min(1, (root.depth - 0.35) / 0.4))
+        }
+
+        // The rest of the dimming multiplies, which keeps the colours
+        Rectangle {
+            anchors.fill: parent
+            color: "black"
+            opacity: 0.25 * Math.max(root.floor, Math.min(1, (root.depth - 0.1) / 0.6))
         }
     }
 
