@@ -9,6 +9,7 @@ Item {
     readonly property PwNode sink: Pipewire.defaultAudioSink
     readonly property real volume: sink?.audio?.volume ?? 0
     readonly property bool muted: sink?.audio?.muted ?? false
+    property bool lit: false
 
     anchors.verticalCenter: parent.verticalCenter
     implicitWidth: row.implicitWidth
@@ -22,19 +23,16 @@ Item {
         id: row
         spacing: 7
 
-        NerdIcon {
+        Icon {
             anchors.verticalCenter: parent.verticalCenter
-            text: root.muted || root.volume === 0 ? "\u{f0581}"
-                : root.volume < 0.34 ? "\u{f057f}"
-                : root.volume < 0.67 ? "\u{f0580}"
-                : "\u{f057e}"
-            color: root.muted ? Theme.subtext : Theme.text
-        }
-
-        Label {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Math.round(root.volume * 100) + "%"
-            color: root.muted ? Theme.subtext : Theme.text
+            font.pixelSize: Theme.barIcon
+            weight: 500
+            text: root.muted ? "no_sound"
+                : root.volume >= 0.5 ? "volume_up"
+                : root.volume > 0 ? "volume_down"
+                : "volume_mute"
+            color: root.lit ? Theme.accent : root.muted ? Theme.subtext : Theme.secondary
+            Behavior on color { ColorAnimation { duration: Theme.anim } }
         }
     }
 

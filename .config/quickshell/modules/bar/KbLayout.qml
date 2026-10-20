@@ -3,19 +3,22 @@ import qs.config
 import qs.components
 import qs.services
 
-Rectangle {
+Item {
+    property bool lit: false
+
     anchors.verticalCenter: parent.verticalCenter
-    implicitWidth: label.implicitWidth + 16
-    implicitHeight: 24
-    radius: 6
-    color: Theme.surface
+    implicitWidth: label.implicitWidth
+    implicitHeight: label.implicitHeight
+
+    HoverHandler { cursorShape: Qt.PointingHandCursor }
 
     Label {
         id: label
         anchors.centerIn: parent
-        text: Keyboard.layout || "--"
-        font.pixelSize: 13
+        text: (Keyboard.layout || "--").toLowerCase()
+        font.pixelSize: 14
         font.weight: Font.Bold
-        color: Theme.accent
+        color: parent.lit ? Theme.accent : Theme.secondary
+        Behavior on color { ColorAnimation { duration: Theme.anim } }
     }
 }

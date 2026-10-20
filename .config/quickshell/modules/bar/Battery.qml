@@ -11,26 +11,31 @@ Row {
     readonly property bool charging: dev?.state === UPowerDeviceState.Charging
                                   || dev?.state === UPowerDeviceState.FullyCharged
     readonly property bool low: !charging && pct <= 15
+    property bool lit: false
 
     visible: dev?.isLaptopBattery ?? false
     anchors.verticalCenter: parent.verticalCenter
     spacing: 7
 
-    // nf-md battery glyphs, 0..100% in steps of 10
-    readonly property var levels: ["\u{f008e}", "\u{f007a}", "\u{f007b}", "\u{f007c}", "\u{f007d}", "\u{f007e}",
-                                   "\u{f007f}", "\u{f0080}", "\u{f0081}", "\u{f0082}", "\u{f0079}"]
-    readonly property var chargingLevels: ["\u{f089f}", "\u{f089c}", "\u{f0086}", "\u{f0087}", "\u{f0088}", "\u{f089d}",
-                                           "\u{f0089}", "\u{f089e}", "\u{f008a}", "\u{f008b}", "\u{f0085}"]
+    HoverHandler { cursorShape: Qt.PointingHandCursor }
 
-    NerdIcon {
-        anchors.verticalCenter: parent.verticalCenter
-        text: (root.charging ? root.chargingLevels : root.levels)[Math.round(root.pct / 10)]
-        color: root.low ? Theme.urgent : root.charging ? Theme.accent : Theme.text
+    readonly property string icon: {
+        const p = dev?.percentage ?? 0;
+        if (p >= 1)
+            return charging ? "battery_charging_full" : "battery_full";
+        let level = Math.floor(p * 7);
+        // Material has no charging_40 or charging_70
+        if (charging && (level === 4 || level === 1))
+            level--;
+        return charging ? `battery_charging_${(level + 3) * 10}` : `battery_${level}_bar`;
     }
 
-    Label {
+    Icon {
         anchors.verticalCenter: parent.verticalCenter
-        text: root.pct + "%"
-        color: root.low ? Theme.urgent : Theme.text
+        font.pixelSize: Theme.barIcon
+        weight: 500
+        text: root.icon
+        color: root.low ? Theme.urgent : root.lit ? Theme.accent : Theme.secondary
+        Behavior on color { ColorAnimation { duration: Theme.anim } }
     }
 }

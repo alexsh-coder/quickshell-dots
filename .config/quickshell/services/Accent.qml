@@ -18,6 +18,14 @@ Singleton {
     readonly property real grayC: 0.035
 
     readonly property color color: mix(from, to, progress)
+    // M3-style roles: secondary is a muted accent, tertiary sits 60° away in hue
+    readonly property color secondary: role(0.84, 0.05, 0)
+    readonly property color tertiary: role(0.82, 0.1, 60)
+
+    function role(L, C, shift) {
+        const [l, c, h] = toOklch(color);
+        return fromOklch(L, Math.min(C, c), (h + shift) % 360);
+    }
 
     property color from: fallback
     property color to: fallback

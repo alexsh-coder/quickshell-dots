@@ -9,6 +9,9 @@ Singleton {
     id: root
 
     property string layout: ""
+    property var layouts: []
+    property int index: 0
+    property string keymap: ""
     property bool caps: false
     property bool capsRequested: false
 
@@ -47,6 +50,9 @@ Singleton {
                 const name = kb.active_keymap.slice(0, 2).toUpperCase();
                 const first = root.layout === "";
                 root.caps = kb.capsLock;
+                root.layouts = kb.layout.split(",").filter(l => l);
+                root.index = kb.active_layout_index ?? 0;
+                root.keymap = kb.active_keymap;
                 if (name !== root.layout) {
                     root.layout = name;
                     if (!first)
@@ -62,6 +68,10 @@ Singleton {
                 }
             }
         }
+    }
+
+    function switchTo(i) {
+        Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(i)]);
     }
 
     Connections {
