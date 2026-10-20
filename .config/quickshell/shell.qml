@@ -1,6 +1,7 @@
 import Quickshell
 import qs.modules.bar
 import qs.modules.launcher
+import qs.modules.lock
 import qs.modules.lyrics
 import qs.modules.musicfx
 import qs.modules.notifications
@@ -36,5 +37,6 @@ ShellRoot {
     Notifications {}
     Osd {}
     Launcher {}
+    Lock {}
     WallpaperPicker {}
 }
