@@ -22,16 +22,18 @@ PanelWindow {
 
     // Spatial blur of the spectrum, eased against the previous frame
     function smoothed(prev, ease) {
-        const half = (kernel.length - 1) / 2;
+        // Plain JS copies: indexing a list property directly re-reads the whole list every time
+        const vals = Array.from(values), ker = Array.from(kernel);
+        const half = (ker.length - 1) / 2;
         const out = [];
         for (let i = 0; i < n; i++) {
             let s = 0;
-            for (let k = 0; k < kernel.length; k++) {
+            for (let k = 0; k < ker.length; k++) {
                 // Reflect at the ends, the curves continue into their mirrored half
                 let j = Math.abs(i + k - half);
                 if (j >= n)
                     j = 2 * n - 2 - j;
-                s += (values[j] ?? 0) * kernel[k];
+                s += (vals[j] ?? 0) * ker[k];
             }
             out.push((prev[i] ?? 0) * ease + s * (1 - ease));
         }
@@ -49,6 +51,30 @@ PanelWindow {
         const p2 = levels[Math.min(i + 1, last)], p3 = levels[Math.min(i + 2, last)];
         const v = 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (3 * p1 - p0 - 3 * p2 + p3) * f * f * f);
         return Math.max(0, Math.min(1, v));
+    }
+
+    // Spectral flux onset detection: the summed rise of cur over prev across a band range, against an
+    // adaptive threshold; d is the detector's state, b its bands. Straight from the raw spectrum, so
+    // hits fire without smoothing lag. Returns a pulse that jumps on a hit and decays quickly.
+    function onset(d, b, cur, prev) {
+        let f = 0;
+        for (let j = b.lo; j < b.hi; j++)
+            f += Math.max(0, cur[j] - prev[j]);
+        f /= b.hi - b.lo;
+        const threshold = d.mean * 2 + b.floor;
+        d.mean = d.mean * 0.9 + f * 0.1;
+        d.peak = Math.max(f, d.peak * 0.997);
+        d.age++;
+        let hit = 0;
+        // Strength relative to recent peaks, so loud and soft hits differ. After a refractory
+        // gap a new hit fires; right after one the same hit keeps growing to its peak.
+        if (f > threshold && (d.age > 6 || d.age < 3)) {
+            hit = f / d.peak * (b.gain ?? 1);
+            if (d.age > 6)
+                d.age = 0;
+        }
+        d.charge = Math.min(1, Math.max(d.charge * 0.6, hit));
+        return d.charge;
     }
 
     visible: active || stage.opacity > 0
@@ -383,202 +409,213 @@ PanelWindow {
         }
     }
 
-    // Wide neon ribbons hanging down a back wall that fold in the lower third and run along
-    // the floor towards the viewer, in real perspective. The ribbons never move; pulses fired by
-    // onsets in each band travel along them as smooth mirrored bulges, entering at the top.
+    // Recent per-column values as a ring-buffer texture for the shader styles: one row per frame,
+    // row `head` the newest. Only new rows are drawn: writing Canvas ImageData pixel by pixel goes
+    // through a slow per-pixel call, a few dozen fillRects are cheap.
+    component History: Item {
+        id: hist
+
+        required property int cols
+        required property int rows
+        property int head: 0
+        property var pending: []
+        readonly property var texture: ShaderEffectSource {
+            sourceItem: canvas
+            hideSource: true
+            smooth: true
+            wrapMode: ShaderEffectSource.Repeat
+            textureSize: Qt.size(hist.cols, hist.rows)
+        }
+
+        // One [r, g, b] in 0..1 per column
+        function push(row) {
+            head = (head + rows - 1) % rows;
+            pending.push({ at: head, row: row });
+            canvas.requestPaint();
+        }
+
+        Canvas {
+            id: canvas
+
+            width: hist.cols
+            height: hist.rows
+            renderTarget: Canvas.Image
+            onPaint: {
+                const ctx = getContext("2d");
+                for (const p of hist.pending) {
+                    for (let c = 0; c < hist.cols; c++) {
+                        const [r, g, b] = p.row[c];
+                        ctx.fillStyle = `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
+                        ctx.fillRect(c, p.at, 1, 1);
+                    }
+                }
+                hist.pending = [];
+            }
+        }
+    }
+
+    // Flat spectrogram of neon ribbons, one per frequency band with the bass at the bottom. Time runs
+    // out from the centre: the live sound is born in the middle and drifts to both edges, and hits in
+    // each band fire pulses that race outwards along its ribbon. Drawn by ribbons.frag.
     Component {
         id: flow
 
         Item {
-            id: ribbons
+            id: strip
 
-            readonly property int count: 4
-            readonly property int res: 120
-            // Frames the waveform takes to cross the whole ribbon
-            readonly property int travel: 30
-            readonly property real span: (root.n - 1) * 0.6
-
-            // World units are screen heights; the camera looks down +z with focal length 1
-            readonly property real horizon: 0.3
-            readonly property real wall: 1
-            readonly property real floorY: 0.38
-            readonly property real ceiling: 0.36
-            readonly property real near: 0.42
-            readonly property real bend: 0.035
-            readonly property real spread: 0.6
-            readonly property real halfWidth: 0.045
-
-            readonly property real wallLen: ceiling + floorY - bend
-            readonly property real arcLen: bend * Math.PI / 2
-            readonly property real floorLen: wall - bend - near
-            readonly property real total: wallLen + arcLen + floorLen
-
-            property var levels: []
-            // Per-ribbon loudness and pulse history, newest first
-            property var bodies: []
-            property var pulses: []
-            property var waves: []
-            // Slow per-ribbon average and the decaying pulse fired when the band jumps above it
+            readonly property int count: 7
+            readonly property int rows: 100
+            // Log-spaced cava bands grouped per ribbon, bottom first
+            readonly property var bands: Array.from({ length: count }, (_, k) => {
+                const lo = Math.floor(k * root.n / count * 0.85), hi = Math.floor((k + 1) * root.n / count * 0.85);
+                return { lo: lo, hi: Math.max(lo + 1, hi), floor: 0.02 };
+            })
+            readonly property var detectors: bands.map(() => ({ mean: 0, peak: 0.05, age: 99, charge: 0 }))
+            property var raw: []
             property var average: []
-            property var charge: []
-            property var previous: []
-            // Left and right edges of every ribbon, fixed
-            readonly property var edges: {
-                const out = [];
-                for (let i = 0; i < count; i++)
-                    out.push([strip(i, -halfWidth), strip(i, halfWidth)]);
-                return out;
-            }
-
-            // Point on the centre line at arc fraction u, as [y, z]
-            function along(u) {
-                const d = u * total;
-                if (d < wallLen)
-                    return [ceiling - d, wall];
-                if (d < wallLen + arcLen) {
-                    const a = (d - wallLen) / bend;
-                    return [-floorY + bend - bend * Math.sin(a), wall - bend + bend * Math.cos(a)];
-                }
-                return [-floorY, wall - bend - (d - wallLen - arcLen)];
-            }
-
-            function project(x, y, z) {
-                return Qt.point(root.w / 2 + x / z * root.h, (horizon - y / z) * root.h);
-            }
-
-            function xOf(i) {
-                return (i / (count - 1) * 2 - 1) * spread;
-            }
-
-            function strip(i, dx) {
-                const pts = [];
-                for (let j = 0; j <= res; j++) {
-                    const [y, z] = along(j / res);
-                    pts.push(project(xOf(i) + dx, y, z));
-                }
-                return pts;
-            }
-
-            // Static per-sample geometry: screen y, perspective scale, and where each sample reads
-            // the history, so the per-frame loop is plain arithmetic
-            readonly property var table: {
-                const rows = [];
-                for (let j = 0; j <= res; j++) {
-                    const u = j / res;
-                    const [y, z] = along(u);
-                    const f = u * (travel - 1);
-                    const k = Math.floor(f);
-                    rows.push({ sy: (horizon - y / z) * root.h, scale: root.h / z, k: k, t: f - k });
-                }
-                return rows;
-            }
 
             function rebuild() {
-                levels = root.smoothed(levels, 0.3);
-                const body = [], avg = [], chg = [], prev = [];
-                for (let i = 0; i < count; i++) {
-                    const lv = root.spline(levels, Math.abs(i / (count - 1) * 2 - 1) * span);
-                    const a = average[i] ?? lv;
-                    // An onset is the band rising this frame while above its own recent average,
-                    // relative to it so quieter bands fire as often as loud ones. Rise only, so a
-                    // sustained loud note fires once instead of stretching one long pulse.
-                    const rise = lv - (previous[i] ?? lv);
-                    const hit = lv > a * 1.1 ? Math.max(0, rise) / Math.max(0.08, a) * 6 : 0;
-                    prev.push(lv);
-                    // Fast decay keeps the tail short, so the bulge rises and falls within a few frames
-                    chg.push(Math.min(1, Math.max((charge[i] ?? 0) * 0.54, hit)));
-                    avg.push(a * 0.9 + lv * 0.1);
-                    body.push(Math.pow(lv, 0.7) * 0.3);
+                const cur = Array.from(root.values), prev = raw.length === root.n ? raw : cur;
+                const row = [], avg = [];
+                for (let k = 0; k < count; k++) {
+                    const b = bands[k];
+                    let lv = 0;
+                    for (let j = b.lo; j < b.hi; j++)
+                        lv += cur[j];
+                    lv /= b.hi - b.lo;
+                    // Relative to the band's own average, so every ribbon moves, not just the loud bass
+                    const a = average[k] ?? lv;
+                    avg.push(a * 0.98 + lv * 0.02);
+                    const body = Math.tanh(lv * Math.pow(lv / (a + 0.05), 1.5) * 1.2);
+                    row.push([body, root.onset(detectors[k], b, cur, prev), 0]);
                 }
+                raw = cur;
                 average = avg;
-                charge = chg;
-                previous = prev;
-                const hb = [body].concat(bodies).slice(0, travel);
-                const hp = [chg].concat(pulses).slice(0, travel);
-                bodies = hb;
-                pulses = hp;
-
-                const out = [];
-                const rows = table, n = count, last = hb.length - 1, cx = root.w / 2;
-                const hw = halfWidth * 0.92;
-                for (let i = 0; i < n; i++) {
-                    // Body and pulse summed per frame first: the spline is linear, so this is the same curve
-                    const col = [];
-                    for (let k = 0; k <= last; k++)
-                        col.push(hb[k][i] + hp[k][i]);
-                    const x0 = xOf(i);
-                    const left = [], right = [];
-                    for (const r of rows) {
-                        const k = r.k, t = r.t;
-                        const p0 = col[k > 0 ? k - 1 : 0], p1 = col[k < last ? k : last];
-                        const p2 = col[k + 1 < last ? k + 1 : last], p3 = col[k + 2 < last ? k + 2 : last];
-                        const v = 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
-                        // Soft saturation instead of a hard clamp, so strong pulses stay round instead of flat-sided
-                        const half = (0.04 + Math.tanh(Math.max(0, v) * 1.3) * 0.96) * hw;
-                        left.push(Qt.point(cx + (x0 - half) * r.scale, r.sy));
-                        right.push(Qt.point(cx + (x0 + half) * r.scale, r.sy));
-                    }
-                    out.push(left.concat(right.reverse()));
-                }
-                waves = out;
+                trail.push(row);
             }
 
             anchors.fill: parent
 
             Connections {
                 target: root
-                function onValuesChanged() { ribbons.rebuild(); }
+                function onValuesChanged() { strip.rebuild(); }
             }
 
-            // Neon bloom, always on for this style
-            layer.enabled: true
-            layer.samples: 4
-            layer.effect: MultiEffect {
-                shadowEnabled: true
-                shadowColor: Theme.accent
-                blurMax: 48
-                shadowBlur: 1
-                shadowOpacity: 1
+            History {
+                id: trail
+
+                cols: strip.count
+                rows: strip.rows
             }
 
-            Repeater {
-                model: ribbons.count
+            ShaderEffect {
+                // Lane layout in screen heights, from the bottom ribbon up
+                readonly property real aspect: width / height
+                readonly property real pixel: 1 / height
+                readonly property real laneBase: 0.9
+                readonly property real laneGap: 0.045
+                readonly property real lanes: strip.count
+                readonly property real halfSpan: aspect * 0.48
+                readonly property real head: trail.head
+                readonly property real rows: strip.rows
+                readonly property color accent: Theme.accent
+                readonly property color highlight: Theme.text
+                readonly property var history: trail.texture
 
-                Shape {
-                    required property int index
-                    readonly property var edge: ribbons.edges[index]
+                anchors.fill: parent
+                fragmentShader: Qt.resolvedUrl("../../shaders/ribbons.frag.qsb")
+            }
+        }
+    }
 
-                    anchors.fill: parent
-                    // Paths change every frame: triangulate off the GUI thread; the bloom layer's MSAA smooths edges
-                    preferredRendererType: Shape.GeometryRenderer
-                    asynchronous: true
+    // Legacy, not in the style list. Spectrogram terrain in the spirit of Unknown Pleasures: the recent spectrum lies on a floor as a
+    // smooth glowing landscape receding to the horizon. The front edge is the live spectrum, the past
+    // scrolls away frame by frame, and hits light the ground up so the beat ripples into the distance.
+    // History goes to the GPU as a small ring-buffer texture and terrain.frag ray-marches it.
+    Component {
+        id: terrain
 
-                    // The ribbon itself: a faint band, faded in from the top
-                    ShapePath {
-                        strokeWidth: -1
-                        fillGradient: LinearGradient {
-                            x1: 0; y1: 0
-                            x2: 0; y2: root.h * 0.5
-                            GradientStop { position: 0; color: Qt.alpha(Theme.accent, 0) }
-                            GradientStop { position: 1; color: Qt.alpha(Theme.accent, 0.14) }
-                        }
-                        PathPolyline { path: edge[0].concat(edge[1].slice().reverse()) }
-                    }
+        Item {
+            id: field
 
-                    // The waveform racing along it
-                    ShapePath {
-                        strokeWidth: 1.5
-                        strokeColor: Theme.text
-                        fillGradient: LinearGradient {
-                            x1: 0; y1: 0
-                            x2: 0; y2: root.h * 0.4
-                            GradientStop { position: 0; color: Qt.alpha(Theme.accent, 0) }
-                            GradientStop { position: 1; color: Qt.alpha(Theme.accent, 0.9) }
-                        }
-                        joinStyle: ShapePath.RoundJoin
-                        PathPolyline { path: ribbons.waves[index] ?? [] }
-                    }
+            // Texture size: columns across half the width (mirrored in the shader), one row per frame
+            readonly property int cols: 40
+            readonly property int rows: 90
+            readonly property real span: (root.n - 1) * 0.8
+
+            // Hits light the ground up: the kick from the low bands, snares and claps from broadband flux
+            readonly property var bands: [{ lo: 16, hi: 40, floor: 0.01, gain: 0.7 }, { lo: 0, hi: 6, floor: 0.03, gain: 1 }]
+            readonly property var detectors: bands.map(() => ({ mean: 0, peak: 0.05, age: 99, charge: 0 }))
+            property var raw: []
+            property var levels: []
+            // Slow per-band average, each band is shown relative to it so the whole width has relief
+            property var average: []
+
+            function profile() {
+                const rel = [], avg = [];
+                for (let i = 0; i < root.n; i++) {
+                    const a = average[i] ?? levels[i];
+                    avg.push(a * 0.98 + levels[i] * 0.02);
+                    // Bands rising above their own average stand out. Soft saturation keeps loud peaks
+                    // round instead of flat-topped, the power keeps quiet parts flat.
+                    rel.push(Math.pow(Math.tanh(levels[i] * Math.pow(levels[i] / (a + 0.05), 1.5) * 1.6), 1.1));
                 }
+                average = avg;
+                const out = [];
+                for (let c = 0; c < cols; c++)
+                    out.push(root.spline(rel, c / (cols - 1) * span));
+                return out;
+            }
+
+            function rebuild() {
+                levels = root.smoothed(levels, 0.2);
+                const cur = Array.from(root.values), prev = raw.length === root.n ? raw : cur;
+                let glow = 0;
+                for (let p = 0; p < bands.length; p++)
+                    glow = Math.max(glow, root.onset(detectors[p], bands[p], cur, prev));
+                raw = cur;
+
+                const row = profile();
+                // Height as high and low bytes in red and blue, the glow in green
+                trail.push(row.map(v => {
+                    const x = Math.min(1, v) * 255, hi = Math.floor(x);
+                    return [hi / 255, glow, Math.round((x - hi) * 255) / 255];
+                }));
+            }
+
+            anchors.fill: parent
+
+            Connections {
+                target: root
+                function onValuesChanged() { field.rebuild(); }
+            }
+
+            History {
+                id: trail
+
+                cols: field.cols
+                rows: field.rows
+            }
+
+            ShaderEffect {
+                // World units are screen heights; the camera looks down +z with focal length 1
+                readonly property real aspect: width / height
+                readonly property real pixel: 1 / height
+                readonly property real horizon: 0.56
+                readonly property real eye: 0.4
+                readonly property real amp: 0.3
+                readonly property real halfWidth: 0.85
+                readonly property real zNear: 1
+                readonly property real zFar: 4.4
+                readonly property real head: trail.head
+                readonly property real rows: field.rows
+                readonly property color accent: Theme.accent
+                readonly property color highlight: Theme.text
+                readonly property color shade: Theme.bg
+                readonly property var history: trail.texture
+
+                anchors.fill: parent
+                fragmentShader: Qt.resolvedUrl("../../shaders/terrain.frag.qsb")
             }
         }
     }

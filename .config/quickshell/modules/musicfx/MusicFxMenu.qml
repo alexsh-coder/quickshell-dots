@@ -29,7 +29,7 @@ PopupWindow {
 
     readonly property int pad: 16
     readonly property int gapTop: (Theme.barHeight - anchorItem.height) / 2 + 6
-    readonly property var styleIcons: ({ bars: "graphic_eq", wave: "airwave", mirror: "align_vertical_center", ring: "donut_large", nation: "album", flow: "road" })
+    readonly property var styleIcons: ({ bars: "graphic_eq", wave: "airwave", mirror: "align_vertical_center", ring: "donut_large", nation: "album", flow: "stacked_line_chart" })
 
     function toggle() {
         if (!open && Date.now() - closedAt < 250)
