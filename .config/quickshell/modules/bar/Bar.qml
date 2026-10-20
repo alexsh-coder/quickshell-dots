@@ -25,6 +25,7 @@ PanelWindow {
 
             OsLogo {}
             Workspaces { screen: root.screen }
+            Visualizer {}
         }
 
         Row {
