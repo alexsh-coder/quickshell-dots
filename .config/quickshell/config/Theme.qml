@@ -21,5 +21,8 @@ Singleton {
     readonly property int barHeight: 42
     readonly property int radius: 12
     readonly property int anim: 220
+
+    // Material 3 motion curves, for Easing.BezierSpline
+    readonly property list<real> emphasizedDecel: [0.05, 0.7, 0.1, 1, 1, 1]
     readonly property int osdMargin: 56
 }

@@ -12,7 +12,8 @@ PanelWindow {
 
     property bool enabled: true
     readonly property bool active: enabled && Lyrics.lines.length > 0
-    readonly property int moveDuration: 420
+    readonly property int moveDuration: 600
+    readonly property int growDuration: 450
 
     visible: active || view.opacity > 0
 
@@ -36,8 +37,8 @@ PanelWindow {
         interactive: false
         spacing: 4
 
-        // Scroll by animating a hidden highlight, so the list glides with the same
-        // easing as the line scaling instead of ListView's built-in SmoothedAnimation
+        // Scroll by animating a hidden highlight, so the list glides on a custom
+        // curve instead of ListView's built-in SmoothedAnimation
         highlightRangeMode: ListView.StrictlyEnforceRange
         preferredHighlightBegin: (height - 32) / 2
         preferredHighlightEnd: (height + 32) / 2
@@ -46,7 +47,13 @@ PanelWindow {
             width: view.width
             height: view.currentItem?.height ?? 0
             y: view.currentItem?.y ?? 0
-            Behavior on y { NumberAnimation { duration: root.moveDuration; easing.type: Easing.OutCubic } }
+            Behavior on y {
+                NumberAnimation {
+                    duration: root.moveDuration
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Theme.emphasizedDecel
+                }
+            }
         }
 
         opacity: root.active ? (Lyrics.player?.isPlaying ? 1 : 0.45) : 0
@@ -78,9 +85,27 @@ PanelWindow {
             opacity: dist === 0 ? 1 : dist === 1 ? 0.45 : 0
             scale: dist === 0 ? 1 : 0.75
 
-            Behavior on scale { NumberAnimation { duration: root.moveDuration; easing.type: Easing.OutCubic } }
-            Behavior on opacity { NumberAnimation { duration: root.moveDuration; easing.type: Easing.OutCubic } }
-            Behavior on color { ColorAnimation { duration: root.moveDuration; easing.type: Easing.OutCubic } }
+            Behavior on scale {
+                NumberAnimation {
+                    duration: root.growDuration
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Theme.emphasizedDecel
+                }
+            }
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: root.growDuration
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Theme.emphasizedDecel
+                }
+            }
+            Behavior on color {
+                ColorAnimation {
+                    duration: root.growDuration
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Theme.emphasizedDecel
+                }
+            }
         }
     }
 
