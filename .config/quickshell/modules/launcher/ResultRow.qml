@@ -13,6 +13,10 @@ MouseArea {
     property bool pinned: false
     property bool current: false
     readonly property alias iconItem: icon
+    // Vertical offset for the entrance hop; a transform so it doesn't fight ListView's y
+    property real lift: 0
+
+    transform: Translate { y: root.lift }
 
     hoverEnabled: true
     acceptedButtons: Qt.LeftButton | Qt.RightButton

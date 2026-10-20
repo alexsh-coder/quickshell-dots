@@ -14,6 +14,8 @@ Scope {
     property bool open: false
     // Flipped off and on in show() to replay the rows' entrance
     property bool populated: true
+    // True right after opening: rows pop in like bubbles instead of sliding
+    property bool entering: false
     // Hover only takes over the selection after a real cursor move, not when the list scrolls under it
     property bool mouseActive: false
     property point lastCursor: Qt.point(-1, -1)
@@ -89,6 +91,8 @@ Scope {
         mouseActive = false;
         lastCursor = Qt.point(-1, -1);
         ranks = Usage.ranks();
+        entering = true;
+        enterTimer.restart();
         populated = false;
         populated = true;
         resultsView.currentIndex = 0;
@@ -223,6 +227,12 @@ Scope {
 
     ListModel {
         id: pinModel
+    }
+
+    Timer {
+        id: enterTimer
+        interval: 900
+        onTriggered: root.entering = false
     }
 
     Connections {
@@ -386,6 +396,7 @@ Scope {
                         clip: true
                         focus: true
                         onTextEdited: {
+                            root.entering = false;
                             root.query = text;
                             root.zone = "list";
                             resultsView.currentIndex = 0;
@@ -437,12 +448,17 @@ Scope {
                     }
 
                     add: Transition {
+                        id: addTrans
                         SequentialAnimation {
                             PropertyAction { property: "opacity"; value: 0 }
-                            PauseAnimation { duration: Math.max(0, Math.min(ViewTransition.index, 10)) * 18 }
+                            PropertyAction { property: "scale"; value: root.entering ? 0.86 : 1 }
+                            PropertyAction { property: "lift"; value: root.entering ? 14 : 0 }
+                            PauseAnimation { duration: Math.max(0, Math.min(addTrans.ViewTransition.index, 10)) * (root.entering ? 45 : 18) }
                             ParallelAnimation {
                                 NumberAnimation { property: "opacity"; to: 1; duration: Theme.anim }
-                                NumberAnimation { property: "x"; from: 16; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
+                                NumberAnimation { property: "x"; from: root.entering ? 0 : 16; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
+                                NumberAnimation { property: "scale"; to: 1; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 2.6 }
+                                NumberAnimation { property: "lift"; to: 0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 2.6 }
                             }
                         }
                     }
@@ -452,6 +468,9 @@ Scope {
                     displaced: Transition {
                         NumberAnimation { properties: "x,y"; duration: Theme.anim; easing.type: Easing.OutCubic }
                         NumberAnimation { property: "opacity"; to: 1; duration: Theme.anim }
+                        // An interrupted pop must still settle
+                        NumberAnimation { property: "scale"; to: 1; duration: Theme.anim; easing.type: Easing.OutCubic }
+                        NumberAnimation { property: "lift"; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
                     }
                 }
             }
