@@ -10,8 +10,7 @@ import qs.services
 PanelWindow {
     id: root
 
-    property bool enabled: true
-    readonly property bool active: enabled && Lyrics.lines.length > 0
+    readonly property bool active: MusicFx.lyrics && Lyrics.lines.length > 0
     readonly property int moveDuration: 600
     readonly property int growDuration: 450
 
@@ -116,7 +115,7 @@ PanelWindow {
         target: "lyrics"
 
         function toggle(): void {
-            root.enabled = !root.enabled;
+            MusicFx.lyrics = !MusicFx.lyrics;
         }
     }
 }

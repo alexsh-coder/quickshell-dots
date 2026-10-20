@@ -2,6 +2,7 @@ import Quickshell
 import qs.modules.bar
 import qs.modules.launcher
 import qs.modules.lyrics
+import qs.modules.musicfx
 import qs.modules.osd
 import qs.modules.wallpaper
 
@@ -12,6 +13,18 @@ ShellRoot {
         Bar {
             required property var modelData
             screen: modelData
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+
+        Scope {
+            id: desk
+            required property var modelData
+
+            WallpaperFx { screen: desk.modelData }
+            DesktopVisualizer { screen: desk.modelData }
         }
     }
 
