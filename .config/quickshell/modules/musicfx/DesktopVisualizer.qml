@@ -42,8 +42,11 @@ PanelWindow {
     function spline(levels, m) {
         const i = Math.floor(m), f = m - i;
         const last = levels.length - 1;
-        const at = j => levels[Math.abs(Math.min(j, last))] ?? 0;
-        const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+        if (last < 0)
+            return 0;
+        // Reflect below 0 and clamp past the end; no closures, this runs thousands of times a frame
+        const p0 = levels[Math.abs(Math.min(i - 1, last))], p1 = levels[Math.min(i, last)];
+        const p2 = levels[Math.min(i + 1, last)], p3 = levels[Math.min(i + 2, last)];
         const v = 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (3 * p1 - p0 - 3 * p2 + p3) * f * f * f);
         return Math.max(0, Math.min(1, v));
     }
@@ -79,10 +82,16 @@ PanelWindow {
             shadowScale: 1.02
         }
 
-        Loader {
-            anchors.fill: parent
-            active: root.visible
-            sourceComponent: ({ bars: bars, wave: wave, mirror: mirror, ring: ring, nation: nation, flow: flow })[MusicFx.style] ?? bars
+        // Extra layers first so they sit behind the main style
+        Repeater {
+            model: root.visible ? MusicFx.layers.filter(l => l !== MusicFx.style).concat([MusicFx.style]) : []
+
+            Loader {
+                required property string modelData
+
+                anchors.fill: parent
+                sourceComponent: ({ bars: bars, wave: wave, mirror: mirror, ring: ring, nation: nation, flow: flow })[modelData] ?? null
+            }
         }
     }
 
@@ -257,35 +266,47 @@ PanelWindow {
 
             readonly property int layers: 6
             readonly property int lag: 2
-            readonly property int res: 180
+            readonly property int res: 120
             // Mostly the low and mid bands, the top end is too quiet to shape the ring
             readonly property real span: (root.n - 1) * 0.75
-            readonly property real pulse: 1 + Cava.bass * 0.08
+            // Swells with the bass and punches out on kicks
+            readonly property real pulse: 1 + Cava.bass * 0.1 + Cava.kick * 0.08
             readonly property real radius: root.h * 0.13 * pulse
-            readonly property real amp: root.h * 0.09
+            readonly property real amp: root.h * 0.12
             readonly property var player: Lyrics.player
 
             property var levels: []
             property var history: []
             property var paths: []
 
-            // Every layer has the same amplitude; they only differ by delay plus a hairline offset,
-            // so colour shows just where the shape is moving
-            function ringPath(lv, depth) {
-                const cx = root.w / 2, cy = root.h / 2;
-                const pts = [];
+            // Ring geometry lives in a box around the centre, so the MSAA layer stays small
+            readonly property real box: (root.h * 0.13 * 1.18 + amp + layers * 1.5) * 2 + 8
+            // Static angle table: sin, cos and which band each sample reads
+            readonly property var table: {
+                const rows = [];
                 for (let i = 0; i <= res; i++) {
                     const a = i / res * Math.PI * 2;
                     // 0 at the top, 1 at the bottom, mirrored left/right
-                    const m = 1 - Math.abs(i / res * 2 - 1);
-                    const r = radius + root.spline(lv, m * span) * amp + depth * 1.5;
-                    pts.push(Qt.point(cx + Math.sin(a) * r, cy - Math.cos(a) * r));
+                    rows.push({ s: Math.sin(a), c: Math.cos(a), m: (1 - Math.abs(i / res * 2 - 1)) * span });
+                }
+                return rows;
+            }
+
+            // Every layer has the same amplitude; they only differ by delay plus a hairline offset,
+            // so colour shows just where the shape is moving
+            function ringPath(lv, depth) {
+                const c = box / 2, base = radius + depth * 1.5, a = amp;
+                const pts = [];
+                for (const r of table) {
+                    const rad = base + root.spline(lv, r.m) * a;
+                    pts.push(Qt.point(c + r.s * rad, c - r.c * rad));
                 }
                 return pts;
             }
 
             function rebuild() {
-                levels = root.smoothed(levels, 0.4);
+                // Smooth shape, but little easing over time so the ring moves snappily
+                levels = root.smoothed(levels, 0.15);
                 const h = [levels].concat(history).slice(0, layers * lag);
                 history = h;
                 const out = [];
@@ -301,26 +322,37 @@ PanelWindow {
                 function onValuesChanged() { rings.rebuild(); }
             }
 
-            // Back to front: the most delayed, widest layer is drawn first
-            Repeater {
-                model: rings.layers
+            Item {
+                anchors.centerIn: parent
+                width: rings.box
+                height: rings.box
+                layer.enabled: true
+                layer.samples: 4
 
+                // One shape for all layers, triangulated off the GUI thread.
+                // Back to front: the most delayed, widest layer is drawn first.
                 Shape {
-                    required property int index
-                    readonly property int depth: rings.layers - 1 - index
-
                     anchors.fill: parent
-                    preferredRendererType: Shape.CurveRenderer
-                    opacity: depth === 0 ? 1 : 0.95 - depth * 0.08
+                    preferredRendererType: Shape.GeometryRenderer
+                    asynchronous: true
 
-                    ShapePath {
-                        strokeWidth: -1
-                        // Hues fan out from the accent, the classic rainbow stack kept in the house colour family
-                        fillColor: depth === 0 ? Theme.text
-                            : Qt.hsla((Theme.accent.hslHue + depth * 0.06) % 1, Math.max(0.7, Theme.accent.hslSaturation), 0.62, 1)
-                        PathPolyline { path: rings.paths[depth] ?? [] }
-                    }
+                    Ring { depth: 5 }
+                    Ring { depth: 4 }
+                    Ring { depth: 3 }
+                    Ring { depth: 2 }
+                    Ring { depth: 1 }
+                    Ring { depth: 0 }
                 }
+            }
+
+            component Ring: ShapePath {
+                required property int depth
+
+                strokeWidth: -1
+                // Hues fan out from the accent, the classic rainbow stack kept in the house colour family
+                fillColor: depth === 0 ? Theme.text
+                    : Qt.hsla((Theme.accent.hslHue + depth * 0.06) % 1, Math.max(0.7, Theme.accent.hslSaturation), 0.62, 0.95 - depth * 0.08)
+                PathPolyline { path: rings.paths[depth] ?? [] }
             }
 
             // Cover art, or an accent disc when the player has none
@@ -361,7 +393,7 @@ PanelWindow {
             id: ribbons
 
             readonly property int count: 4
-            readonly property int res: 320
+            readonly property int res: 120
             // Frames the waveform takes to cross the whole ribbon
             readonly property int travel: 30
             readonly property real span: (root.n - 1) * 0.6
@@ -427,14 +459,18 @@ PanelWindow {
                 return pts;
             }
 
-            // History value at fractional frame f, Catmull-Rom between frames: smooth without
-            // averaging neighbours, which would smear the pulses out
-            function envAt(h, i, f) {
-                const at = j => h[Math.max(0, Math.min(h.length - 1, j))]?.[i] ?? 0;
-                const k = Math.floor(f), t = f - k;
-                const p0 = at(k - 1), p1 = at(k), p2 = at(k + 1), p3 = at(k + 2);
-                const v = 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
-                return Math.max(0, v);
+            // Static per-sample geometry: screen y, perspective scale, and where each sample reads
+            // the history, so the per-frame loop is plain arithmetic
+            readonly property var table: {
+                const rows = [];
+                for (let j = 0; j <= res; j++) {
+                    const u = j / res;
+                    const [y, z] = along(u);
+                    const f = u * (travel - 1);
+                    const k = Math.floor(f);
+                    rows.push({ sy: (horizon - y / z) * root.h, scale: root.h / z, k: k, t: f - k });
+                }
+                return rows;
             }
 
             function rebuild() {
@@ -463,18 +499,24 @@ PanelWindow {
                 pulses = hp;
 
                 const out = [];
-                for (let i = 0; i < count; i++) {
+                const rows = table, n = count, last = hb.length - 1, cx = root.w / 2;
+                const hw = halfWidth * 0.92;
+                for (let i = 0; i < n; i++) {
+                    // Body and pulse summed per frame first: the spline is linear, so this is the same curve
+                    const col = [];
+                    for (let k = 0; k <= last; k++)
+                        col.push(hb[k][i] + hp[k][i]);
                     const x0 = xOf(i);
                     const left = [], right = [];
-                    for (let j = 0; j <= res; j++) {
-                        const u = j / res;
-                        const f = u * (travel - 1);
+                    for (const r of rows) {
+                        const k = r.k, t = r.t;
+                        const p0 = col[k > 0 ? k - 1 : 0], p1 = col[k < last ? k : last];
+                        const p2 = col[k + 1 < last ? k + 1 : last], p3 = col[k + 2 < last ? k + 2 : last];
+                        const v = 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
                         // Soft saturation instead of a hard clamp, so strong pulses stay round instead of flat-sided
-                        const env = Math.tanh((envAt(hb, i, f) + envAt(hp, i, f)) * 1.3);
-                        const half = (0.04 + env * 0.96) * halfWidth * 0.92;
-                        const [y, z] = along(u);
-                        left.push(project(x0 - half, y, z));
-                        right.push(project(x0 + half, y, z));
+                        const half = (0.04 + Math.tanh(Math.max(0, v) * 1.3) * 0.96) * hw;
+                        left.push(Qt.point(cx + (x0 - half) * r.scale, r.sy));
+                        right.push(Qt.point(cx + (x0 + half) * r.scale, r.sy));
                     }
                     out.push(left.concat(right.reverse()));
                 }
@@ -490,6 +532,7 @@ PanelWindow {
 
             // Neon bloom, always on for this style
             layer.enabled: true
+            layer.samples: 4
             layer.effect: MultiEffect {
                 shadowEnabled: true
                 shadowColor: Theme.accent
@@ -506,7 +549,9 @@ PanelWindow {
                     readonly property var edge: ribbons.edges[index]
 
                     anchors.fill: parent
-                    preferredRendererType: Shape.CurveRenderer
+                    // Paths change every frame: triangulate off the GUI thread; the bloom layer's MSAA smooths edges
+                    preferredRendererType: Shape.GeometryRenderer
+                    asynchronous: true
 
                     // The ribbon itself: a faint band, faded in from the top
                     ShapePath {

@@ -18,6 +18,8 @@ Singleton {
     property alias zoom: adapter.zoom
     property alias shake: adapter.shake
     property alias blur: adapter.blur
+    // Extra styles drawn behind the main one
+    property alias layers: adapter.layers
 
     readonly property bool wallpaperFx: zoom || shake || glow || blur
 
@@ -30,6 +32,10 @@ Singleton {
         const g = Object.assign({}, adapter.gains);
         g[key] = Math.round(Math.max(0.1, Math.min(2, v)) * 20) / 20;
         adapter.gains = g;
+    }
+
+    function toggleLayer(name) {
+        adapter.layers = layers.includes(name) ? layers.filter(l => l !== name) : layers.concat([name]);
     }
 
     function setIntensity(v) {
@@ -57,6 +63,7 @@ Singleton {
             property bool shake: false
             property bool blur: false
             property var gains: ({})
+            property list<string> layers: []
         }
     }
 
@@ -70,6 +77,10 @@ Singleton {
         function style(name: string): void {
             if (root.styles.includes(name))
                 adapter.style = name;
+        }
+        function layer(name: string): void {
+            if (root.styles.includes(name))
+                root.toggleLayer(name);
         }
         function intensity(value: real): void {
             root.setIntensity(value);

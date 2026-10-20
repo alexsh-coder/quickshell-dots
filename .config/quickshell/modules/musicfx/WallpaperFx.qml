@@ -5,7 +5,7 @@ import Quickshell.Wayland
 import qs.config
 import qs.services
 
-// Music-reactive copy of the wallpaper on top of awww: zoom and blur on the bass, shake on kicks,
+// Music-reactive copy of the wallpaper on top of awww: zoom on the bass, blur and shake on kicks,
 // accent glow from the bottom edge. Only mapped while music plays, so awww shows through otherwise.
 PanelWindow {
     id: root
@@ -82,7 +82,8 @@ PanelWindow {
                 autoPaddingEnabled: false
                 blurEnabled: true
                 blurMax: 48
-                blur: Math.min(1, Cava.bass * 0.4 * MusicFx.gain("blur"))
+                // Kicks, not loudness: a song that stays loud shouldn't keep the wallpaper blurred
+                blur: Math.min(1, Cava.kick * 0.8 * MusicFx.gain("blur"))
             }
 
             // Overscan just enough to hide the edges while shaking

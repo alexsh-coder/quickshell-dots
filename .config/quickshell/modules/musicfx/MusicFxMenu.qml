@@ -169,11 +169,14 @@ PopupWindow {
 
                             required property string modelData
                             readonly property bool selected: MusicFx.desktop && MusicFx.style === modelData
+                            readonly property bool layered: MusicFx.desktop && !selected && MusicFx.layers.includes(modelData)
 
                             width: (parent.width - 12) / 3
                             height: 52
                             radius: Theme.radius
-                            color: selected ? Theme.accent : chipMouse.containsMouse ? Theme.muted : Theme.surface
+                            color: selected ? Theme.accent : layered ? Qt.alpha(Theme.accent, 0.16) : chipMouse.containsMouse ? Theme.muted : Theme.surface
+                            border.width: 1
+                            border.color: layered ? Qt.alpha(Theme.accent, 0.6) : "transparent"
                             Behavior on color { ColorAnimation { duration: Theme.anim } }
 
                             Column {
@@ -184,8 +187,8 @@ PopupWindow {
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     text: root.styleIcons[chip.modelData]
                                     font.pixelSize: 20
-                                    fill: chip.selected ? 1 : 0
-                                    color: chip.selected ? Theme.bg : Theme.text
+                                    fill: chip.selected || chip.layered ? 1 : 0
+                                    color: chip.selected ? Theme.bg : chip.layered ? Theme.accent : Theme.text
                                 }
                                 Label {
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -201,13 +204,15 @@ PopupWindow {
                                 hoverEnabled: true
                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 cursorShape: Qt.PointingHandCursor
-                                // Picking a style also turns the visualizer on
+                                // Left picks the main style, right adds or removes it as a layer behind it.
+                                // Either turns the visualizer on.
                                 onClicked: mouse => {
                                     if (mouse.button === Qt.RightButton) {
-                                        root.edit("desktop");
-                                        return;
+                                        if (!chip.selected)
+                                            MusicFx.toggleLayer(chip.modelData);
+                                    } else {
+                                        MusicFx.style = chip.modelData;
                                     }
-                                    MusicFx.style = chip.modelData;
                                     MusicFx.desktop = true;
                                 }
                             }
