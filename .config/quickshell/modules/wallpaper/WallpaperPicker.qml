@@ -74,6 +74,36 @@ Scope {
             strip.currentIndex = Math.max(0, Math.min(n - 1, strip.currentIndex + by));
     }
 
+    function randomOffset() {
+        return 1 + Math.floor(Math.random() * (n - 1));
+    }
+
+    // Moves to a random other image the short way round, like a normal step
+    function pickRandom() {
+        if (n < 2)
+            return;
+        const cur = strip.currentIndex % n;
+        const target = (cur + randomOffset()) % n;
+        if (!loop) {
+            strip.currentIndex = target;
+            return;
+        }
+        let d = target - cur;
+        if (d > n / 2)
+            d -= n;
+        else if (d < -n / 2)
+            d += n;
+        strip.currentIndex += d;
+    }
+
+    function applyRandom() {
+        if (n === 0)
+            return;
+        const cur = files.indexOf("file://" + Wallpaper.current);
+        const i = cur < 0 || n < 2 ? Math.floor(Math.random() * n) : (cur + randomOffset()) % n;
+        Wallpaper.set(files.get(i, "filePath"));
+    }
+
     function switchTag(by) {
         if (tags.count < 2)
             return;
@@ -141,6 +171,8 @@ Scope {
 
         function open(): void { root.show(); }
         function close(): void { root.hide(); }
+        // Picks from the tag last shown in the picker, so it never wanders into another folder
+        function random(): void { root.applyRandom(); }
     }
 
     PanelWindow {
@@ -168,6 +200,12 @@ Scope {
             id: keys
             focus: true
             Keys.onPressed: event => {
+                // R on any layout (RU "К" is a different key, same scancode)
+                if (event.key === Qt.Key_R || event.nativeScanCode === 27) {
+                    root.pickRandom();
+                    event.accepted = true;
+                    return;
+                }
                 switch (event.key) {
                 case Qt.Key_Escape:
                     root.hide();
