@@ -2,9 +2,10 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import qs.services
 
 Singleton {
-    readonly property color accent: "#33ccff"
+    readonly property color accent: Accent.color
     readonly property color bg: "#0d1117"
     readonly property color surface: "#161c24"
     readonly property color text: "#e6edf3"

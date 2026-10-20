@@ -63,9 +63,9 @@ PanelWindow {
         layer.effect: MultiEffect {
             shadowEnabled: true
             shadowColor: "#000000"
-            shadowOpacity: 0.6
-            shadowBlur: 0.6
-            shadowVerticalOffset: 2
+            // Dense halo instead of a drop shadow, so light text holds up on light wallpapers
+            shadowOpacity: 0.85
+            shadowBlur: 0.45
         }
 
         delegate: Text {
@@ -82,7 +82,10 @@ PanelWindow {
             font.pixelSize: 22
             font.weight: Font.Bold
             color: dist === 0 ? Theme.accent : Theme.text
-            opacity: dist === 0 ? 1 : dist === 1 ? 0.45 : 0
+            // Subtitle-style crisp edge under the halo
+            style: Text.Outline
+            styleColor: Qt.alpha("#000000", 0.7)
+            opacity: dist === 0 ? 1 : dist === 1 ? 0.6 : 0
             scale: dist === 0 ? 1 : 0.75
 
             Behavior on scale {
