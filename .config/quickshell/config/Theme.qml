@@ -8,12 +8,16 @@ Singleton {
     readonly property color accent: Accent.color
     readonly property color secondary: Accent.secondary
     readonly property color tertiary: Accent.tertiary
-    readonly property color bg: "#0d1117"
-    readonly property color surface: "#161c24"
-    readonly property color text: "#e6edf3"
-    readonly property color subtext: "#8b949e"
-    readonly property color muted: "#30363d"
-    readonly property color urgent: "#ff6b81"
+    // Dark is GitHub Dark-based, light follows GitHub Primer light
+    readonly property bool light: Scheme.light
+    readonly property color bg: Scheme.pick("#ffffff", "#0d1117")
+    readonly property color surface: Scheme.pick("#f6f8fa", "#161c24")
+    readonly property color text: Scheme.pick("#1f2328", "#e6edf3")
+    readonly property color subtext: Scheme.pick("#59636e", "#8b949e")
+    readonly property color muted: Scheme.pick("#d1d9e0", "#30363d")
+    readonly property color urgent: Scheme.pick("#cf222e", "#ff6b81")
+    // Halo behind text drawn straight on the wallpaper
+    readonly property color halo: Scheme.pick("#ffffff", "#000000")
 
     readonly property string font: "Maple Mono"
     readonly property string nerdFont: "CaskaydiaCove Nerd Font"

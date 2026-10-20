@@ -61,8 +61,8 @@ PanelWindow {
         layer.enabled: true
         layer.effect: MultiEffect {
             shadowEnabled: true
-            shadowColor: "#000000"
-            // Dense halo instead of a drop shadow, so light text holds up on light wallpapers
+            shadowColor: Theme.halo
+            // Dense halo instead of a drop shadow, so the text holds up on any wallpaper
             shadowOpacity: 0.85
             shadowBlur: 0.45
         }
@@ -83,7 +83,7 @@ PanelWindow {
             color: dist === 0 ? Theme.accent : Theme.text
             // Subtitle-style crisp edge under the halo
             style: Text.Outline
-            styleColor: Qt.alpha("#000000", 0.7)
+            styleColor: Qt.alpha(Theme.halo, 0.7)
             opacity: dist === 0 ? 1 : dist === 1 ? 0.6 : 0
             scale: dist === 0 ? 1 : 0.75
 

@@ -12,18 +12,21 @@ Singleton {
 
     readonly property color fallback: "#33ccff"
     readonly property real targetL: 0.79
+    // Light scheme: dark enough for 4.5:1 on white across hues
+    readonly property real lightL: 0.55
     readonly property real minC: 0.12
     readonly property real maxC: 0.17
     // Source colors below this chroma don't count as a hue
     readonly property real grayC: 0.035
 
-    readonly property color color: mix(from, to, progress)
+    readonly property color base: mix(from, to, progress)
+    readonly property color color: Scheme.dark >= 1 ? base : role(lightL + (targetL - lightL) * Scheme.dark, 1, 0)
     // M3-style roles: secondary is a muted accent, tertiary sits 60° away in hue
-    readonly property color secondary: role(0.84, 0.05, 0)
-    readonly property color tertiary: role(0.82, 0.1, 60)
+    readonly property color secondary: role(0.5 + 0.34 * Scheme.dark, 0.05, 0)
+    readonly property color tertiary: role(0.52 + 0.3 * Scheme.dark, 0.1, 60)
 
     function role(L, C, shift) {
-        const [l, c, h] = toOklch(color);
+        const [l, c, h] = toOklch(base);
         return fromOklch(L, Math.min(C, c), (h + shift) % 360);
     }
 
@@ -46,7 +49,7 @@ Singleton {
     function fade(next) {
         if (Qt.colorEqual(next, to))
             return;
-        from = color;
+        from = base;
         to = next;
         progress = 0;
         anim.restart();
