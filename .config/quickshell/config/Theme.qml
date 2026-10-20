@@ -16,6 +16,8 @@ Singleton {
     readonly property string nerdFont: "CaskaydiaCove Nerd Font"
     readonly property string iconFont: "Material Symbols Rounded"
 
+    readonly property string terminal: "kitty"
+
     readonly property int barHeight: 42
     readonly property int radius: 12
     readonly property int anim: 220
