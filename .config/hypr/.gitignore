@@ -1,0 +1,5 @@
+# Per-machine and generated files
+hardware.lua
+hyprland-gui.lua
+colors.lua
+cursor.lua

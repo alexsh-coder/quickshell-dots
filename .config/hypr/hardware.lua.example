@@ -1,0 +1,26 @@
+-- Per-machine hardware settings, not tracked in git.
+-- Copy this file to hardware.lua and adjust values for your machine:
+--   cp hardware.lua.example hardware.lua
+-- Every field is optional.
+return {
+    -- Hyprland monitor scale factor. 1 for a standard-DPI desktop monitor,
+    -- ~1.2-1.5 for a high-PPI laptop panel or a 4K screen.
+    monitor_scale = 1,
+
+    -- Mouse: -1.0..1.0, and "" (libinput default), "flat" or "adaptive".
+    -- mouse_sensitivity   = 0,
+    -- mouse_accel_profile = "flat",
+
+    -- OSD pill height above the bottom screen edge, px (default 56).
+    -- Try values live with: ~/.config/hypr/scripts/osd.py margin 80
+    -- osd_margin = 56,
+
+    -- Extra environment variables, e.g. for an NVIDIA GPU:
+    -- env = {
+    --     LIBVA_DRIVER_NAME         = "nvidia",
+    --     __GLX_VENDOR_LIBRARY_NAME = "nvidia",
+    -- },
+
+    -- Extra commands run once at Hyprland start.
+    -- autostart = { "systemctl --user start wayvnc" },
+}
