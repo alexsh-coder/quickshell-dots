@@ -16,6 +16,11 @@ Singleton {
     readonly property color subtext: Scheme.pick("#59636e", "#8b949e")
     readonly property color muted: Scheme.pick("#d1d9e0", "#30363d")
     readonly property color urgent: Scheme.pick("#cf222e", "#ff6b81")
+    // Bar's left pill: M3-style neutrals carrying the accent hue,
+    // with the accent held to the chroma of soft anime/pastel wallpapers
+    readonly property color tintAccent: Scheme.pick(Accent.role(0.63, 0.14, 0, 0.14), Accent.color)
+    readonly property color tintSubtext: Scheme.pick(Accent.role(0.71, 0.06, 0, 0.06), Accent.role(0.6, 0.045, 0, 0.045))
+    readonly property color tintMuted: Scheme.pick(Accent.role(0.875, 0.035, 0, 0.035), Accent.role(0.36, 0.03, 0, 0.03))
     // Halo behind text drawn straight on the wallpaper
     readonly property color halo: Scheme.pick("#ffffff", "#000000")
 

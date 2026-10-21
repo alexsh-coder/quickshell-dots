@@ -69,9 +69,9 @@ Item {
                     radius: root.dotSize / 2
                     scale: slot.active ? 1 : 10 / 15
                     color: slot.ws?.urgent ? Theme.urgent
-                         : slot.active ? Theme.accent
-                         : slot.occupied ? Theme.subtext
-                         : Theme.muted
+                         : slot.active ? Theme.tintAccent
+                         : slot.occupied ? Theme.tintSubtext
+                         : Theme.tintMuted
 
                     Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
                     Behavior on color { ColorAnimation { duration: Theme.anim } }

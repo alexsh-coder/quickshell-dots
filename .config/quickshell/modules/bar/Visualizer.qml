@@ -42,7 +42,7 @@ Item {
                     width: root.barWidth
                     height: Math.max(root.barWidth, root.values[index] * root.implicitHeight)
                     radius: root.barWidth / 2
-                    color: Theme.accent
+                    color: Theme.tintAccent
 
                     Behavior on height { NumberAnimation { duration: 50 } }
                 }
@@ -52,7 +52,7 @@ Item {
         layer.enabled: MusicFx.glow && Cava.active
         layer.effect: MultiEffect {
             shadowEnabled: true
-            shadowColor: Theme.accent
+            shadowColor: Theme.tintAccent
             shadowBlur: 0.6
             shadowOpacity: Math.min(1, (0.4 + Cava.level * 0.6) * MusicFx.gain("glow"))
         }
