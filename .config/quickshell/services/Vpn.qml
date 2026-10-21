@@ -26,6 +26,12 @@ Singleton {
     readonly property string flagDir: Quickshell.cachePath("flags")
     property int flagsGen: 0
     readonly property string current: selected === "auto" ? autoPick : selected
+    // Subscriptions live in root-owned storage managed by the `vpn sub` command
+    property var subs: []
+    property string activeSub: ""
+    property string subError: ""
+    readonly property bool subBusy: subJob.running
+    readonly property var subNow: subs.find(x => x.id === activeSub) ?? null
 
     // "🇳🇱Нидерланды CDN" -> { flag: "🇳🇱", code: "NL", name: "Нидерланды CDN" }
     function split(tag) {
@@ -50,6 +56,23 @@ Singleton {
         refreshSoon.restart();
     }
 
+    function loadSubs() {
+        if (!subList.running)
+            subList.running = true;
+    }
+
+    function subRun(...args) {
+        if (subJob.running)
+            return;
+        subError = "";
+        subJob.command = ["sudo", "-n", "vpn", "sub", ...args];
+        subJob.running = true;
+    }
+
+    function subAdd(url) { subRun("add", url.trim()); }
+    function subUse(id) { subRun("use", id); }
+    function subRemove(id) { subRun("rm", id); }
+
     function test() {
         if (on && !tester.running)
             tester.running = true;
@@ -68,6 +91,44 @@ Singleton {
             refreshSoon.restart();
             root.test();
         }
+    }
+
+    Component.onCompleted: loadSubs()
+
+    Process {
+        id: subList
+        command: ["sudo", "-n", "vpn", "sub", "list", "--json"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const db = JSON.parse(text);
+                    root.subs = db.subs;
+                    root.activeSub = db.active ?? "";
+                } catch (e) {}
+            }
+        }
+    }
+
+    Process {
+        id: subJob
+        stdout: StdioCollector {}
+        stderr: StdioCollector {}
+        onExited: code => {
+            if (code !== 0) {
+                const lines = stderr.text.trim().split("\n");
+                root.subError = lines[lines.length - 1] || "failed";
+            }
+            root.loadSubs();
+            refreshSoon.restart();
+            // The new server list needs a moment to come up
+            testSoonTimer.restart();
+        }
+    }
+
+    Timer {
+        id: testSoonTimer
+        interval: 2500
+        onTriggered: root.test()
     }
 
     function flag(code) {
