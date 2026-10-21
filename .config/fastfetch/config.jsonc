@@ -5,13 +5,13 @@
   },
   "display": {
     "separator": "  ",
-    "color": { "keys": "#33ccff", "title": "#33ccff" },
+    "color": { "keys": "blue", "title": "blue" },
     "key": { "width": 10 },
     "bar": {
       "char": { "elapsed": "▰", "total": "▱" },
       "border": { "left": "", "right": "" },
       "width": 8,
-      "color": { "elapsed": "#33ccff", "total": "90" }
+      "color": { "elapsed": "blue", "total": "90" }
     },
     "percent": { "type": ["bar", "num"] }
   },
