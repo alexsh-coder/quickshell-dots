@@ -286,6 +286,8 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 24
 
+                Recording {}
+
                 Row {
                     id: status
                     anchors.verticalCenter: parent.verticalCenter
