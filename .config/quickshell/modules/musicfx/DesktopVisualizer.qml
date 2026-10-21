@@ -500,16 +500,103 @@ PanelWindow {
                     radius: width / 2
                     color: Theme.surface
 
-                    Image {
+                    // Two slots: the new cover fades in over the old one, which only drops once covered.
+                    // While the art is still downloading the url is empty, so the old cover is held
+                    Item {
+                        id: cover
+
+                        readonly property string raw: rings.player?.trackArtUrl ?? ""
+                        readonly property string url: Art.local(raw)
+                        property Image front: picA
+                        property Image prev: null
+
+                        function fadeTo(pic, value) {
+                            if (pic === front && fade.running && fade.to === value)
+                                return;
+                            settle();
+                            if (pic !== front) {
+                                pic.opacity = 0;
+                                pic.z = 1;
+                                front.z = 0;
+                                prev = front;
+                                front = pic;
+                            }
+                            fade.target = pic;
+                            fade.to = value;
+                            fade.start();
+                        }
+
+                        // Finish a running fade at once, before its slots get reused
+                        function settle() {
+                            if (!fade.running)
+                                return;
+                            fade.stop();
+                            fade.target.opacity = fade.to;
+                            dropPrev();
+                        }
+
+                        function dropPrev() {
+                            if (prev)
+                                prev.opacity = 0;
+                            prev = null;
+                        }
+
+                        function loaded(pic) {
+                            if (pic.status === Image.Ready && pic !== front && pic.source.toString() === url)
+                                fadeTo(pic, 1);
+                        }
+
+                        function load() {
+                            if (!raw)
+                                return fadeTo(front, 0);
+                            if (!url)
+                                return;
+                            if (front.source.toString() === url && front.status === Image.Ready)
+                                return fadeTo(front, 1);
+                            const back = front === picA ? picB : picA;
+                            if (back.source.toString() === url && back.status === Image.Ready)
+                                fadeTo(back, 1);
+                            else {
+                                if (back === prev)
+                                    settle();
+                                back.source = url;
+                            }
+                        }
+
                         anchors.fill: parent
-                        source: Art.local(rings.player?.trackArtUrl ?? "")
-                        fillMode: Image.PreserveAspectCrop
-                        sourceSize: Qt.size(512, 512)
-                        asynchronous: true
+                        onRawChanged: Qt.callLater(load)
+                        onUrlChanged: Qt.callLater(load)
+                        Component.onCompleted: load()
+
+                        NumberAnimation {
+                            id: fade
+                            property: "opacity"
+                            duration: 500
+                            easing.type: Easing.InOutQuad
+                            onFinished: cover.dropPrev()
+                        }
+
+                        CoverPic {
+                            id: picA
+                            onStatusChanged: cover.loaded(picA)
+                        }
+
+                        CoverPic {
+                            id: picB
+                            onStatusChanged: cover.loaded(picB)
+                        }
                     }
                 }
             }
         }
+    }
+
+    component CoverPic: Image {
+        anchors.fill: parent
+        opacity: 0
+        fillMode: Image.PreserveAspectCrop
+        sourceSize: Qt.size(512, 512)
+        asynchronous: true
     }
 
     // Recent per-column values as a ring-buffer texture for the shader styles: one row per frame,
