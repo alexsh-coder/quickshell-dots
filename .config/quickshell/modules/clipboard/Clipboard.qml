@@ -53,10 +53,18 @@ Scope {
         return mouseActive;
     }
 
-    function copy(entry) {
+    function copy(entry, paste) {
         if (!entry)
             return;
-        Quickshell.execDetached(["sh", "-c", "printf '%s\\t\\n' \"$1\" | cliphist decode | wl-copy", "sh", entry.id]);
+        const pasteCmd = `win=$(hyprctl activewindow -j)
+            sleep 0.2
+            case $(echo "$win" | jq -r .class) in
+                kitty|foot|Alacritty|com.mitchellh.ghostty|org.wezfurlong.wezterm|org.kde.konsole) mods="CTRL SHIFT" ;;
+                *) mods=CTRL ;;
+            esac
+            addr=$(echo "$win" | jq -r .address)
+            hyprctl dispatch 'hl.dsp.send_shortcut({mods="'"$mods"'", key="code:55", window="address:'"$addr"'"})' >/dev/null 2>&1`;
+        Quickshell.execDetached(["sh", "-c", "printf '%s\\t\\n' \"$1\" | cliphist decode | wl-copy" + (paste ? "\n" + pasteCmd : ""), "sh", entry.id]);
         hide();
     }
 
@@ -76,7 +84,7 @@ Scope {
         if (event.key === Qt.Key_Escape)
             hide();
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-            copy(resultsView.currentItem?.modelData ?? null);
+            copy(resultsView.currentItem?.modelData ?? null, !(event.modifiers & Qt.ControlModifier));
         else if (event.key === Qt.Key_Delete)
             remove(resultsView.currentItem?.modelData ?? null);
         else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab)
@@ -279,7 +287,7 @@ Scope {
                             if (event.button === Qt.RightButton)
                                 root.remove(modelData);
                             else
-                                root.copy(modelData);
+                                root.copy(modelData, true);
                         }
 
                         Item {
@@ -331,7 +339,7 @@ Scope {
                     font.pixelSize: 12
                     font.weight: Font.Normal
                     color: Theme.subtext
-                    text: "Enter copy · Del remove"
+                    text: "Enter paste · Ctrl+Enter copy · Del remove"
                 }
             }
         }
