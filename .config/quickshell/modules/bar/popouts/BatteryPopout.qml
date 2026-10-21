@@ -207,6 +207,84 @@ Item {
                 }
             }
         }
+
+        // Night light and caffeine
+        Rectangle {
+            width: parent.width
+            height: switches.implicitHeight + 8
+            radius: Theme.radius
+            color: Theme.surface
+
+            Column {
+                id: switches
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.leftMargin: 4
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+
+                Switch {
+                    icon: "bedtime"
+                    label: "Night mode"
+                    checked: NightMode.enabled
+                    onToggled: NightMode.toggle()
+                }
+                Switch {
+                    icon: "coffee"
+                    label: "Caffeine"
+                    checked: Caffeine.enabled
+                    onToggled: Caffeine.toggle()
+                }
+            }
+        }
+    }
+
+    component Switch: Item {
+        id: sw
+
+        property string icon
+        property string label
+        property bool checked
+        signal toggled
+
+        width: parent.width
+        height: 40
+
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: sw.toggled()
+        }
+
+        Row {
+            anchors.left: parent.left
+            anchors.leftMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 10
+
+            Icon {
+                anchors.verticalCenter: parent.verticalCenter
+                text: sw.icon
+                font.pixelSize: 18
+                fill: 0
+                color: sw.checked ? Theme.accent : Theme.subtext
+                Behavior on color { ColorAnimation { duration: Theme.anim } }
+            }
+
+            Label {
+                anchors.verticalCenter: parent.verticalCenter
+                text: sw.label
+                font.pixelSize: 13
+            }
+        }
+
+        Toggle {
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            checked: sw.checked
+            onToggled: sw.toggled()
+        }
     }
 
     component Stat: Column {

@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.config
+import qs.services
 import qs.modules.bar.popouts
 
 // Taller than the bar so popouts can grow out of it; input passes through
@@ -157,6 +158,12 @@ PanelWindow {
         windows: [root]
         active: popouts.pinned
         onCleared: popouts.close()
+    }
+
+    // Caffeine holds an idle inhibitor on the bar's always-visible surface
+    IdleInhibitor {
+        window: root
+        enabled: Caffeine.enabled
     }
 
     Item {

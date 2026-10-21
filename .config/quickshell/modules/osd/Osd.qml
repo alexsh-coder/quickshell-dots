@@ -161,6 +161,11 @@ Scope {
         function caps(): void {
             Keyboard.checkCaps();
         }
+
+        function night(state: string): void {
+            root.showText(state === "on" ? "bedtime" : "bedtime_off",
+                          state === "on" ? "Night mode on" : "Night mode off");
+        }
     }
 
     Timer {
