@@ -10,7 +10,26 @@ Item {
     required property Item popouts
     property bool here: false
 
-    onHereChanged: if (here) Vpn.test()
+    property bool managing: false
+
+    onHereChanged: {
+        if (here)
+            Vpn.test();
+        else
+            managing = false;
+    }
+    onManagingChanged: {
+        popouts.pinned = managing;
+        if (managing)
+            Vpn.loadSubs();
+    }
+    Connections {
+        target: root.popouts
+        function onPinnedChanged() {
+            if (!root.popouts.pinned)
+                root.managing = false;
+        }
+    }
 
     implicitWidth: 300
     implicitHeight: content.implicitHeight + Theme.padTop + Theme.pad
@@ -87,10 +106,158 @@ Item {
             }
         }
 
+        // Active subscription; opens the manager
+        Rectangle {
+            width: parent.width
+            height: 34
+            radius: Theme.radius - 2
+            visible: Vpn.subs.length > 0 || root.managing
+            color: root.managing ? Theme.surface : subMouse.containsMouse ? Theme.surface : Qt.alpha(Theme.surface, 0)
+            Behavior on color { ColorAnimation { duration: Theme.anim } }
+
+            Icon {
+                id: subIcon
+                x: 10
+                anchors.verticalCenter: parent.verticalCenter
+                text: "rss_feed"
+                font.pixelSize: 17
+                color: Theme.subtext
+            }
+
+            Label {
+                anchors.left: subIcon.right
+                anchors.leftMargin: 10
+                anchors.right: chevron.left
+                anchors.rightMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                text: Vpn.subNow?.name ?? "Subscriptions"
+                elide: Text.ElideRight
+                font.pixelSize: 13
+                color: Theme.subtext
+            }
+
+            Icon {
+                id: chevron
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                text: "expand_more"
+                font.pixelSize: 18
+                color: Theme.subtext
+                rotation: root.managing ? 180 : 0
+                Behavior on rotation { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+            }
+
+            MouseArea {
+                id: subMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.managing = !root.managing
+            }
+        }
+
         Column {
             width: parent.width
             spacing: 2
-            visible: Vpn.on && Vpn.servers.length > 0
+            visible: root.managing
+
+            Repeater {
+                model: Vpn.subs
+                delegate: SubRow {}
+            }
+
+            // Add field
+            Rectangle {
+                id: box
+
+                width: parent.width
+                height: 36
+                radius: Theme.radius - 2
+                color: Theme.surface
+                border.width: 1
+                border.color: Vpn.subError ? Theme.urgent : field.activeFocus ? Theme.accent : Theme.muted
+                Behavior on border.color { ColorAnimation { duration: Theme.anim } }
+
+                TextInput {
+                    id: field
+
+                    anchors.left: parent.left
+                    anchors.right: addButtons.left
+                    anchors.margins: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    font.family: Theme.font
+                    font.pixelSize: 13
+                    color: Theme.text
+                    selectionColor: Qt.alpha(Theme.accent, 0.4)
+                    clip: true
+                    enabled: root.managing
+
+                    onEnabledChanged: {
+                        text = "";
+                        if (enabled)
+                            forceActiveFocus();
+                    }
+                    onTextChanged: Vpn.subError = ""
+                    onAccepted: if (text.trim() !== "" && !Vpn.subBusy) Vpn.subAdd(text)
+                    Keys.onEscapePressed: root.managing = false
+
+                    Label {
+                        visible: !field.text
+                        text: "Subscription link"
+                        font.pixelSize: 13
+                        color: Theme.subtext
+                    }
+                }
+
+                Row {
+                    id: addButtons
+
+                    anchors.right: parent.right
+                    anchors.rightMargin: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 2
+
+                    RoundButton {
+                        icon: "content_paste"
+                        onClicked: {
+                            field.selectAll();
+                            field.paste();
+                            field.forceActiveFocus();
+                        }
+                    }
+
+                    RoundButton {
+                        icon: "arrow_forward"
+                        spinning: Vpn.subBusy
+                        onClicked: field.accepted()
+                    }
+                }
+            }
+
+            Label {
+                visible: Vpn.subError !== ""
+                width: parent.width
+                leftPadding: 4
+                text: Vpn.subError
+                wrapMode: Text.Wrap
+                font.pixelSize: 11
+                color: Theme.urgent
+            }
+
+            Connections {
+                target: Vpn
+                function onSubsChanged() {
+                    if (!Vpn.subError)
+                        field.text = "";
+                }
+            }
+        }
+
+        Column {
+            width: parent.width
+            spacing: 2
+            visible: Vpn.on && Vpn.servers.length > 0 && !root.managing
 
             Repeater {
                 model: Vpn.servers
@@ -220,18 +387,91 @@ Item {
         }
     }
 
+    component SubRow: Rectangle {
+        id: sub
+
+        required property var modelData
+        readonly property bool current: modelData.id === Vpn.activeSub
+        property bool confirming: false
+
+        width: parent.width
+        height: 40
+        radius: Theme.radius - 2
+        color: current ? Qt.alpha(Theme.accent, 0.12) : subHover.containsMouse ? Theme.surface : Qt.alpha(Theme.surface, 0)
+        Behavior on color { ColorAnimation { duration: Theme.anim } }
+
+        Timer {
+            id: confirmTimer
+            interval: 3000
+            onTriggered: sub.confirming = false
+        }
+
+        Column {
+            anchors.left: parent.left
+            anchors.leftMargin: 12
+            anchors.right: del.left
+            anchors.rightMargin: 8
+            anchors.verticalCenter: parent.verticalCenter
+
+            Label {
+                width: parent.width
+                text: sub.modelData.name
+                elide: Text.ElideRight
+                font.pixelSize: 13
+                color: sub.current ? Theme.text : Theme.subtext
+            }
+
+            Label {
+                width: parent.width
+                text: sub.confirming ? "Press again to delete" : sub.modelData.servers ? `${sub.modelData.servers} servers · ${sub.modelData.host}` : sub.modelData.host
+                elide: Text.ElideRight
+                font.pixelSize: 11
+                color: sub.confirming ? Theme.urgent : Theme.subtext
+            }
+        }
+
+        MouseArea {
+            id: subHover
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: del.left
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: if (!sub.current && !Vpn.subBusy) Vpn.subUse(sub.modelData.id)
+        }
+
+        RoundButton {
+            id: del
+            anchors.right: parent.right
+            anchors.rightMargin: 8
+            icon: "delete"
+            danger: sub.confirming
+            spinning: Vpn.subBusy && sub.confirming
+            onClicked: {
+                if (sub.confirming) {
+                    Vpn.subRemove(sub.modelData.id);
+                } else {
+                    sub.confirming = true;
+                    confirmTimer.restart();
+                }
+            }
+        }
+    }
+
     component RoundButton: Rectangle {
         id: btn
 
         property string icon
         property bool spinning: false
+        property bool danger: false
         signal clicked
 
         anchors.verticalCenter: parent.verticalCenter
         width: 26
         height: 26
         radius: 13
-        color: btnMouse.containsMouse ? Qt.alpha(Theme.text, 0.12) : Qt.alpha(Theme.text, 0)
+        color: danger ? Qt.alpha(Theme.urgent, 0.25) : btnMouse.containsMouse ? Qt.alpha(Theme.text, 0.12) : Qt.alpha(Theme.text, 0)
         Behavior on color { ColorAnimation { duration: Theme.anim } }
 
         Icon {
@@ -239,7 +479,7 @@ Item {
             anchors.centerIn: parent
             text: btn.icon
             font.pixelSize: 17
-            color: btn.spinning ? Theme.accent : Theme.subtext
+            color: btn.danger ? Theme.urgent : btn.spinning ? Theme.accent : Theme.subtext
 
             SequentialAnimation on opacity {
                 running: btn.spinning
