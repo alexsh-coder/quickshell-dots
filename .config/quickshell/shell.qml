@@ -1,5 +1,6 @@
 import Quickshell
 import qs.modules.bar
+import qs.modules.clipboard
 import qs.modules.launcher
 import qs.modules.lock
 import qs.modules.lyrics
@@ -7,6 +8,8 @@ import qs.modules.musicfx
 import qs.modules.notifications
 import qs.modules.osd
 import qs.modules.wallpaper
+
+// 
 
 ShellRoot {
     Variants {
@@ -37,6 +40,7 @@ ShellRoot {
     Notifications {}
     Osd {}
     Launcher {}
+    Clipboard {}
     Lock {}
     WallpaperPicker {}
 }
