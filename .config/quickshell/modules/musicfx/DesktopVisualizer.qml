@@ -502,7 +502,7 @@ PanelWindow {
 
                     Image {
                         anchors.fill: parent
-                        source: rings.player?.trackArtUrl ?? ""
+                        source: Art.local(rings.player?.trackArtUrl ?? "")
                         fillMode: Image.PreserveAspectCrop
                         sourceSize: Qt.size(512, 512)
                         asynchronous: true

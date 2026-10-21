@@ -120,7 +120,7 @@ Item {
                 id: blurCover
                 anchors.fill: parent
                 anchors.margins: -60
-                url: root.player?.trackArtUrl ?? ""
+                url: Art.local(root.player?.trackArtUrl ?? "")
                 size: 128
                 visible: false
             }
@@ -221,7 +221,7 @@ Item {
                     Cover {
                         id: cover
                         anchors.fill: parent
-                        url: root.player?.trackArtUrl ?? ""
+                        url: Art.local(root.player?.trackArtUrl ?? "")
                         size: 256
                     }
                 }
