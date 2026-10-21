@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Effects
 import Quickshell.Services.Mpris
+import Quickshell.Services.Pipewire
 import Quickshell.Widgets
 import qs.config
 import qs.components
@@ -55,7 +56,11 @@ Item {
     }
 
     onPlayerChanged: sync()
-    onHereChanged: sync()
+    onHereChanged: {
+        sync();
+        if (!here)
+            volume.open = false;
+    }
 
     readonly property bool keyboard: here && popouts.pinned
     onKeyboardChanged: if (keyboard) forceActiveFocus()
@@ -77,7 +82,7 @@ Item {
     Binding {
         target: root.popouts
         property: "busy"
-        value: seek.pressed || fxControls.busy
+        value: seek.pressed || volSlider.pressed || fxControls.busy
         when: root.here
     }
 
@@ -305,10 +310,10 @@ Item {
                             anchors.rightMargin: -6
                             anchors.verticalCenter: parent.verticalCenter
                             visible: SpotifyLike.known && root.player === SpotifyLike.player
-                            icon: "favorite"
+                            // nf-md heart / heart-outline: Material's filled heart rasterizes with holes
+                            nerd: SpotifyLike.liked ? "\u{f02d1}" : "\u{f02d5}"
                             iconSize: 20
                             diameter: 30
-                            fill: SpotifyLike.liked ? 1 : 0
                             active: SpotifyLike.liked
                             onClicked: SpotifyLike.toggle()
                         }
@@ -356,78 +361,197 @@ Item {
                 }
             }
 
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 14
+            Item {
+                width: parent.width
+                height: 52
 
-                CtrlButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    icon: "shuffle"
-                    active: root.player?.shuffle ?? false
-                    enabled: root.player?.shuffleSupported ?? false
-                    onClicked: root.player.shuffle = !root.player.shuffle
+                Row {
+                    anchors.centerIn: parent
+                    spacing: 14
+                    enabled: !volume.open
+                    opacity: volume.open ? 0 : 1
+                    Behavior on opacity { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+
+                    CtrlButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: "shuffle"
+                        active: root.player?.shuffle ?? false
+                        enabled: root.player?.shuffleSupported ?? false
+                        onClicked: root.player.shuffle = !root.player.shuffle
+                    }
+
+                    CtrlButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: "skip_previous"
+                        iconSize: 28
+                        plain: true
+                        enabled: root.player?.canGoPrevious ?? false
+                        onClicked: root.player.previous()
+                    }
+
+                    // Circle while paused, squircle while playing, as in M3 Expressive media controls
+                    Rectangle {
+                        id: play
+
+                        readonly property bool playing: root.player?.isPlaying ?? false
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 52
+                        height: 52
+                        radius: playing ? 16 : 26
+                        color: Theme.accent
+                        scale: playMouse.pressed ? 0.92 : playMouse.containsMouse ? 1.05 : 1
+
+                        Behavior on radius { NumberAnimation { duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
+                        Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+                        Icon {
+                            anchors.centerIn: parent
+                            text: play.playing ? "pause" : "play_arrow"
+                            font.pixelSize: 28
+                            color: Theme.bg
+                        }
+
+                        MouseArea {
+                            id: playMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: if (root.player?.canTogglePlaying) root.player.togglePlaying()
+                        }
+                    }
+
+                    CtrlButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: "skip_next"
+                        iconSize: 28
+                        plain: true
+                        enabled: root.player?.canGoNext ?? false
+                        onClicked: root.player.next()
+                    }
+
+                    CtrlButton {
+                        readonly property int loop: root.player?.loopState ?? MprisLoopState.None
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: loop === MprisLoopState.Track ? "repeat_one" : "repeat"
+                        active: loop !== MprisLoopState.None
+                        enabled: root.player?.loopSupported ?? false
+                        onClicked: root.player.loopState = loop === MprisLoopState.None ? MprisLoopState.Playlist
+                            : loop === MprisLoopState.Playlist ? MprisLoopState.Track
+                            : MprisLoopState.None
+                    }
                 }
 
-                CtrlButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    icon: "skip_previous"
-                    iconSize: 28
-                    plain: true
-                    enabled: root.player?.canGoPrevious ?? false
-                    onClicked: root.player.previous()
-                }
+                // Hovering the speaker slides a volume slider out over the transport controls
+                Item {
+                    id: volume
 
-                // Circle while paused, squircle while playing, as in M3 Expressive media controls
-                Rectangle {
-                    id: play
+                    // The player's own volume where it has one, the output's otherwise
+                    readonly property bool own: (root.player?.volumeSupported ?? false) && (root.player?.canControl ?? false)
+                    readonly property PwNode sink: Pipewire.defaultAudioSink
+                    readonly property real level: Math.min(1, (own ? root.player.volume : sink?.audio?.volume) ?? 0)
+                    readonly property bool muted: own ? level === 0 : sink?.audio?.muted ?? false
+                    readonly property real full: parent.width + 6
+                    property real restore: 0.5
+                    property bool open: false
 
-                    readonly property bool playing: root.player?.isPlaying ?? false
+                    function set(v) {
+                        v = Math.max(0, Math.min(1, v));
+                        if (own) {
+                            root.player.volume = v;
+                        } else if (sink?.audio) {
+                            sink.audio.volume = v;
+                            if (v > 0 && sink.audio.muted)
+                                sink.audio.muted = false;
+                        }
+                    }
 
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 52
-                    height: 52
-                    radius: playing ? 16 : 26
-                    color: Theme.accent
-                    scale: playMouse.pressed ? 0.92 : playMouse.containsMouse ? 1.05 : 1
+                    function toggleMute() {
+                        if (!own) {
+                            if (sink?.audio)
+                                sink.audio.muted = !sink.audio.muted;
+                        } else if (level > 0) {
+                            restore = level;
+                            set(0);
+                        } else {
+                            set(restore);
+                        }
+                    }
 
-                    Behavior on radius { NumberAnimation { duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
-                    Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                    x: -6
+                    width: open ? full : speaker.width
+                    height: parent.height
 
-                    Icon {
-                        anchors.centerIn: parent
-                        text: play.playing ? "pause" : "play_arrow"
-                        font.pixelSize: 28
-                        color: Theme.bg
+                    PwObjectTracker {
+                        objects: [volume.sink]
+                    }
+
+                    HoverHandler {
+                        id: volHover
+                        onHoveredChanged: if (hovered) volume.open = true; else closer.restart()
+                    }
+
+                    Timer {
+                        id: closer
+                        interval: 500
+                        onTriggered: if (!volHover.hovered && !volSlider.pressed) volume.open = false
+                    }
+
+                    CtrlButton {
+                        id: speaker
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: volume.muted || volume.level === 0 ? "volume_off"
+                            : volume.level < 0.34 ? "volume_mute"
+                            : volume.level < 0.67 ? "volume_down"
+                            : "volume_up"
+                        active: volume.open
+                        enabled: volume.own || !!volume.sink
+                        onClicked: volume.toggleMute()
                     }
 
                     MouseArea {
-                        id: playMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: if (root.player?.canTogglePlaying) root.player.togglePlaying()
+                        anchors.fill: speaker
+                        acceptedButtons: Qt.NoButton
+                        onWheel: wheel => volume.set(volume.level + (wheel.angleDelta.y > 0 ? 0.05 : -0.05))
                     }
-                }
 
-                CtrlButton {
-                    anchors.verticalCenter: parent.verticalCenter
-                    icon: "skip_next"
-                    iconSize: 28
-                    plain: true
-                    enabled: root.player?.canGoNext ?? false
-                    onClicked: root.player.next()
-                }
+                    Item {
+                        anchors.left: speaker.right
+                        anchors.leftMargin: 8
+                        width: volume.open ? volume.full - speaker.width - 8 : 0
+                        height: parent.height
+                        clip: true
+                        opacity: volume.open ? 1 : 0
+                        Behavior on width { NumberAnimation { duration: 380; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasizedDecel } }
+                        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
 
-                CtrlButton {
-                    readonly property int loop: root.player?.loopState ?? MprisLoopState.None
+                        Slider {
+                            id: volSlider
 
-                    anchors.verticalCenter: parent.verticalCenter
-                    icon: loop === MprisLoopState.Track ? "repeat_one" : "repeat"
-                    active: loop !== MprisLoopState.None
-                    enabled: root.player?.loopSupported ?? false
-                    onClicked: root.player.loopState = loop === MprisLoopState.None ? MprisLoopState.Playlist
-                        : loop === MprisLoopState.Playlist ? MprisLoopState.Track
-                        : MprisLoopState.None
+                            property real held: 0
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: volume.full - speaker.width - 8 - 44
+                            value: pressed ? held : volume.level
+                            dim: volume.muted
+                            onMoved: v => {
+                                held = v;
+                                volume.set(v);
+                            }
+                            onPressedChanged: if (!pressed) closer.restart()
+                        }
+
+                        Label {
+                            x: volSlider.width + 8
+                            width: 36
+                            anchors.verticalCenter: parent.verticalCenter
+                            horizontalAlignment: Text.AlignRight
+                            text: volume.muted && !volume.own ? "Muted" : Math.round(volume.level * 100) + "%"
+                            font.pixelSize: 12
+                            color: Theme.subtext
+                        }
+                    }
                 }
             }
         }
@@ -483,20 +607,7 @@ Item {
             width: parent.width
             height: 28
 
-            CtrlButton {
-                id: back
-                x: -6
-                anchors.verticalCenter: parent.verticalCenter
-                icon: "arrow_back"
-                iconSize: 20
-                diameter: 32
-                plain: true
-                onClicked: root.popouts.fx = false
-            }
-
             Label {
-                anchors.left: back.right
-                anchors.leftMargin: 6
                 anchors.verticalCenter: parent.verticalCenter
                 text: "Music effects"
                 font.pixelSize: 15
@@ -504,7 +615,8 @@ Item {
 
             // What is playing, small, so the cover in the background still has a name
             Label {
-                anchors.right: parent.right
+                anchors.right: back.left
+                anchors.rightMargin: 4
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, parent.width * 0.45)
                 visible: root.hasTrack
@@ -512,6 +624,18 @@ Item {
                 font.pixelSize: 12
                 color: Theme.subtext
                 elide: Text.ElideRight
+            }
+
+            // On the right, where the tune button that opened this view sits
+            CtrlButton {
+                id: back
+                x: parent.width - width + 6
+                anchors.verticalCenter: parent.verticalCenter
+                icon: "arrow_back"
+                iconSize: 20
+                diameter: 32
+                plain: true
+                onClicked: root.popouts.fx = false
             }
         }
 
@@ -586,6 +710,8 @@ Item {
         property int diameter: 38
         property bool active: false
         property real fill: 1
+        // Nerd Font glyph drawn instead of the Material icon
+        property string nerd
         // Prev/next are always drawn in the text colour
         property bool plain: false
         signal clicked
@@ -604,12 +730,22 @@ Item {
 
         Icon {
             anchors.centerIn: parent
+            visible: !btn.nerd
             text: btn.icon
             font.pixelSize: btn.iconSize
             fill: btn.fill
             color: btn.plain ? Theme.text : btn.active ? Theme.accent : Theme.subtext
             Behavior on color { ColorAnimation { duration: Theme.anim } }
             Behavior on fill { NumberAnimation { duration: Theme.anim } }
+        }
+
+        NerdIcon {
+            anchors.centerIn: parent
+            visible: !!btn.nerd
+            text: btn.nerd
+            font.pixelSize: btn.iconSize
+            color: btn.plain ? Theme.text : btn.active ? Theme.accent : Theme.subtext
+            Behavior on color { ColorAnimation { duration: Theme.anim } }
         }
 
         MouseArea {

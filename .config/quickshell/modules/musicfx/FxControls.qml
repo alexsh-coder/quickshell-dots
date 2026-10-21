@@ -174,63 +174,82 @@ Column {
 
     Column {
         width: parent.width
+        spacing: 10
 
-        // Effects
-        Grid {
+        Item {
             width: parent.width
-            columns: 2
-            spacing: 6
+            height: 24
 
-            Tile { icon: "flare"; label: "Glow"; key: "glow" }
-            Tile { icon: "blur_on"; label: "Blur"; key: "blur" }
-            Tile { icon: "zoom_out_map"; label: "Zoom"; key: "zoom" }
-            Tile { icon: "earthquake"; label: "Shake"; key: "shake" }
+            Label { text: "Wallpaper effects"; anchors.verticalCenter: parent.verticalCenter }
+
+            Switch {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                checked: MusicFx.wallpaperFx
+                onToggled: MusicFx.setWallpaperFx(!MusicFx.wallpaperFx)
+            }
         }
 
-        // Strength of one effect, slides open under the grid
-        Item {
-            id: editor
-
-            readonly property string key: root.shownKey
-
+        Column {
             width: parent.width
-            height: root.editing ? editorCol.implicitHeight + 14 : 0
-            clip: true
-            opacity: root.editing ? 1 : 0
-            Behavior on height { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
-            Behavior on opacity { NumberAnimation { duration: Theme.anim } }
 
-            Column {
-                id: editorCol
-
-                y: 14
+            // Effects
+            Grid {
                 width: parent.width
-                spacing: 10
+                columns: 2
+                spacing: 6
 
-                Item {
+                Tile { icon: "flare"; label: "Glow"; key: "glow" }
+                Tile { icon: "blur_on"; label: "Blur"; key: "blur" }
+                Tile { icon: "zoom_out_map"; label: "Zoom"; key: "zoom" }
+                Tile { icon: "earthquake"; label: "Shake"; key: "shake" }
+            }
+
+            // Strength of one effect, slides open under the grid
+            Item {
+                id: editor
+
+                readonly property string key: root.shownKey
+
+                width: parent.width
+                height: root.editing ? editorCol.implicitHeight + 14 : 0
+                clip: true
+                opacity: root.editing ? 1 : 0
+                Behavior on height { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: Theme.anim } }
+
+                Column {
+                    id: editorCol
+
+                    y: 14
                     width: parent.width
-                    height: 20
+                    spacing: 10
 
-                    Label {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: (root.names[editor.key] ?? "") + " strength"
-                        font.pixelSize: 14
-                    }
-                    Label {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: Math.round(MusicFx.gain(editor.key) * 100) + "%"
-                        font.pixelSize: 14
-                        color: Theme.subtext
-                    }
-                }
+                    Item {
+                        width: parent.width
+                        height: 20
 
-                FxSlider {
-                    id: strengthSlider
-                    width: parent.width
-                    min: 0.1
-                    value: MusicFx.gain(editor.key)
-                    onMoved: v => MusicFx.setGain(editor.key, v)
+                        Label {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: (root.names[editor.key] ?? "") + " strength"
+                            font.pixelSize: 14
+                        }
+                        Label {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: Math.round(MusicFx.gain(editor.key) * 100) + "%"
+                            font.pixelSize: 14
+                            color: Theme.subtext
+                        }
+                    }
+
+                    FxSlider {
+                        id: strengthSlider
+                        width: parent.width
+                        min: 0.1
+                        value: MusicFx.gain(editor.key)
+                        onMoved: v => MusicFx.setGain(editor.key, v)
+                    }
                 }
             }
         }

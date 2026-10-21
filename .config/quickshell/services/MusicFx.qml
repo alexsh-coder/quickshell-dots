@@ -21,6 +21,7 @@ Singleton {
     // Extra styles drawn behind the main one
     property alias layers: adapter.layers
 
+    readonly property var wallpaperKeys: ["glow", "blur", "zoom", "shake"]
     readonly property bool wallpaperFx: zoom || shake || glow || blur
 
     // Per-effect strength on top of the global intensity, 1 = default
@@ -38,15 +39,34 @@ Singleton {
         adapter.layers = layers.includes(name) ? layers.filter(l => l !== name) : layers.concat([name]);
     }
 
+    // Master switch: off remembers which effects were on, on brings them back (all if none were)
+    function setWallpaperFx(on) {
+        // One write for the whole batch, otherwise the file watcher reloads a half-applied state
+        file.batching = true;
+        if (on) {
+            const restore = adapter.savedFx.length ? adapter.savedFx : wallpaperKeys;
+            wallpaperKeys.forEach(k => adapter[k] = restore.includes(k));
+        } else {
+            adapter.savedFx = wallpaperKeys.filter(k => adapter[k]);
+            wallpaperKeys.forEach(k => adapter[k] = false);
+        }
+        file.batching = false;
+        file.writeAdapter();
+    }
+
     function setIntensity(v) {
         adapter.intensity = Math.round(Math.max(0.25, Math.min(2, v)) * 20) / 20;
     }
 
     FileView {
+        id: file
+
+        property bool batching
+
         path: Quickshell.statePath("musicfx.json")
         watchChanges: true
         onFileChanged: reload()
-        onAdapterUpdated: writeAdapter()
+        onAdapterUpdated: if (!batching) writeAdapter()
         onLoadFailed: err => {
             if (err === FileViewError.FileNotFound)
                 writeAdapter();
@@ -64,6 +84,7 @@ Singleton {
             property bool blur: false
             property var gains: ({})
             property list<string> layers: []
+            property list<string> savedFx: []
         }
     }
 
@@ -73,6 +94,8 @@ Singleton {
         function toggle(name: string): void {
             if (["desktop", "lyrics", "glow", "zoom", "shake", "blur"].includes(name))
                 adapter[name] = !adapter[name];
+            else if (name === "wallpaper")
+                root.setWallpaperFx(!root.wallpaperFx);
         }
         function style(name: string): void {
             if (root.styles.includes(name))
