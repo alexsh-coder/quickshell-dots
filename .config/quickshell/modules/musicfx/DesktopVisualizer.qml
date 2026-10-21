@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import QtQuick.Shapes
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Widgets
 import qs.config
@@ -21,9 +22,9 @@ PanelWindow {
     readonly property list<real> kernel: [0.05, 0.12, 0.2, 0.26, 0.2, 0.12, 0.05]
 
     // Spatial blur of the spectrum, eased against the previous frame
-    function smoothed(prev, ease) {
+    function smoothed(prev, ease, kern) {
         // Plain JS copies: indexing a list property directly re-reads the whole list every time
-        const vals = Array.from(values), ker = Array.from(kernel);
+        const vals = Array.from(values), ker = Array.from(kern ?? kernel);
         const half = (ker.length - 1) / 2;
         const out = [];
         for (let i = 0; i < n; i++) {
@@ -282,8 +283,10 @@ PanelWindow {
         }
     }
 
-    // Trap Nation style: stacked smooth closed curves around the cover art, each layer
-    // averaging over more frames than the one in front, the whole thing kicking on the bass
+    // Trap Nation style, rebuilt the way their After Effects template works: a linear 15-110 Hz spectrum
+    // bent into a circle and mirrored, top to bottom. Each layer is the same spectrum over a shorter FFT
+    // window, so the coloured ones behind the white ring are snappier and reach a bit further.
+    // Spectrum comes from scripts/nation-fft.py; the ears are simply wherever the kick and 808 sit.
     Component {
         id: nation
 
@@ -291,18 +294,17 @@ PanelWindow {
             id: rings
 
             readonly property int layers: 6
-            // Frames of extra averaging per layer: more is a longer, lazier tail
-            readonly property real lag: 1
-            readonly property int res: 120
-            // Mostly the low and mid bands, the top end is too quiet to shape the ring
-            readonly property real span: (root.n - 1) * 0.75
+            readonly property int res: 240
             // Swells with the bass and punches out on kicks
             readonly property real pulse: 1 + Cava.bass * 0.1 + Cava.kick * 0.08
             readonly property real radius: root.h * 0.13 * pulse
-            readonly property real amp: root.h * 0.12
-            // Each layer reaches a bit further on peaks, so colour opens up where the music hits.
-            // Grows with the square of the level: moderate music keeps the halo thin, loud hits throw it out
-            readonly property real spread: 0.06
+            // Spectrum height in ring radii at full level
+            readonly property real lift: 1.45
+            // Soft ceiling in ring radii: small bumps grow as they are, long lobes level off near it
+            readonly property real ceiling: 0.9
+            // Each layer behind reaches this much further. The template goes 700 to 1100 over 9 copies, but
+            // its glow eats most of that; on screen the coloured edge stays thin
+            readonly property real spread: 0.03
             // Hairline gap between layers at rest, in px
             readonly property real gap: 0.5
             readonly property var player: Lyrics.player
@@ -345,63 +347,59 @@ PanelWindow {
                 return out;
             }
             // Distance outside the white ring, in px, at which the palette runs out
-            readonly property real reach: amp * 0.25
+            readonly property real reach: root.h * 0.03
 
-            property var levels: []
-            property var history: []
             property var paths: []
 
             // Ring geometry lives in a box around the centre, so the MSAA layer stays small
-            readonly property real box: (root.h * 0.13 * 1.18 + amp * (1 + layers * spread) + layers * gap) * 2 + 8
-            // Static angle table: sin, cos and which band each sample reads
+            readonly property real box: (root.h * 0.13 * 1.18 * (2 + lift * (1 + (layers - 1) * spread)) + layers * gap) * 2 + 8
+            // Static angle table: sin, cos and where along the spectrum each sample reads (0 top, 1 bottom)
             readonly property var table: {
                 const rows = [];
-                for (let i = 0; i <= res; i++) {
+                for (let i = 0; i < res; i++) {
                     const a = i / res * Math.PI * 2;
-                    // 0 at the top, 1 at the bottom, mirrored left/right
-                    rows.push({ s: Math.sin(a), c: Math.cos(a), m: (1 - Math.abs(i / res * 2 - 1)) * span });
+                    rows.push({ s: Math.sin(a), c: Math.cos(a), t: 1 - Math.abs(i / res * 2 - 1) });
                 }
                 return rows;
             }
+            // Triangle blur around the circle, standing in for the template's glow-softened edges
+            readonly property var blur: [1, 2, 3, 2, 1].map(w => w / 9)
 
-            // Layers differ by averaging window, a reach that grows on loud peaks and a hairline offset,
-            // so colour shows mostly where the shape is moving or peaking
-            function ringPath(lv, depth) {
-                const c = box / 2, base = radius + depth * gap, a = amp, extra = amp * depth * spread;
-                const pts = [];
+            function ringPath(spec, depth) {
+                const c = box / 2, base = radius + depth * gap, reachPx = radius * lift * (1 + depth * spread);
+                const capPx = radius * ceiling * (1 + depth * spread);
+                const last = spec.length - 1, disp = [];
                 for (const r of table) {
-                    const v = root.spline(lv, r.m);
-                    const rad = base + v * a + v * v * extra;
+                    const m = r.t * last, k = Math.min(last - 1, Math.floor(m));
+                    const v = spec[k] + (spec[k + 1] - spec[k]) * (m - k);
+                    disp.push(capPx * (1 - Math.exp(-v * reachPx / capPx)));
+                }
+                const pts = [];
+                for (let i = 0; i <= res; i++) {
+                    let d = 0;
+                    for (let j = 0; j < blur.length; j++)
+                        d += disp[(i + j - 2 + res) % res] * blur[j];
+                    const rad = base + d, r = table[i % res];
                     pts.push(Qt.point(c + r.s * rad, c - r.c * rad));
                 }
                 return pts;
             }
 
-            function rebuild() {
-                // Smooth shape, but little easing over time so the ring moves snappily
-                levels = root.smoothed(levels, 0.05);
-                const h = [levels].concat(history).slice(0, Math.round((layers - 1) * lag) + 1);
-                history = h;
-                // Layer k is a moving average over the last round(k * lag) + 1 frames (SnGmng's AverageSize):
-                // the front ring stays sharp, the ones behind lag and soften into a halo
-                const sum = new Array(root.n).fill(0);
-                const out = [];
-                let f = 0;
-                for (let k = 0; k < layers; k++) {
-                    const end = Math.min(Math.round(k * lag) + 1, h.length);
-                    for (; f < end; f++)
-                        for (let i = 0; i < root.n; i++)
-                            sum[i] += h[f][i] ?? 0;
-                    out.push(ringPath(sum.map(s => s / f), k));
-                }
-                paths = out;
+            function feed(line) {
+                const specs = line.split("|").map(l => l.split(";").map(v => Number(v) / 1000 * root.gain));
+                if (specs.length !== layers || specs.some(sp => sp.length < 2))
+                    return;
+                paths = specs.map((sp, k) => ringPath(sp, k));
             }
 
             anchors.fill: parent
 
-            Connections {
-                target: root
-                function onValuesChanged() { rings.rebuild(); }
+            Process {
+                running: root.active
+                command: ["python3", Quickshell.shellDir + "/scripts/nation-fft.py"]
+                stdout: SplitParser {
+                    onRead: data => rings.feed(data)
+                }
             }
 
             Item {

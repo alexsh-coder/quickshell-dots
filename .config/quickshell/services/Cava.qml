@@ -46,7 +46,12 @@ Singleton {
 
     function feed(raw) {
         const gain = MusicFx.intensity;
-        const v = raw.map(n => Math.min(1, n / 100 * gain));
+        // cava runs unsmoothed; instant attack and a short release here, so hits land on the frame they happen
+        const prev = Array.from(values);
+        const v = raw.map((n, i) => {
+            const x = Math.min(1, n / 100 * gain), p = prev[i] ?? 0;
+            return x > p ? x : p * 0.8 + x * 0.2;
+        });
         values = v;
 
         let sum = 0, low = 0;
@@ -83,7 +88,7 @@ bar_delimiter = 59
 frame_delimiter = 10
 channels = mono
 [smoothing]
-noise_reduction = 70
+noise_reduction = 0
 EOF`]
         stdout: SplitParser {
             onRead: data => {
