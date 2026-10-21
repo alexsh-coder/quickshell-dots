@@ -300,10 +300,11 @@ PanelWindow {
             readonly property real pulse: 1 + Cava.bass * 0.1 + Cava.kick * 0.08
             readonly property real radius: root.h * 0.13 * pulse
             readonly property real amp: root.h * 0.12
-            // Each layer reaches a bit further on peaks, so colour opens up where the music hits
+            // Each layer reaches a bit further on peaks, so colour opens up where the music hits.
+            // Grows with the square of the level: moderate music keeps the halo thin, loud hits throw it out
             readonly property real spread: 0.06
             // Hairline gap between layers at rest, in px
-            readonly property real gap: 1
+            readonly property real gap: 0.5
             readonly property var player: Lyrics.player
 
             // Palette by distance outside the white ring: a pale tint, then the wallpaper's hues in neon,
@@ -363,13 +364,14 @@ PanelWindow {
                 return rows;
             }
 
-            // Layers differ by averaging window, a slightly larger amplitude and a hairline offset,
+            // Layers differ by averaging window, a reach that grows on loud peaks and a hairline offset,
             // so colour shows mostly where the shape is moving or peaking
             function ringPath(lv, depth) {
-                const c = box / 2, base = radius + depth * gap, a = amp * (1 + depth * spread);
+                const c = box / 2, base = radius + depth * gap, a = amp, extra = amp * depth * spread;
                 const pts = [];
                 for (const r of table) {
-                    const rad = base + root.spline(lv, r.m) * a;
+                    const v = root.spline(lv, r.m);
+                    const rad = base + v * a + v * v * extra;
                     pts.push(Qt.point(c + r.s * rad, c - r.c * rad));
                 }
                 return pts;
