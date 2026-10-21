@@ -8,6 +8,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
+    readonly property var apps: adapter.apps
     readonly property real halfLife: 7 * 24 * 3600 * 1000
 
     function rank(entry, now) {
@@ -31,6 +32,8 @@ Singleton {
 
     FileView {
         path: Quickshell.statePath("usage.json")
+        // Load synchronously so the first open after a restart already sees the data
+        blockLoading: true
         watchChanges: true
         onFileChanged: reload()
         onAdapterUpdated: writeAdapter()

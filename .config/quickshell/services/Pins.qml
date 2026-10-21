@@ -15,6 +15,8 @@ Singleton {
 
     FileView {
         path: Quickshell.statePath("pins.json")
+        // Load synchronously so the first open after a restart already sees the data
+        blockLoading: true
         watchChanges: true
         onFileChanged: reload()
         onAdapterUpdated: writeAdapter()

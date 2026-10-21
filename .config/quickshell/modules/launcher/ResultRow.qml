@@ -24,12 +24,11 @@ MouseArea {
     onPositionChanged: mouse => {
         if (!launcher.cursorMoved(root, mouse.x, mouse.y))
             return;
-        launcher.zone = "list";
         ListView.view.currentIndex = index;
     }
     onClicked: event => {
         if (event.button === Qt.RightButton)
-            launcher.togglePin(modelData, icon);
+            launcher.togglePin(modelData);
         else
             launcher.launch(modelData);
     }

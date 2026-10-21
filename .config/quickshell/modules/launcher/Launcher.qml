@@ -20,13 +20,9 @@ Scope {
     property bool mouseActive: false
     property point lastCursor: Qt.point(-1, -1)
     property string query: ""
-    property string zone: "list"
-    property string flyId: ""
     // Snapshot taken on open, so the list doesn't reshuffle while the card fades out after a launch
     property var ranks: ({})
 
-    readonly property int pinSize: 56
-    readonly property int pinGap: 6
     readonly property int rowHeight: 52
     readonly property int maxRows: 7
 
@@ -38,11 +34,17 @@ Scope {
         const q = query.trim().toLowerCase();
         const alt = swapLayout(q);
         const used = a => ranks[a.id] ?? 0;
-        // apps is already sorted by name, and sort() is stable, so name stays the last tie-breaker
+        // QML's sort() isn't stable, so name is an explicit last tie-breaker
+        const byName = (x, y) => x.name.localeCompare(y.name);
+        if (!q) {
+            const pinned = Pins.ids.map(id => apps.find(a => a.id === id)).filter(a => a);
+            const rest = apps.filter(a => !Pins.ids.includes(a.id));
+            return pinned.concat(rest.sort((x, y) => used(y) - used(x) || byName(x, y)));
+        }
         return apps
-            .map(a => ({ a, s: q ? Math.max(score(a, q), alt === q ? 0 : score(a, alt) - 5) : 1 }))
+            .map(a => ({ a, s: Math.max(score(a, q), alt === q ? 0 : score(a, alt) - 5) }))
             .filter(r => r.s > 0)
-            .sort((x, y) => y.s - x.s || used(y.a) - used(x.a))
+            .sort((x, y) => y.s - x.s || used(y.a) - used(x.a) || byName(x.a, y.a))
             .map(r => r.a);
     }
 
@@ -87,7 +89,6 @@ Scope {
         // Everything here runs before open flips, so geometry snaps instead of animating
         search.clear();
         query = "";
-        zone = "list";
         mouseActive = false;
         lastCursor = Qt.point(-1, -1);
         ranks = Usage.ranks();
@@ -127,61 +128,28 @@ Scope {
         hide();
     }
 
-    function pinIndex(id) {
-        for (let i = 0; i < pinModel.count; i++) {
-            if (pinModel.get(i).appId === id)
-                return i;
-        }
-        return -1;
-    }
-
-    function savePins() {
-        const ids = [];
-        for (let i = 0; i < pinModel.count; i++)
-            ids.push(pinModel.get(i).appId);
+    function togglePin(entry) {
+        if (!entry)
+            return;
+        const ids = Pins.ids.slice();
+        const i = ids.indexOf(entry.id);
+        if (i >= 0)
+            ids.splice(i, 1);
+        else
+            ids.push(entry.id);
         Pins.save(ids);
     }
 
-    function loadPins() {
-        const ids = Pins.ids.filter(id => DesktopEntries.byId(id));
-        let same = ids.length === pinModel.count;
-        for (let i = 0; same && i < ids.length; i++)
-            same = pinModel.get(i).appId === ids[i];
-        if (same)
+    // Pins sit on top of the empty-query list in their saved order
+    function movePin(entry, step) {
+        const ids = Pins.ids.slice();
+        const i = ids.indexOf(entry?.id);
+        const j = i + step;
+        if (query.trim() || i < 0 || j < 0 || j >= ids.length)
             return;
-        pinModel.clear();
-        for (const id of ids)
-            pinModel.append({ appId: id });
-    }
-
-    function togglePin(entry, from) {
-        if (!entry)
-            return;
-        const i = pinIndex(entry.id);
-        if (i >= 0) {
-            pinModel.remove(i);
-            pinsView.currentIndex = Math.min(pinsView.currentIndex, pinModel.count - 1);
-            if (pinModel.count === 0)
-                zone = "list";
-        } else {
-            if (from)
-                ghost.fly(entry, from);
-            pinModel.append({ appId: entry.id });
-        }
-        savePins();
-    }
-
-    function movePin(from, to) {
-        if (from === to || to < 0 || to >= pinModel.count)
-            return;
-        pinModel.move(from, to, 1);
-        pinsView.currentIndex = to;
-    }
-
-    function currentEntry() {
-        return zone === "pins"
-            ? DesktopEntries.byId(pinModel.get(pinsView.currentIndex)?.appId ?? "")
-            : resultsView.currentItem?.modelData ?? null;
+        ids.splice(j, 0, ids.splice(i, 1)[0]);
+        Pins.save(ids);
+        resultsView.currentIndex = j;
     }
 
     function handleKey(event) {
@@ -189,44 +157,25 @@ Scope {
         // P on any layout: Qt reports the RU layout's "З" as a different key, the scancode is the same
         const isP = event.key === Qt.Key_P || event.nativeScanCode === 33;
 
-        if ([Qt.Key_Up, Qt.Key_Down, Qt.Key_Left, Qt.Key_Right, Qt.Key_Tab].includes(event.key))
+        if ([Qt.Key_Up, Qt.Key_Down, Qt.Key_Tab].includes(event.key))
             mouseActive = false;
 
         if (event.key === Qt.Key_Escape) {
             hide();
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            launch(currentEntry());
+            launch(resultsView.currentItem?.modelData ?? null);
         } else if (ctrl && isP) {
-            const entry = currentEntry();
-            togglePin(entry, zone === "list" ? resultsView.currentItem?.iconItem : null);
-        } else if (event.key === Qt.Key_Tab) {
-            zone = zone === "list" && pinModel.count > 0 ? "pins" : "list";
-        } else if (event.key === Qt.Key_Down) {
-            if (zone === "pins")
-                zone = "list";
-            else
-                resultsView.incrementCurrentIndex();
+            togglePin(resultsView.currentItem?.modelData ?? null);
+        } else if (ctrl && (event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
+            movePin(resultsView.currentItem?.modelData, event.key === Qt.Key_Up ? -1 : 1);
+        } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab) {
+            resultsView.incrementCurrentIndex();
         } else if (event.key === Qt.Key_Up) {
-            if (zone === "list" && resultsView.currentIndex <= 0 && pinModel.count > 0)
-                zone = "pins";
-            else if (zone === "list")
-                resultsView.decrementCurrentIndex();
-        } else if (zone === "pins" && (event.key === Qt.Key_Left || event.key === Qt.Key_Right)) {
-            const step = event.key === Qt.Key_Left ? -1 : 1;
-            if (ctrl) {
-                movePin(pinsView.currentIndex, pinsView.currentIndex + step);
-                savePins();
-            } else {
-                pinsView.currentIndex = Math.max(0, Math.min(pinModel.count - 1, pinsView.currentIndex + step));
-            }
+            resultsView.decrementCurrentIndex();
         } else {
             return;
         }
         event.accepted = true;
-    }
-
-    ListModel {
-        id: pinModel
     }
 
     Timer {
@@ -235,14 +184,13 @@ Scope {
         onTriggered: root.entering = false
     }
 
+    // Usage may finish loading after the first open
     Connections {
-        target: Pins
-        function onIdsChanged() { root.loadPins(); }
-    }
-
-    Connections {
-        target: DesktopEntries
-        function onApplicationsChanged() { root.loadPins(); }
+        target: Usage
+        function onAppsChanged() {
+            if (root.open)
+                root.ranks = Usage.ranks();
+        }
     }
 
     IpcHandler {
@@ -320,56 +268,13 @@ Scope {
                 width: parent.width - 24
                 spacing: 8
 
-                Item {
-                    width: parent.width
-                    height: pinModel.count > 0 ? root.pinSize + 8 : 0
-                    clip: !pinsView.dragging
-                    Behavior on height { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
-
-                    ListView {
-                        id: pinsView
-
-                        property bool dragging: false
-                        property string hoveredName: ""
-
-                        x: (parent.width - width) / 2
-                        y: 4
-                        width: Math.max(0, pinModel.count * (root.pinSize + root.pinGap) - root.pinGap)
-                        height: root.pinSize
-                        orientation: ListView.Horizontal
-                        spacing: root.pinGap
-                        interactive: false
-                        model: pinModel
-                        Behavior on x { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
-
-                        delegate: PinTile {
-                            launcher: root
-                            size: root.pinSize
-                            selected: root.zone === "pins" && ListView.isCurrentItem
-                        }
-
-                        add: Transition {
-                            NumberAnimation { property: "scale"; from: 0; to: 1; duration: Theme.anim + 80; easing.type: Easing.OutBack }
-                        }
-                        remove: Transition {
-                            NumberAnimation { properties: "scale,opacity"; to: 0; duration: Theme.anim; easing.type: Easing.InCubic }
-                        }
-                        move: Transition {
-                            NumberAnimation { property: "x"; duration: Theme.anim; easing.type: Easing.OutCubic }
-                        }
-                        displaced: Transition {
-                            NumberAnimation { property: "x"; duration: Theme.anim; easing.type: Easing.OutCubic }
-                        }
-                    }
-                }
-
                 Rectangle {
                     width: parent.width
                     height: 48
                     radius: Theme.radius
                     color: Theme.surface
                     border.width: 1
-                    border.color: search.activeFocus && root.zone === "list" ? Qt.alpha(Theme.accent, 0.6) : "transparent"
+                    border.color: search.activeFocus ? Qt.alpha(Theme.accent, 0.6) : "transparent"
                     Behavior on border.color { ColorAnimation { duration: Theme.anim } }
 
                     Icon {
@@ -398,7 +303,6 @@ Scope {
                         onTextEdited: {
                             root.entering = false;
                             root.query = text;
-                            root.zone = "list";
                             resultsView.currentIndex = 0;
                         }
                         Keys.onPressed: event => root.handleKey(event)
@@ -408,11 +312,7 @@ Scope {
                             anchors.verticalCenter: parent.verticalCenter
                             font.pixelSize: 17
                             color: Theme.subtext
-                            // Pins are icon-only, so their name shows up here
-                            readonly property string hovered: root.mouseActive ? pinsView.hoveredName : ""
-                            text: root.zone === "pins" || hovered
-                                  ? (hovered || root.currentEntry()?.name || "")
-                                  : "Search apps"
+                            text: "Search apps"
                         }
                     }
                 }
@@ -435,8 +335,6 @@ Scope {
                     highlight: Rectangle {
                         radius: Theme.radius
                         color: Qt.alpha(Theme.accent, 0.14)
-                        opacity: root.zone === "list" ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
                     }
 
                     delegate: ResultRow {
@@ -444,7 +342,7 @@ Scope {
                         height: root.rowHeight
                         width: resultsView.width
                         pinned: Pins.ids.includes(modelData.id)
-                        current: root.zone === "list" && ListView.isCurrentItem
+                        current: ListView.isCurrentItem
                     }
 
                     add: Transition {
@@ -472,40 +370,6 @@ Scope {
                         NumberAnimation { property: "scale"; to: 1; duration: Theme.anim; easing.type: Easing.OutCubic }
                         NumberAnimation { property: "lift"; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
                     }
-                }
-            }
-
-            IconImage {
-                id: ghost
-
-                property string target: ""
-
-                function fly(entry, from) {
-                    const p = from.mapToItem(card, 0, 0);
-                    source = Quickshell.iconPath(entry.icon, "application-x-executable");
-                    x = p.x;
-                    y = p.y;
-                    implicitSize = from.width;
-                    // The new pin lands last; the row re-centers around it
-                    const n = pinModel.count + 1;
-                    const rowWidth = n * (root.pinSize + root.pinGap) - root.pinGap;
-                    const icon = Math.round(root.pinSize * 0.64);
-                    flyX.to = content.x + (content.width + rowWidth) / 2 - (root.pinSize + icon) / 2;
-                    flyY.to = content.y + 4 + (root.pinSize - icon) / 2;
-                    flySize.to = icon;
-                    root.flyId = entry.id;
-                    flight.restart();
-                }
-
-                visible: flight.running
-                z: 10
-
-                ParallelAnimation {
-                    id: flight
-                    NumberAnimation { id: flyX; target: ghost; property: "x"; duration: 460; easing.type: Easing.InOutCubic }
-                    NumberAnimation { id: flyY; target: ghost; property: "y"; duration: 460; easing.type: Easing.InOutBack; easing.overshoot: 2.2 }
-                    NumberAnimation { id: flySize; target: ghost; property: "implicitSize"; duration: 460; easing.type: Easing.InOutCubic }
-                    onFinished: root.flyId = ""
                 }
             }
         }
