@@ -22,6 +22,14 @@ Scope {
     property string query: ""
     // Snapshot taken on open, so the list doesn't reshuffle while the card fades out after a launch
     property var ranks: ({})
+    // Pin being dragged: its index, where its row's top is and the slot it would drop into.
+    // The model keeps its order until the drop, the other pins only shift visually.
+    property string dragId: ""
+    property int dragFrom: -1
+    property real dragTop: 0
+    readonly property int dragSlot: Math.round(dragTop / rowHeight)
+    // True for the instant the drop reorders the model, so nothing animates the jump
+    property bool dropping: false
 
     readonly property int rowHeight: 52
     readonly property int maxRows: 7
@@ -30,6 +38,9 @@ Scope {
         .filter(a => !a.noDisplay)
         .sort((a, b) => a.name.localeCompare(b.name))
 
+    // Pins of apps that are still installed; the others keep their place in the file but are skipped
+    readonly property var shownPins: Pins.ids.filter(id => apps.some(a => a.id === id))
+
     readonly property var results: {
         const q = query.trim().toLowerCase();
         const alt = swapLayout(q);
@@ -37,8 +48,8 @@ Scope {
         // QML's sort() isn't stable, so name is an explicit last tie-breaker
         const byName = (x, y) => x.name.localeCompare(y.name);
         if (!q) {
-            const pinned = Pins.ids.map(id => apps.find(a => a.id === id)).filter(a => a);
-            const rest = apps.filter(a => !Pins.ids.includes(a.id));
+            const pinned = shownPins.map(id => apps.find(a => a.id === id));
+            const rest = apps.filter(a => !shownPins.includes(a.id));
             return pinned.concat(rest.sort((x, y) => used(y) - used(x) || byName(x, y)));
         }
         return apps
@@ -114,6 +125,7 @@ Scope {
     }
 
     function hide() {
+        endDrag();
         open = false;
     }
 
@@ -140,16 +152,60 @@ Scope {
         Pins.save(ids);
     }
 
+    function savePinOrder(ids) {
+        Pins.save(ids.concat(Pins.ids.filter(id => !shownPins.includes(id))));
+    }
+
     // Pins sit on top of the empty-query list in their saved order
     function movePin(entry, step) {
-        const ids = Pins.ids.slice();
+        const ids = shownPins.slice();
         const i = ids.indexOf(entry?.id);
         const j = i + step;
         if (query.trim() || i < 0 || j < 0 || j >= ids.length)
             return;
         ids.splice(j, 0, ids.splice(i, 1)[0]);
-        Pins.save(ids);
+        savePinOrder(ids);
         resultsView.currentIndex = j;
+    }
+
+    function startDrag(entry, index) {
+        if (query.trim() || shownPins.indexOf(entry.id) !== index)
+            return false;
+        dragId = entry.id;
+        dragFrom = index;
+        return true;
+    }
+
+    // top: where the dragged row's top would be, in list content coordinates
+    function dragTo(top) {
+        dragTop = Math.max(0, Math.min(top, (shownPins.length - 1) * rowHeight));
+        resultsView.currentIndex = dragSlot;
+    }
+
+    // How far a row steps aside to open the slot the dragged pin hovers over
+    function dragShift(index) {
+        if (!dragId || index === dragFrom)
+            return 0;
+        if (dragFrom < index && index <= dragSlot)
+            return -rowHeight;
+        if (dragSlot <= index && index < dragFrom)
+            return rowHeight;
+        return 0;
+    }
+
+    function endDrag() {
+        if (!dragId)
+            return;
+        const ids = shownPins.slice();
+        const slot = dragSlot;
+        ids.splice(slot, 0, ids.splice(dragFrom, 1)[0]);
+        dropping = true;
+        savePinOrder(ids);
+        resultsView.forceLayout();
+        dragId = "";
+        dragFrom = -1;
+        resultsView.currentIndex = slot;
+        dropping = false;
     }
 
     function handleKey(event) {
@@ -324,6 +380,7 @@ Scope {
                     width: parent.width
                     height: Math.min(count, root.maxRows) * root.rowHeight
                     clip: true
+                    interactive: !root.dragId
                     boundsBehavior: Flickable.StopAtBounds
                     highlightMoveDuration: 160
                     highlightMoveVelocity: -1
@@ -342,7 +399,7 @@ Scope {
                         launcher: root
                         height: root.rowHeight
                         width: resultsView.width
-                        pinned: Pins.ids.includes(modelData.id)
+                        pinned: Pins.ids.includes(modelData?.id)
                         current: ListView.isCurrentItem
                     }
 
@@ -365,6 +422,7 @@ Scope {
                         NumberAnimation { property: "opacity"; to: 0; duration: 120 }
                     }
                     displaced: Transition {
+                        enabled: !root.dropping
                         NumberAnimation { properties: "x,y"; duration: Theme.anim; easing.type: Easing.OutCubic }
                         NumberAnimation { property: "opacity"; to: 1; duration: Theme.anim }
                         // An interrupted pop must still settle
