@@ -7,6 +7,7 @@ import qs.modules.lyrics
 import qs.modules.musicfx
 import qs.modules.notifications
 import qs.modules.osd
+import qs.modules.overview
 import qs.modules.wallpaper
 
 // 
@@ -39,6 +40,7 @@ ShellRoot {
 
     Notifications {}
     Osd {}
+    Overview {}
     Launcher {}
     Clipboard {}
     Lock {}
