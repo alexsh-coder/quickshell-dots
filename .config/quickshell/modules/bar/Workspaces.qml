@@ -65,8 +65,7 @@ Item {
                     height: root.dotSize
                     radius: root.dotSize / 2
                     scale: slot.active ? 1 : 10 / 15
-                    color: slot.ws?.urgent ? Theme.urgent
-                         : slot.active ? Theme.tintAccent
+                    color: slot.active ? Theme.tintAccent
                          : slot.occupied ? Theme.tintSubtext
                          : Theme.tintMuted
 
