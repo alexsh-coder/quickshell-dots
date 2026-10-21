@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import qs.config
 import qs.components
+import qs.services
 
 MouseArea {
     id: root
@@ -10,8 +11,17 @@ MouseArea {
     required property int index
     required property var launcher
     property bool pinned: false
+    property bool hidden: false
     property bool current: false
     readonly property alias iconItem: icon
+    readonly property bool renaming: launcher.renaming !== "" && launcher.renaming === modelData?.id
+    onRenamingChanged: {
+        if (!renaming)
+            return;
+        nameInput.text = launcher.renameText;
+        nameInput.forceActiveFocus();
+        nameInput.selectAll();
+    }
     // Vertical offset for the entrance hop; a transform so it doesn't fight ListView's y
     property real lift: 0
     // Pinned row picked up by a long press or by moving while pressed (touchpad tap-and-drag gives no pause)
@@ -128,15 +138,17 @@ MouseArea {
             follow();
             return;
         }
-        if (!launcher.cursorMoved(root, mouse.x, mouse.y))
+        if (!launcher.cursorMoved(root, mouse.x, mouse.y) || launcher.renaming)
             return;
         ListView.view.currentIndex = index;
     }
     onClicked: event => {
         if (dragged)
             return;
-        if (event.button === Qt.RightButton)
-            launcher.togglePin(modelData);
+        if (launcher.renaming)
+            launcher.commitRename();
+        else if (event.button === Qt.RightButton)
+            launcher.openMenu(modelData, mapToItem(null, event.x, event.y));
         else
             launcher.launch(modelData);
     }
@@ -157,6 +169,8 @@ MouseArea {
         x: 12
         anchors.verticalCenter: parent.verticalCenter
         implicitSize: 32
+        opacity: root.hidden ? 0.4 : 1
+        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
         icon: root.modelData?.icon ?? ""
     }
 
@@ -167,13 +181,41 @@ MouseArea {
         anchors.rightMargin: 8
         anchors.verticalCenter: parent.verticalCenter
         spacing: 1
+        opacity: root.hidden ? 0.4 : 1
+        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
 
         Label {
+            visible: !root.renaming
             width: parent.width
             elide: Text.ElideRight
-            text: root.modelData?.name ?? ""
+            text: Names.name(root.modelData)
             color: root.current ? Theme.accent : Theme.text
             Behavior on color { ColorAnimation { duration: Theme.anim } }
+        }
+
+        TextInput {
+            id: nameInput
+            visible: root.renaming
+            width: parent.width
+            font.family: Theme.font
+            font.pixelSize: 15
+            font.weight: Font.Medium
+            color: Theme.accent
+            selectionColor: Qt.alpha(Theme.accent, 0.4)
+            selectedTextColor: Theme.text
+            clip: true
+            onTextEdited: root.launcher.renameText = text
+            // Losing focus to a click elsewhere keeps the new name
+            onActiveFocusChanged: if (!activeFocus && root.renaming) root.launcher.commitRename()
+            Keys.onPressed: event => {
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                    root.launcher.commitRename();
+                else if (event.key === Qt.Key_Escape)
+                    root.launcher.cancelRename();
+                else if (event.key !== Qt.Key_Up && event.key !== Qt.Key_Down && event.key !== Qt.Key_Tab)
+                    return;
+                event.accepted = true;
+            }
         }
 
         Label {
@@ -197,6 +239,17 @@ MouseArea {
         color: Theme.accent
         opacity: root.pinned ? 1 : 0
         scale: root.pinned ? 1 : 0.4
+        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
+        Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
+    }
+
+    Icon {
+        anchors.centerIn: pin
+        text: "visibility_off"
+        font.pixelSize: 18
+        color: Theme.subtext
+        opacity: root.hidden && !root.pinned ? 1 : 0
+        scale: root.hidden && !root.pinned ? 1 : 0.4
         Behavior on opacity { NumberAnimation { duration: Theme.anim } }
         Behavior on scale { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutBack } }
     }

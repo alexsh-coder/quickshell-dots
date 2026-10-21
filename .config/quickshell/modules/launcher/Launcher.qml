@@ -20,6 +20,8 @@ Scope {
     property bool mouseActive: false
     property point lastCursor: Qt.point(-1, -1)
     property string query: ""
+    // Hidden apps stay out of the list until this is flipped for the current session
+    property bool showHidden: false
     // Snapshot taken on open, so the list doesn't reshuffle while the card fades out after a launch
     property var ranks: ({})
     // Pin being dragged: its index, where its row's top is and the slot it would drop into.
@@ -30,13 +32,20 @@ Scope {
     readonly property int dragSlot: Math.round(dragTop / rowHeight)
     // True for the instant the drop reorders the model, so nothing animates the jump
     property bool dropping: false
+    // Context menu: the app it's for and its actions, both kept while it fades out
+    property bool menuOpen: false
+    property var menuEntry: null
+    property var menuItems: []
+    // Id of the app whose name is being edited in its row, and the text typed so far
+    property string renaming: ""
+    property string renameText: ""
 
     readonly property int rowHeight: 52
     readonly property int maxRows: 7
 
     readonly property var apps: DesktopEntries.applications.values
-        .filter(a => !a.noDisplay)
-        .sort((a, b) => a.name.localeCompare(b.name))
+        .filter(a => !a.noDisplay && (showHidden || !Hidden.ids.includes(a.id)))
+        .sort((a, b) => Names.name(a).localeCompare(Names.name(b)))
 
     // Pins of apps that are still installed; the others keep their place in the file but are skipped
     readonly property var shownPins: Pins.ids.filter(id => apps.some(a => a.id === id))
@@ -46,7 +55,7 @@ Scope {
         const alt = swapLayout(q);
         const used = a => ranks[a.id] ?? 0;
         // QML's sort() isn't stable, so name is an explicit last tie-breaker
-        const byName = (x, y) => x.name.localeCompare(y.name);
+        const byName = (x, y) => Names.name(x).localeCompare(Names.name(y));
         if (!q) {
             const pinned = shownPins.map(id => apps.find(a => a.id === id));
             const rest = apps.filter(a => !shownPins.includes(a.id));
@@ -71,7 +80,7 @@ Scope {
     }
 
     function score(a, q) {
-        const name = a.name.toLowerCase();
+        const name = Names.name(a).toLowerCase();
         if (name === q)
             return 100;
         if (name.startsWith(q))
@@ -80,7 +89,8 @@ Scope {
             return 80;
         if (name.includes(q))
             return 70;
-        const extra = [a.genericName, a.id, a.keywords.join(" ")].join(" ").toLowerCase();
+        // The original name still finds a renamed app
+        const extra = [a.name, a.genericName, a.id, a.keywords.join(" ")].join(" ").toLowerCase();
         if (extra.includes(q))
             return 50;
         // Fuzzy: every char of q in order, fewer gaps is better
@@ -100,6 +110,9 @@ Scope {
         // Everything here runs before open flips, so geometry snaps instead of animating
         search.clear();
         query = "";
+        showHidden = false;
+        menuOpen = false;
+        renaming = "";
         mouseActive = false;
         lastCursor = Qt.point(-1, -1);
         ranks = Usage.ranks();
@@ -125,6 +138,8 @@ Scope {
     }
 
     function hide() {
+        closeMenu();
+        commitRename();
         endDrag();
         open = false;
     }
@@ -150,6 +165,114 @@ Scope {
         else
             ids.push(entry.id);
         Pins.save(ids);
+    }
+
+    function toggleHidden(entry) {
+        if (!entry)
+            return;
+        const ids = Hidden.ids.slice();
+        const i = ids.indexOf(entry.id);
+        if (i >= 0)
+            ids.splice(i, 1);
+        else
+            ids.push(entry.id);
+        Hidden.save(ids);
+    }
+
+    // Keeps the selection on an app after a change reorders the list
+    function select(id) {
+        Qt.callLater(() => {
+            const i = results.findIndex(a => a.id === id);
+            if (i >= 0)
+                resultsView.currentIndex = i;
+        });
+    }
+
+    function startRename(entry) {
+        if (!entry)
+            return;
+        select(entry.id);
+        renameText = Names.name(entry);
+        renaming = entry.id;
+    }
+
+    // An empty name or the original one drops the override
+    function commitRename() {
+        if (!renaming)
+            return;
+        const id = renaming;
+        renaming = "";
+        const text = renameText.trim();
+        const entry = DesktopEntries.applications.values.find(a => a.id === id);
+        Names.rename(id, text === entry?.name ? "" : text);
+        select(id);
+        search.forceActiveFocus();
+    }
+
+    function cancelRename() {
+        renaming = "";
+        search.forceActiveFocus();
+    }
+
+    // pos: where the click was, in window coordinates; without it the menu drops from the selected row
+    function openMenu(entry, pos) {
+        if (!entry)
+            return;
+        commitRename();
+        const pinned = Pins.ids.includes(entry.id);
+        const hidden = Hidden.ids.includes(entry.id);
+        const items = [
+            { action: "pin", icon: "push_pin", text: pinned ? "Unpin" : "Pin", hint: "Ctrl P" },
+            { action: "rename", icon: "edit", text: "Rename", hint: "F2" }
+        ];
+        if (Names.names[entry.id] !== undefined)
+            items.push({ action: "reset", icon: "undo", text: "Reset name", hint: "" });
+        items.push({ action: "hide", icon: hidden ? "visibility" : "visibility_off", text: hidden ? "Unhide" : "Hide", hint: "Ctrl H" });
+        menuEntry = entry;
+        menuItems = items;
+        menu.current = pos ? -1 : 0;
+
+        const row = resultsView.currentItem;
+        const p = pos ?? (row ? row.mapToItem(null, row.width - menu.width - 8, row.height - 4) : Qt.point(0, 0));
+        const win = menu.parent;
+        menu.flipped = p.y + menu.height > win.height - 8;
+        menu.x = Math.max(8, Math.min(p.x, win.width - menu.width - 8));
+        menu.y = menu.flipped ? p.y - menu.height : p.y;
+        menuOpen = true;
+    }
+
+    function closeMenu() {
+        menuOpen = false;
+    }
+
+    function runMenu(action) {
+        const entry = menuEntry;
+        closeMenu();
+        if (action === "pin")
+            togglePin(entry);
+        else if (action === "rename")
+            startRename(entry);
+        else if (action === "reset") {
+            Names.rename(entry.id, "");
+            select(entry.id);
+        } else if (action === "hide")
+            toggleHidden(entry);
+    }
+
+    function menuKey(event) {
+        const n = menuItems.length;
+        if (event.key === Qt.Key_Escape)
+            closeMenu();
+        else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab)
+            menu.current = (menu.current + 1) % n;
+        else if (event.key === Qt.Key_Up)
+            menu.current = (Math.max(menu.current, 0) - 1 + n) % n;
+        else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && menu.current >= 0)
+            runMenu(menuItems[menu.current].action);
+        else if (event.key === Qt.Key_Menu)
+            closeMenu();
+        // Everything else is swallowed so it doesn't reach the search field
+        event.accepted = true;
     }
 
     function savePinOrder(ids) {
@@ -212,16 +335,31 @@ Scope {
         const ctrl = event.modifiers & Qt.ControlModifier;
         // P on any layout: Qt reports the RU layout's "З" as a different key, the scancode is the same
         const isP = event.key === Qt.Key_P || event.nativeScanCode === 33;
+        const isH = event.key === Qt.Key_H || event.nativeScanCode === 43;
+        const shift = event.modifiers & Qt.ShiftModifier;
 
         if ([Qt.Key_Up, Qt.Key_Down, Qt.Key_Tab].includes(event.key))
             mouseActive = false;
+
+        if (menuOpen) {
+            menuKey(event);
+            return;
+        }
 
         if (event.key === Qt.Key_Escape) {
             hide();
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             launch(resultsView.currentItem?.modelData ?? null);
+        } else if (event.key === Qt.Key_Menu || shift && event.key === Qt.Key_F10) {
+            openMenu(resultsView.currentItem?.modelData ?? null);
+        } else if (event.key === Qt.Key_F2) {
+            startRename(resultsView.currentItem?.modelData ?? null);
         } else if (ctrl && isP) {
             togglePin(resultsView.currentItem?.modelData ?? null);
+        } else if (ctrl && shift && isH) {
+            showHidden = !showHidden;
+        } else if (ctrl && isH) {
+            toggleHidden(resultsView.currentItem?.modelData ?? null);
         } else if (ctrl && (event.key === Qt.Key_Up || event.key === Qt.Key_Down)) {
             movePin(resultsView.currentItem?.modelData, event.key === Qt.Key_Up ? -1 : 1);
         } else if (event.key === Qt.Key_Down || event.key === Qt.Key_Tab) {
@@ -316,6 +454,7 @@ Scope {
             // Swallow clicks so they don't reach the close-on-outside-click area
             MouseArea {
                 anchors.fill: parent
+                onPressed: root.commitRename()
             }
 
             Column {
@@ -348,8 +487,8 @@ Scope {
 
                         anchors.left: searchIcon.right
                         anchors.leftMargin: 10
-                        anchors.right: parent.right
-                        anchors.rightMargin: 14
+                        anchors.right: hiddenMark.left
+                        anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
                         font.family: Theme.font
                         font.pixelSize: 17
@@ -371,6 +510,20 @@ Scope {
                             color: Theme.subtext
                             text: "Search apps"
                         }
+                    }
+
+                    // Marks that hidden apps are listed too
+                    Icon {
+                        id: hiddenMark
+                        anchors.right: parent.right
+                        anchors.rightMargin: 14
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "visibility"
+                        font.pixelSize: 20
+                        color: Theme.accent
+                        width: root.showHidden ? implicitWidth : 0
+                        opacity: root.showHidden ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
                     }
                 }
 
@@ -400,6 +553,7 @@ Scope {
                         height: root.rowHeight
                         width: resultsView.width
                         pinned: Pins.ids.includes(modelData?.id)
+                        hidden: Hidden.ids.includes(modelData?.id)
                         current: ListView.isCurrentItem
                     }
 
@@ -431,6 +585,22 @@ Scope {
                     }
                 }
             }
+        }
+
+        // Any click outside the open menu just closes it
+        MouseArea {
+            anchors.fill: parent
+            visible: root.menuOpen
+            acceptedButtons: Qt.AllButtons
+            onPressed: root.closeMenu()
+            onWheel: root.closeMenu()
+        }
+
+        ContextMenu {
+            id: menu
+            open: root.menuOpen
+            items: root.menuItems
+            onTriggered: action => root.runMenu(action)
         }
     }
 }
