@@ -33,11 +33,18 @@ Scope {
         Wallpaper.refresh();
         selectCurrent();
         open = true;
+        restore.stop();
+        windowsFade("hide");
         Qt.callLater(() => keys.forceActiveFocus());
     }
 
     function hide() {
         open = false;
+        windowsFade("show");
+    }
+
+    function windowsFade(mode) {
+        Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/windows-fade.sh", mode]);
     }
 
     function selectCurrent() {
@@ -115,12 +122,16 @@ Scope {
         return n > 0 && strip.currentIndex >= 0 ? files.get(strip.currentIndex % n, "filePath") : "";
     }
 
-    function apply() {
+    function apply(keepOpen) {
         const path = currentPath();
         if (!path)
             return;
         Wallpaper.set(path);
-        hide();
+        if (keepOpen)
+            return;
+        open = false;
+        // Windows stay hidden until the wallpaper transition has played out
+        restore.restart();
     }
 
     function prettify(name) {
@@ -128,6 +139,12 @@ Scope {
             .replace(/[-_.]?\d{3,5}x\d{1,5}([-_.].*)?$/, "")
             .replace(/[-_]+/g, " ")
             .trim() || name;
+    }
+
+    Timer {
+        id: restore
+        interval: 900
+        onTriggered: root.windowsFade("show")
     }
 
     FolderListModel {
@@ -209,6 +226,9 @@ Scope {
                 switch (event.key) {
                 case Qt.Key_Escape:
                     root.hide();
+                    break;
+                case Qt.Key_Space:
+                    root.apply(true);
                     break;
                 case Qt.Key_Return:
                 case Qt.Key_Enter:
