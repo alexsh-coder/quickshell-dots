@@ -5,9 +5,9 @@
 set -u
 mode=${1:-dark}
 if [ "$mode" = light ]; then
-    pref=prefer-light gtk=Breeze kde=BreezeLight icons=Tela-circle-light dark=false
+    pref=prefer-light gtk=Breeze icons=Tela-circle-light dark=false
 else
-    pref=prefer-dark gtk=Breeze-Dark kde=BreezeDark icons=Tela-circle-dark dark=true
+    pref=prefer-dark gtk=Breeze-Dark icons=Tela-circle-dark dark=true
 fi
 
 has() { command -v "$1" >/dev/null 2>&1; }
@@ -25,10 +25,7 @@ for f in "$HOME/.config/gtk-3.0/settings.ini" "$HOME/.config/gtk-4.0/settings.in
            -e "s/^gtk-icon-theme-name=.*/gtk-icon-theme-name=$icons/" "$f"
 done
 
-# Qt apps with QT_QPA_PLATFORMTHEME=kde repaint live on this
-if has plasma-apply-colorscheme; then
-    plasma-apply-colorscheme "$kde" >/dev/null 2>&1
-fi
+# The KDE color scheme is applied by services/Accent.qml, together with the accent
 if has kwriteconfig6; then
     kwriteconfig6 --file kdeglobals --group Icons --key Theme "$icons"
     has dbus-send && dbus-send --session --type=signal /KIconLoader \

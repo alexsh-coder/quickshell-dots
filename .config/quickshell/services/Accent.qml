@@ -299,12 +299,43 @@ Singleton {
         }
     }
 
+    // KDE/Qt apps (Dolphin etc. via QT_QPA_PLATFORMTHEME=kde) and GTK apps take the settled accent,
+    // not every frame of the fade: each apply repaints all of them
+    readonly property color settled: Scheme.light ? fromOklch(lightL, Math.max(toOklch(to)[1], 0.19), toOklch(to)[2]) : to
+    property bool kdeDirty: false
+
+    function pushKde() {
+        if (kde.running) {
+            kdeDirty = true;
+            return;
+        }
+        const c = settled;
+        const rgb = [c.r, c.g, c.b].map(v => Math.round(v * 255)).join(",");
+        // AccentColor with --notify makes kded's gtkconfig regenerate GTK colors.css,
+        // which Firefox/Zen read as the system AccentColor
+        kde.command = ["sh", "-c", 'plasma-apply-colorscheme -a "$1" "$2" && kwriteconfig6 --file kdeglobals --group General --key AccentColor --notify "$3"', "sh", c.toString(), Scheme.light ? "BreezeLight" : "BreezeDark", rgb];
+        kde.running = true;
+    }
+
+    onSettledChanged: pushKde()
+
+    Process {
+        id: kde
+        onExited: {
+            if (root.kdeDirty) {
+                root.kdeDirty = false;
+                root.pushKde();
+            }
+        }
+    }
+
     Component.onCompleted: {
         const last = saved.text().trim();
         if (/^#[0-9a-fA-F]{6}$/.test(last))
             from = to = last;
         pushBorder();
         pushKitty();
+        pushKde();
         pick(Wallpaper.current);
     }
 }
