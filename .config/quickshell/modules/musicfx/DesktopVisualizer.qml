@@ -291,7 +291,8 @@ PanelWindow {
             id: rings
 
             readonly property int layers: 6
-            readonly property int lag: 2
+            // Frames of extra averaging per layer: more is a longer, lazier tail
+            readonly property real lag: 1
             readonly property int res: 120
             // Mostly the low and mid bands, the top end is too quiet to shape the ring
             readonly property real span: (root.n - 1) * 0.75
@@ -299,14 +300,58 @@ PanelWindow {
             readonly property real pulse: 1 + Cava.bass * 0.1 + Cava.kick * 0.08
             readonly property real radius: root.h * 0.13 * pulse
             readonly property real amp: root.h * 0.12
+            // Each layer reaches a bit further on peaks, so colour opens up where the music hits
+            readonly property real spread: 0.06
+            // Hairline gap between layers at rest, in px
+            readonly property real gap: 1
             readonly property var player: Lyrics.player
+
+            // Palette by distance outside the white ring: a pale tint, then the wallpaper's hues in neon,
+            // each owning a stretch matching its share of the image. Hues go dominant first, then nearest hue,
+            // and blend in OKLab so hand-offs pass through soft in-between tones instead of a rainbow
+            readonly property int stopCount: 12
+            readonly property var stops: {
+                const hd = (a, b) => Math.abs((a - b + 540) % 360 - 180);
+                const pal = Accent.palette.length ? Accent.palette.slice(0, 6) : [{ w: 1, h: Accent.toOklch(Theme.accent)[2] }];
+                const order = [pal[0]], rest = pal.slice(1);
+                while (rest.length) {
+                    const last = order[order.length - 1].h;
+                    rest.sort((a, b) => hd(a.h, last) - hd(b.h, last));
+                    order.push(rest.shift());
+                }
+                const lab = ([L, C, H]) => [L, C * Math.cos(H * Math.PI / 180), C * Math.sin(H * Math.PI / 180)];
+                const neons = order.map(g => lab(Accent.neon(g.h)));
+                const pale = lab([0.93, 0.08, order[0].h]);
+                const ends = [];
+                order.reduce((acc, g) => (ends.push(acc + g.w), acc + g.w), 0);
+                const sig = x => 1 / (1 + Math.exp(-x / 0.06));
+                const paleZone = 0.06;
+                const out = [];
+                for (let k = 0; k < stopCount; k++) {
+                    const t = k / (stopCount - 1);
+                    let c;
+                    if (t < paleZone) {
+                        c = pale.map((v, j) => v + (neons[0][j] - v) * t / paleZone);
+                    } else {
+                        // Soft-edged span per hue, normalised so the weights always sum to one
+                        const u = (t - paleZone) / (1 - paleZone);
+                        const w = ends.map((e, i) => (i ? sig(u - ends[i - 1]) : 1) * (i < ends.length - 1 ? sig(e - u) : 1));
+                        const sum = w.reduce((a, b) => a + b);
+                        c = [0, 1, 2].map(j => w.reduce((acc, wi, i) => acc + wi * neons[i][j], 0) / sum);
+                    }
+                    out.push(Accent.fromOklch(c[0], Math.hypot(c[1], c[2]), Math.atan2(c[2], c[1]) * 180 / Math.PI));
+                }
+                return out;
+            }
+            // Distance outside the white ring, in px, at which the palette runs out
+            readonly property real reach: amp * 0.25
 
             property var levels: []
             property var history: []
             property var paths: []
 
             // Ring geometry lives in a box around the centre, so the MSAA layer stays small
-            readonly property real box: (root.h * 0.13 * 1.18 + amp + layers * 1.5) * 2 + 8
+            readonly property real box: (root.h * 0.13 * 1.18 + amp * (1 + layers * spread) + layers * gap) * 2 + 8
             // Static angle table: sin, cos and which band each sample reads
             readonly property var table: {
                 const rows = [];
@@ -318,10 +363,10 @@ PanelWindow {
                 return rows;
             }
 
-            // Layers differ only by averaging window plus a hairline offset,
-            // so colour shows just where the shape is moving
+            // Layers differ by averaging window, a slightly larger amplitude and a hairline offset,
+            // so colour shows mostly where the shape is moving or peaking
             function ringPath(lv, depth) {
-                const c = box / 2, base = radius + depth * 1.5, a = amp;
+                const c = box / 2, base = radius + depth * gap, a = amp * (1 + depth * spread);
                 const pts = [];
                 for (const r of table) {
                     const rad = base + root.spline(lv, r.m) * a;
@@ -333,15 +378,15 @@ PanelWindow {
             function rebuild() {
                 // Smooth shape, but little easing over time so the ring moves snappily
                 levels = root.smoothed(levels, 0.05);
-                const h = [levels].concat(history).slice(0, (layers - 1) * lag + 1);
+                const h = [levels].concat(history).slice(0, Math.round((layers - 1) * lag) + 1);
                 history = h;
-                // Layer k is a moving average over the last k * lag + 1 frames (SnGmng's AverageSize):
+                // Layer k is a moving average over the last round(k * lag) + 1 frames (SnGmng's AverageSize):
                 // the front ring stays sharp, the ones behind lag and soften into a halo
                 const sum = new Array(root.n).fill(0);
                 const out = [];
                 let f = 0;
                 for (let k = 0; k < layers; k++) {
-                    const end = Math.min(k * lag + 1, h.length);
+                    const end = Math.min(Math.round(k * lag) + 1, h.length);
                     for (; f < end; f++)
                         for (let i = 0; i < root.n; i++)
                             sum[i] += h[f][i] ?? 0;
@@ -364,12 +409,22 @@ PanelWindow {
                 layer.enabled: true
                 layer.samples: 4
 
-                // One shape for all layers, triangulated off the GUI thread.
+                // Layers are drawn as a mask and coloured by halo.frag, see there
+                layer.effect: ShaderEffect {
+                    readonly property size size: Qt.size(width, height)
+                    readonly property real reach: rings.reach
+                    readonly property var palette: strip
+
+                    fragmentShader: Qt.resolvedUrl("../../shaders/halo.frag.qsb")
+                }
+
+                // One shape for all layers, on the curve renderer: the geometry renderer either triangulates
+                // on the GUI thread, which starves the JS GC at 60 fps, or on a worker thread, which raced with
+                // per-frame path updates and segfaulted inside QtQuick.Shapes.
                 // Back to front: the most delayed, widest layer is drawn first.
                 Shape {
                     anchors.fill: parent
-                    preferredRendererType: Shape.GeometryRenderer
-                    asynchronous: true
+                    preferredRendererType: Shape.CurveRenderer
 
                     Ring { depth: 5 }
                     Ring { depth: 4 }
@@ -384,10 +439,47 @@ PanelWindow {
                 required property int depth
 
                 strokeWidth: -1
-                // Hues fan out from the accent, the classic rainbow stack kept in the house colour family
-                fillColor: depth === 0 ? "#ffffff"
-                    : Qt.hsla((Theme.accent.hslHue + depth * 0.06) % 1, Math.max(0.7, Theme.accent.hslSaturation), 0.62, 0.95 - depth * 0.08)
+                // Mask for halo.frag: green marks the white ring
+                fillColor: depth === 0 ? Qt.rgba(0, 1, 0, 1) : Qt.rgba(1, 0, 0, 1)
                 PathPolyline { path: rings.paths[depth] ?? [] }
+            }
+
+            // Palette as a strip texture for halo.frag
+            Rectangle {
+                id: paletteStrip
+                width: 64
+                height: 2
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+
+                    Stop { k: 0 }
+                    Stop { k: 1 }
+                    Stop { k: 2 }
+                    Stop { k: 3 }
+                    Stop { k: 4 }
+                    Stop { k: 5 }
+                    Stop { k: 6 }
+                    Stop { k: 7 }
+                    Stop { k: 8 }
+                    Stop { k: 9 }
+                    Stop { k: 10 }
+                    Stop { k: 11 }
+                }
+            }
+
+            ShaderEffectSource {
+                id: strip
+                sourceItem: paletteStrip
+                hideSource: true
+                width: 0
+                height: 0
+            }
+
+            component Stop: GradientStop {
+                required property int k
+
+                position: k / (rings.stopCount - 1)
+                color: rings.stops[k] ?? Theme.accent
             }
 
             // Cover art, or an accent disc when the player has none

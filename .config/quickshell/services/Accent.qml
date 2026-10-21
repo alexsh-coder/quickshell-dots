@@ -25,6 +25,12 @@ Singleton {
     readonly property color secondary: role(0.5 + 0.34 * Scheme.dark, 0.05, 0)
     readonly property color tertiary: role(0.56 + 0.26 * Scheme.dark, 0.1 + 0.07 * (1 - Scheme.dark), -60 + 120 * Scheme.dark)
 
+    // Colour balance of the wallpaper: [{ w: share, h: OKLCH hue }], biggest first.
+    // Gray, white and black don't count, close hues are merged, minor ones dropped
+    property var palette: []
+    readonly property real mergeHue: 30
+    readonly property real minShare: 0.1
+
     function role(L, C, shift, cap) {
         const [l, c, h] = toOklch(base);
         return fromOklch(L, Math.min(C, Math.max(c, cap || 0)), (h + shift + 360) % 360);
@@ -56,6 +62,32 @@ Singleton {
         saved.setText(next.toString());
     }
 
+    // Parses an ImageMagick histogram ("count: (r,g,b) #hex ..." per line)
+    function weigh(text) {
+        const bins = [];
+        const re = /(\d+):.*?(#[0-9a-fA-F]{6})/g;
+        let m;
+        while ((m = re.exec(text)))
+            bins.push([+m[1], m[2]]);
+        bins.sort((a, b) => b[0] - a[0]);
+        const groups = [];
+        for (const [count, hex] of bins) {
+            const [L, C, H] = toOklch(Qt.color(hex));
+            if (C < grayC)
+                continue;
+            let g = groups.find(g => Math.abs((Math.atan2(g.y, g.x) * 180 / Math.PI - H + 540) % 360 - 180) < mergeHue);
+            if (!g)
+                groups.push(g = { w: 0, x: 0, y: 0 });
+            g.w += count;
+            g.x += count * Math.cos(H * Math.PI / 180);
+            g.y += count * Math.sin(H * Math.PI / 180);
+        }
+        const total = groups.reduce((s, g) => s + g.w, 0);
+        const kept = groups.filter(g => g.w >= total * minShare).sort((a, b) => b.w - a.w);
+        const sum = kept.reduce((s, g) => s + g.w, 0);
+        return kept.map(g => ({ w: g.w / sum, h: (Math.atan2(g.y, g.x) * 180 / Math.PI + 360) % 360 }));
+    }
+
     function fromSources(text) {
         for (const hex of text.match(/#[0-9a-fA-F]{6}\b/g) || []) {
             const [L, C, H] = toOklch(Qt.color(hex));
@@ -63,6 +95,22 @@ Singleton {
                 return fromOklch(targetL, Math.min(Math.max(C, minC), maxC), H);
         }
         return fallback;
+    }
+
+    // Most saturated in-gamut colour of a hue, at the lightness where it is juiciest but never dark:
+    // yellow peaks near 0.9, blue near 0.72
+    function neon(H) {
+        let best = [0.72, 0, H];
+        for (let L = 0.72; L <= 0.9; L += 0.02) {
+            let lo = 0, hi = 0.4;
+            for (let i = 0; i < 16; i++) {
+                const mid = (lo + hi) / 2;
+                rawRgb(L, mid, H).every(c => c >= -1e-4 && c <= 1 + 1e-4) ? lo = mid : hi = mid;
+            }
+            if (lo > best[1])
+                best = [L, lo, H];
+        }
+        return best;
     }
 
     // Interpolates in OKLCH so distant hues don't pass through gray
@@ -132,11 +180,19 @@ Singleton {
         id: matugen
         stdout: StdioCollector {
             onStreamFinished: {
-                if (root.ranFor === root.wanted)
+                if (root.ranFor === root.wanted) {
                     root.fade(root.fromSources(text));
-                else
+                    histogram.exec(["magick", root.ranFor, "-resize", "128x128", "-colors", "12", "-depth", "8", "-format", "%c", "histogram:info:-"]);
+                } else
                     root.pick(root.wanted);
             }
+        }
+    }
+
+    Process {
+        id: histogram
+        stdout: StdioCollector {
+            onStreamFinished: root.palette = root.weigh(text)
         }
     }
 
