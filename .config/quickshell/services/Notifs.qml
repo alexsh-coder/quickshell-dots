@@ -16,7 +16,9 @@ Singleton {
     readonly property int maxHistory: 50
 
     function add(n) {
-        const entry = entryComp.createObject(root, { notification: n, popup: !dnd || n.urgency === NotificationUrgency.Critical });
+        // Carried over by keepOnReload: back into history without popping
+        const pop = !n.lastGeneration && (!dnd || n.urgency === NotificationUrgency.Critical);
+        const entry = entryComp.createObject(root, { notification: n, popup: pop });
         list = [entry, ...list];
         for (const old of list.slice(maxHistory))
             old.close();
@@ -161,8 +163,5 @@ Singleton {
 
     Component.onCompleted: {
         dnd = saved.text().trim() === "1";
-        // Notifications kept across a reload come back into the history
-        list = server.trackedNotifications.values.slice().reverse()
-            .map(n => entryComp.createObject(root, { notification: n }));
     }
 }
