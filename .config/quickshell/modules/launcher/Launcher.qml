@@ -239,7 +239,8 @@ Scope {
             id: card
 
             x: (parent.width - width) / 2
-            y: parent.height * 0.2
+            // Centered as if the list were full, so the search field stays put while results come and go
+            y: (parent.height - (24 + 48 + 8 + root.maxRows * root.rowHeight)) / 2
             width: 560
             height: content.implicitHeight + 24
             radius: Theme.radius + 6
@@ -349,14 +350,14 @@ Scope {
                         id: addTrans
                         SequentialAnimation {
                             PropertyAction { property: "opacity"; value: 0 }
-                            PropertyAction { property: "scale"; value: root.entering ? 0.86 : 1 }
-                            PropertyAction { property: "lift"; value: root.entering ? 14 : 0 }
+                            PropertyAction { property: "scale"; value: root.entering ? 1 - 0.14 * Math.pow(0.72, addTrans.ViewTransition.index) : 1 }
+                            PropertyAction { property: "lift"; value: root.entering ? 14 * Math.pow(0.72, addTrans.ViewTransition.index) : 0 }
                             PauseAnimation { duration: Math.max(0, Math.min(addTrans.ViewTransition.index, 10)) * (root.entering ? 45 : 18) }
                             ParallelAnimation {
                                 NumberAnimation { property: "opacity"; to: 1; duration: Theme.anim }
                                 NumberAnimation { property: "x"; from: root.entering ? 0 : 16; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
-                                NumberAnimation { property: "scale"; to: 1; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 2.6 }
-                                NumberAnimation { property: "lift"; to: 0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 2.6 }
+                                NumberAnimation { property: "scale"; to: 1; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 0.5 + 2.1 * Math.pow(0.72, addTrans.ViewTransition.index) }
+                                NumberAnimation { property: "lift"; to: 0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 0.5 + 2.1 * Math.pow(0.72, addTrans.ViewTransition.index) }
                             }
                         }
                     }
