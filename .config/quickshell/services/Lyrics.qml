@@ -5,7 +5,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 
-// Time-synced lyrics for the active MPRIS player, fetched from lrclib.net
+// Time-synced lyrics for the active MPRIS player, word-synced where available
+// (see scripts/lyrics.py)
 Singleton {
     id: root
 
@@ -26,27 +27,10 @@ Singleton {
             debounce.restart();
     }
 
-    function parse(lrc) {
-        const out = [];
-        for (const raw of (lrc ?? "").split("\n")) {
-            const text = raw.replace(/\[[^\]]*\]/g, "").trim();
-            const re = /\[(\d+):(\d+(?:\.\d+)?)\]/g;
-            let m;
-            while ((m = re.exec(raw)))
-                out.push({ time: +m[1] * 60 + +m[2], text: text });
-        }
-        out.sort((a, b) => a.time - b.time);
-        if (out.length && out[0].time > 0)
-            out.unshift({ time: 0, text: "" });
-        return out;
-    }
-
-    function pick(json) {
-        const items = Array.isArray(json) ? json : [json];
-        const len = player?.length ?? 0;
-        const synced = items.filter(i => i?.syncedLyrics);
-        synced.sort((a, b) => Math.abs(a.duration - len) - Math.abs(b.duration - len));
-        return synced[0]?.syncedLyrics ?? "";
+    // Drops all cached lyrics: a hand-made file also covers other versions of the track
+    function reload() {
+        cache = {};
+        load();
     }
 
     function update() {
@@ -67,11 +51,8 @@ Singleton {
             if (!p)
                 return;
             fetch.reqKey = root.key;
-            fetch.exec(["sh", "-c", `
-                curl -sf -m 10 -G "$1/get" --data-urlencode "artist_name=$2" --data-urlencode "track_name=$3" \
-                    --data-urlencode "album_name=$4" --data-urlencode "duration=$5" ||
-                curl -sf -m 10 -G "$1/search" --data-urlencode "artist_name=$2" --data-urlencode "track_name=$3"`,
-                "sh", "https://lrclib.net/api", p.trackArtist, p.trackTitle, p.trackAlbum, String(Math.round(p.length))]);
+            fetch.exec(["python3", Quickshell.shellDir + "/scripts/lyrics.py",
+                p.trackArtist, p.trackTitle, p.trackAlbum, String(p.length)]);
         }
     }
 
@@ -82,7 +63,7 @@ Singleton {
             onStreamFinished: {
                 let lines;
                 try {
-                    lines = root.parse(root.pick(JSON.parse(text)));
+                    lines = JSON.parse(text);
                 } catch (e) {
                     return;
                 }
