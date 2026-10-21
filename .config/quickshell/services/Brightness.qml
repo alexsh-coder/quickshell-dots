@@ -15,6 +15,11 @@ Singleton {
 
     function raise() { step("1%+"); }
     function lower() { step("1%-"); }
+    // Absolute level, 0..1; shown right away, brightnessctl catches up
+    function set(v) {
+        value = v;
+        step(Math.round(v * 100) + "%");
+    }
 
     function step(delta) {
         if (proc.running) {

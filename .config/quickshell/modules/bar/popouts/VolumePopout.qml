@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell.Services.Pipewire
 import qs.config
 import qs.components
+import qs.services
 
 Item {
     id: root
@@ -23,6 +24,13 @@ Item {
         target: root.popouts
         property: "busy"
         value: output.pressed
+        when: root.here
+    }
+
+    Binding {
+        target: OsdGate
+        property: "volumePanel"
+        value: true
         when: root.here
     }
 

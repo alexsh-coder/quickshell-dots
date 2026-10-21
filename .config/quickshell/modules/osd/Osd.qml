@@ -92,19 +92,20 @@ Scope {
 
     Connections {
         target: root.sink?.audio ?? null
-        enabled: root.armed
+        enabled: root.armed && !OsdGate.volume
         function onVolumesChanged() { root.showVolume(); }
         function onMutedChanged() { root.showVolume(); }
     }
 
     Connections {
         target: root.source?.audio ?? null
-        enabled: root.armed
+        enabled: root.armed && !OsdGate.mic
         function onMutedChanged() { root.showMic(); }
     }
 
     Connections {
         target: Brightness
+        enabled: !OsdGate.brightness
         function onStepped() { root.showBar("brightness", "light_mode", Brightness.value, false); }
     }
 

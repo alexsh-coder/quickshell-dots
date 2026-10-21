@@ -10,6 +10,7 @@ import qs.modules.musicfx
 import qs.modules.notifications
 import qs.modules.osd
 import qs.modules.overview
+import qs.modules.quicksettings
 import qs.modules.wallpaper
 
 // 
@@ -48,4 +49,5 @@ ShellRoot {
     Clipboard {}
     Lock {}
     WallpaperPicker {}
+    QuickSettingsCard {}
 }
