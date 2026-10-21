@@ -10,6 +10,10 @@ Item {
 
     required property var modelData
     readonly property var entry: modelData
+    // Shown in the notification center: no countdown, acting on it dismisses it
+    property bool history: false
+
+    signal activated
 
     readonly property bool critical: entry.urgency === NotificationUrgency.Critical
     readonly property int timeout: critical ? 0
@@ -51,7 +55,7 @@ Item {
         from: 1
         to: 0
         duration: root.timeout
-        running: root.timeout > 0
+        running: !root.history && root.timeout > 0
         paused: running && root.held
         onFinished: root.entry.popup = false
     }
@@ -59,18 +63,26 @@ Item {
     Connections {
         target: root.entry
         function onRefreshed() {
-            if (root.timeout > 0)
+            if (!root.history && root.timeout > 0)
                 countdown.restart();
         }
     }
 
-    function activate() {
-        if (defaultAction) {
-            entry.invoke(defaultAction.id);
-            entry.popup = false;
+    function act(id) {
+        if (id)
+            entry.invoke(id);
+        if (history) {
+            if (id)
+                entry.close();
+            activated();
         } else {
             entry.popup = false;
         }
+    }
+
+    function activate() {
+        if (defaultAction || !history)
+            act(defaultAction?.id ?? "");
     }
 
     Rectangle {
@@ -79,7 +91,7 @@ Item {
         width: parent.width
         height: content.implicitHeight + 28
         radius: Theme.radius + 4
-        color: Qt.alpha(Theme.bg, 0.88)
+        color: root.history ? Theme.surface : Qt.alpha(Theme.bg, 0.88)
         border.width: 1
         border.color: root.critical ? Qt.alpha(Theme.urgent, 0.6) : Qt.alpha(Theme.text, root.held ? 0.1 : 0.05)
         opacity: 1 - Math.max(0, x) / width * 0.8
@@ -300,10 +312,7 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    root.entry.invoke(button.modelData.id);
-                                    root.entry.popup = false;
-                                }
+                                onClicked: root.act(button.modelData.id)
                             }
                         }
                     }
@@ -313,7 +322,7 @@ Item {
 
         // Time left; stops while the card is hovered
         Rectangle {
-            visible: root.timeout > 0
+            visible: !root.history && root.timeout > 0
             x: card.radius
             y: card.height - 3
             width: (card.width - card.radius * 2) * root.life

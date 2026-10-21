@@ -41,6 +41,7 @@ ShellRoot {
     }
 
     Notifications {}
+    NotificationCenter {}
     Osd {}
     Overview {}
     Launcher {}

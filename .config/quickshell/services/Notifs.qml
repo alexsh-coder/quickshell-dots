@@ -13,15 +13,21 @@ Singleton {
     property var list: []
     readonly property var popups: list.filter(n => n.popup)
     property bool dnd: false
+    // Notification center is open: new ones land in its list instead of popping
+    property bool centerOpen: false
     readonly property int maxHistory: 50
 
     function add(n) {
         // Carried over by keepOnReload: back into history without popping
-        const pop = !n.lastGeneration && (!dnd || n.urgency === NotificationUrgency.Critical);
+        const pop = !n.lastGeneration && root.shouldPop(n.urgency);
         const entry = entryComp.createObject(root, { notification: n, popup: pop });
         list = [entry, ...list];
         for (const old of list.slice(maxHistory))
             old.close();
+    }
+
+    function shouldPop(urgency) {
+        return !centerOpen && (!dnd || urgency === NotificationUrgency.Critical);
     }
 
     function clear() {
@@ -125,7 +131,7 @@ Singleton {
 
         function update() {
             copy();
-            if (!root.dnd || urgency === NotificationUrgency.Critical)
+            if (root.shouldPop(urgency))
                 popup = true;
             refreshed();
         }
