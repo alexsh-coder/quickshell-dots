@@ -113,7 +113,7 @@ Scope {
     readonly property string wallDir: Quickshell.cachePath("lock")
 
     function prepareWall() {
-        const src = Wallpaper.current;
+        const src = Wallpaper.image;
         wall = src;
         if (!src)
             return;
@@ -125,7 +125,7 @@ Scope {
 
     Connections {
         target: Wallpaper
-        function onCurrentChanged() {
+        function onImageChanged() {
             root.prepareWall();
         }
     }

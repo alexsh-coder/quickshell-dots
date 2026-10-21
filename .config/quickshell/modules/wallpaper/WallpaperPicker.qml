@@ -22,7 +22,7 @@ Scope {
     readonly property int thumbH: 162
     readonly property int gap: 8
     readonly property int tagRow: 36
-    readonly property string tagPath: tagIndex < tags.count ? tags.get(tagIndex, "filePath") : ""
+    readonly property string tagPath: tagIndex < tags.length ? tags[tagIndex].path : ""
 
     // The strip loops only when there are enough images to fill it; a short tag just sits centered
     readonly property int n: files.count
@@ -49,8 +49,8 @@ Scope {
 
     function selectCurrent() {
         const cur = Wallpaper.current;
-        for (let i = 0; i < tags.count; i++) {
-            if (cur.startsWith(tags.get(i, "filePath") + "/")) {
+        for (let i = 0; i < tags.length; i++) {
+            if (cur.startsWith(tags[i].path + "/")) {
                 tagIndex = i;
                 break;
             }
@@ -112,10 +112,10 @@ Scope {
     }
 
     function switchTag(by) {
-        if (tags.count < 2)
+        if (tags.length < 2)
             return;
         slideDir = by;
-        tagIndex = (tagIndex + by + tags.count) % tags.count;
+        tagIndex = (tagIndex + by + tags.length) % tags.length;
     }
 
     function currentPath() {
@@ -126,6 +126,8 @@ Scope {
         const path = currentPath();
         if (!path)
             return;
+        // Leaving a video first freezes it to a still, which pushes the transition back
+        restore.interval = Wallpaper.video ? 1500 : 900;
         Wallpaper.set(path);
         if (keepOpen)
             return;
@@ -147,9 +149,26 @@ Scope {
         onTriggered: root.windowsFade("show")
     }
 
+    // Image folders first, then video ones
+    readonly property var tags: {
+        const out = [];
+        for (const m of [imageTags, videoTags])
+            for (let i = 0; i < m.count; i++)
+                out.push({ name: m.get(i, "fileName"), path: m.get(i, "filePath") });
+        return out;
+    }
+
     FolderListModel {
-        id: tags
+        id: imageTags
         folder: "file://" + Wallpaper.dir
+        showFiles: false
+        showDotAndDotDot: false
+        sortField: FolderListModel.Name
+    }
+
+    FolderListModel {
+        id: videoTags
+        folder: "file://" + Wallpaper.videoDir
         showFiles: false
         showDotAndDotDot: false
         sortField: FolderListModel.Name
@@ -160,7 +179,7 @@ Scope {
         folder: root.tagPath ? "file://" + root.tagPath : ""
         showDirs: false
         caseSensitive: false
-        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp"]
+        nameFilters: Wallpaper.filters
         sortField: FolderListModel.Name
         onStatusChanged: {
             if (status === FolderListModel.Ready)
@@ -190,6 +209,7 @@ Scope {
         function close(): void { root.hide(); }
         // Picks from the tag last shown in the picker, so it never wanders into another folder
         function random(): void { root.applyRandom(); }
+        function set(path: string): void { Wallpaper.set(path); }
     }
 
     PanelWindow {
@@ -298,7 +318,7 @@ Scope {
                 height: Math.min(root.thumbH, count * root.tagRow)
                 clip: true
                 interactive: false
-                model: tags
+                model: root.tags
                 currentIndex: root.tagIndex
                 highlightMoveDuration: Theme.anim
                 highlightMoveVelocity: -1
@@ -317,8 +337,7 @@ Scope {
                     id: tagItem
 
                     required property int index
-                    required property string fileName
-                    required property string filePath
+                    required property var modelData
                     readonly property bool current: index === root.tagIndex
 
                     width: tagList.width
@@ -326,7 +345,7 @@ Scope {
 
                     FolderListModel {
                         id: tagFiles
-                        folder: "file://" + tagItem.filePath
+                        folder: "file://" + tagItem.modelData.path
                         showDirs: false
                         caseSensitive: false
                         nameFilters: files.nameFilters
@@ -337,7 +356,7 @@ Scope {
                         anchors.verticalCenter: parent.verticalCenter
                         width: parent.width - 50
                         elide: Text.ElideRight
-                        text: tagItem.fileName
+                        text: tagItem.modelData.name
                         color: tagItem.current ? Theme.text : Theme.subtext
                         Behavior on color { ColorAnimation { duration: Theme.anim } }
                     }
@@ -439,13 +458,28 @@ Scope {
                                 color: Qt.alpha(Theme.bg, 0.6)
 
                                 Image {
+                                    id: thumb
+
+                                    readonly property string url: "file://" + Wallpaper.thumb(tile.filePath)
+
                                     anchors.fill: parent
-                                    source: "file://" + tile.filePath
+                                    source: url
                                     sourceSize.width: root.thumbW * 2
                                     fillMode: Image.PreserveAspectCrop
                                     asynchronous: true
                                     opacity: status === Image.Ready ? 1 : 0
                                     Behavior on opacity { NumberAnimation { duration: Theme.anim } }
+
+                                    // A video's poster may still be on its way when the tile shows up
+                                    Connections {
+                                        target: Wallpaper
+                                        function onPostersChanged() {
+                                            if (thumb.status !== Image.Error)
+                                                return;
+                                            thumb.source = "";
+                                            thumb.source = Qt.binding(() => thumb.url);
+                                        }
+                                    }
                                 }
                             }
 
@@ -516,7 +550,7 @@ Scope {
                     elide: Text.ElideRight
                     font.pixelSize: 14
                     text: root.n === 0
-                          ? (tags.count === 0 ? "No folders in " + Wallpaper.dir : "No images here")
+                          ? (root.tags.length === 0 ? "No folders in " + Wallpaper.dir + " or " + Wallpaper.videoDir : "Nothing here")
                           : root.prettify(files.get(strip.currentIndex % root.n, "fileBaseName") ?? "")
                 }
 

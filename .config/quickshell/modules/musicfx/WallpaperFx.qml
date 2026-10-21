@@ -10,12 +10,13 @@ import qs.services
 PanelWindow {
     id: root
 
-    property string source: Wallpaper.current
+    property string source: Wallpaper.image
     // Hidden while awww runs its own transition, so that one stays visible
     property bool swapping: false
     property real time: 0
 
-    readonly property bool active: MusicFx.wallpaperFx && Cava.active && source !== "" && !swapping
+    // Off over a video wallpaper, which a still copy would only freeze
+    readonly property bool active: MusicFx.wallpaperFx && Cava.active && source !== "" && !swapping && !Wallpaper.video
     readonly property real zoom: MusicFx.zoom ? Cava.bass * 0.04 * MusicFx.gain("zoom") : 0
     // Trauma squared, as in game screen shake, so small kicks stay subtle
     readonly property real shakeAmp: MusicFx.shake ? Cava.kick * Cava.kick * 14 * MusicFx.gain("shake") : 0
@@ -37,7 +38,7 @@ PanelWindow {
 
     Connections {
         target: Wallpaper
-        function onCurrentChanged() {
+        function onImageChanged() {
             root.swapping = true;
             swap.restart();
         }
@@ -47,7 +48,7 @@ PanelWindow {
         id: swap
         interval: 900
         onTriggered: {
-            root.source = Wallpaper.current;
+            root.source = Wallpaper.image;
             root.swapping = false;
         }
     }

@@ -206,8 +206,8 @@ Singleton {
 
     Connections {
         target: Wallpaper
-        function onCurrentChanged() {
-            root.pick(Wallpaper.current);
+        function onImageChanged() {
+            root.pick(Wallpaper.image);
         }
     }
 
@@ -336,6 +336,6 @@ Singleton {
         pushBorder();
         pushKitty();
         pushKde();
-        pick(Wallpaper.current);
+        pick(Wallpaper.image);
     }
 }

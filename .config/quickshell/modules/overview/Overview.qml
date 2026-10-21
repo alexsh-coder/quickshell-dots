@@ -486,7 +486,7 @@ Scope {
                     id: wall
 
                     anchors.fill: parent
-                    source: Wallpaper.current ? "file://" + Wallpaper.current : ""
+                    source: Wallpaper.image ? "file://" + Wallpaper.image : ""
                     sourceSize: Qt.size(width, height)
                     fillMode: Image.PreserveAspectCrop
                     cache: false
