@@ -283,7 +283,7 @@ PanelWindow {
     }
 
     // Trap Nation style: stacked smooth closed curves around the cover art, each layer
-    // lagging a few frames behind the one in front, the whole thing kicking on the bass
+    // averaging over more frames than the one in front, the whole thing kicking on the bass
     Component {
         id: nation
 
@@ -318,7 +318,7 @@ PanelWindow {
                 return rows;
             }
 
-            // Every layer has the same amplitude; they only differ by delay plus a hairline offset,
+            // Layers differ only by averaging window plus a hairline offset,
             // so colour shows just where the shape is moving
             function ringPath(lv, depth) {
                 const c = box / 2, base = radius + depth * 1.5, a = amp;
@@ -332,12 +332,21 @@ PanelWindow {
 
             function rebuild() {
                 // Smooth shape, but little easing over time so the ring moves snappily
-                levels = root.smoothed(levels, 0.15);
-                const h = [levels].concat(history).slice(0, layers * lag);
+                levels = root.smoothed(levels, 0.05);
+                const h = [levels].concat(history).slice(0, (layers - 1) * lag + 1);
                 history = h;
+                // Layer k is a moving average over the last k * lag + 1 frames (SnGmng's AverageSize):
+                // the front ring stays sharp, the ones behind lag and soften into a halo
+                const sum = new Array(root.n).fill(0);
                 const out = [];
-                for (let k = 0; k < layers; k++)
-                    out.push(ringPath(h[Math.min(k * lag, h.length - 1)], k));
+                let f = 0;
+                for (let k = 0; k < layers; k++) {
+                    const end = Math.min(k * lag + 1, h.length);
+                    for (; f < end; f++)
+                        for (let i = 0; i < root.n; i++)
+                            sum[i] += h[f][i] ?? 0;
+                    out.push(ringPath(sum.map(s => s / f), k));
+                }
                 paths = out;
             }
 
@@ -376,7 +385,7 @@ PanelWindow {
 
                 strokeWidth: -1
                 // Hues fan out from the accent, the classic rainbow stack kept in the house colour family
-                fillColor: depth === 0 ? Theme.text
+                fillColor: depth === 0 ? "#ffffff"
                     : Qt.hsla((Theme.accent.hslHue + depth * 0.06) % 1, Math.max(0.7, Theme.accent.hslSaturation), 0.62, 0.95 - depth * 0.08)
                 PathPolyline { path: rings.paths[depth] ?? [] }
             }
@@ -389,7 +398,7 @@ PanelWindow {
                 radius: width / 2
                 color: Theme.bg
                 border.width: 3
-                border.color: Theme.text
+                border.color: "#ffffff"
 
                 ClippingRectangle {
                     anchors.fill: parent
