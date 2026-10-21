@@ -312,8 +312,10 @@ Singleton {
         const c = settled;
         const rgb = [c.r, c.g, c.b].map(v => Math.round(v * 255)).join(",");
         // AccentColor with --notify makes kded's gtkconfig regenerate GTK colors.css,
-        // which Firefox/Zen read as the system AccentColor
-        kde.command = ["sh", "-c", 'plasma-apply-colorscheme -a "$1" "$2" && kwriteconfig6 --file kdeglobals --group General --key AccentColor --notify "$3"', "sh", c.toString(), Scheme.light ? "BreezeLight" : "BreezeDark", rgb];
+        // which Firefox/Zen read as the system AccentColor.
+        // plasma-apply-colorscheme -a signals the palette change before kdeglobals is written,
+        // so running Qt apps (Telegram etc.) reload the old colors; signal again once it's on disk
+        kde.command = ["sh", "-c", 'plasma-apply-colorscheme -a "$1" "$2" && kwriteconfig6 --file kdeglobals --group General --key AccentColor --notify "$3" && dbus-send --session --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:0 int32:0', "sh", c.toString(), Scheme.light ? "BreezeLight" : "BreezeDark", rgb];
         kde.running = true;
     }
 
