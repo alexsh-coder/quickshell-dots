@@ -19,9 +19,11 @@ Item {
     readonly property int overlap: 6
 
     property string shownName: ""
+    // Media page shows its music effects section
+    property bool fx: false
     property real center: 0
     property real drawnCenter: center
-    readonly property Item page: ({ keyboard: keyboardPage, network: networkPage, vpn: vpnPage, bluetooth: bluetoothPage, volume: volumePage, power: powerPage, calendar: calendarPage, battery: batteryPage })[shownName] ?? null
+    readonly property Item page: ({ keyboard: keyboardPage, network: networkPage, vpn: vpnPage, bluetooth: bluetoothPage, volume: volumePage, power: powerPage, calendar: calendarPage, battery: batteryPage, media: mediaPage })[shownName] ?? null
 
     function show(name, item) {
         closeTimer.stop();
@@ -46,6 +48,8 @@ Item {
         pinned = false;
         current = "";
     }
+
+    onCurrentChanged: if (current !== "media") fx = false
 
     Timer {
         id: closeTimer
@@ -147,6 +151,7 @@ Item {
             Page { id: batteryPage; name: "battery"; BatteryPopout { popouts: root; here: parent.here } }
             Page { id: calendarPage; name: "calendar"; CalendarPopout { popouts: root; here: parent.here } }
             Page { id: powerPage; name: "power"; PowerPopout { popouts: root; here: parent.here } }
+            Page { id: mediaPage; name: "media"; MediaPopout { popouts: root; here: parent.here } }
         }
     }
 

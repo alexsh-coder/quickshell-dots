@@ -36,7 +36,8 @@ PanelWindow {
         { name: "volume", item: volume },
         { name: "battery", item: battery },
         { name: "calendar", item: clock },
-        { name: "power", item: power }
+        { name: "power", item: power },
+        { name: "media", item: visualizer }
     ]
 
     // Hit zones hug the items: the gaps between them are neutral, so a diagonal
@@ -63,10 +64,10 @@ PanelWindow {
     property Item hovered: null
     readonly property Item litItem: triggers.find(t => t.name === popouts.current)?.item ?? null
     // While a panel is open the pill marks its item, so it moves together with the panel
-    // The clock is a pill of its own and lights up by itself
+    // The clock is a pill of its own and lights up by itself, the visualizer needs none
     readonly property Item pillItem: {
         const item = popouts.open ? litItem : hovered;
-        return item === clock ? null : item;
+        return item === clock || item === visualizer ? null : item;
     }
 
     function track() {
@@ -129,6 +130,25 @@ PanelWindow {
         }
     }
 
+    IpcHandler {
+        target: "media"
+        enabled: root.screen?.name === Hyprland.focusedMonitor?.name
+
+        function toggle(): void {
+            if (popouts.current === "media")
+                popouts.close();
+            else
+                root.openMedia(false);
+        }
+    }
+
+    function openMedia(fx) {
+        popouts.close();
+        popouts.show("media", visualizer);
+        popouts.pinned = true;
+        popouts.fx = fx;
+    }
+
     HyprlandFocusGrab {
         windows: [root]
         active: popouts.pinned
@@ -178,7 +198,18 @@ PanelWindow {
 
                     OsLogo {}
                     Workspaces { screen: root.screen }
-                    Visualizer {}
+                    Visualizer {
+                        id: visualizer
+                        // Right click opens the player with its effects section, or folds it back
+                        onFxRequested: {
+                            if (popouts.current !== "media")
+                                return root.openMedia(true);
+                            if (popouts.fx && popouts.pinned)
+                                return popouts.close();
+                            popouts.fx = true;
+                            popouts.pinned = true;
+                        }
+                    }
                 }
             }
 

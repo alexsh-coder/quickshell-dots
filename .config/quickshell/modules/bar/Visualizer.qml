@@ -1,11 +1,12 @@
 import QtQuick
 import QtQuick.Effects
+import Quickshell.Services.Mpris
 import qs.config
 import qs.services
-import qs.modules.musicfx
 
-// Mirrored spectrum bars that read like a waveform; folds away when nothing plays.
-// Click opens the music effects menu, wheel changes intensity.
+// Mirrored spectrum bars that read like a waveform; dims while paused, folds away without a track.
+// Hover opens the player panel, click plays/pauses, right click opens it with the music effects,
+// wheel changes intensity.
 Item {
     id: root
 
@@ -14,11 +15,13 @@ Item {
     readonly property int gap: 2
     readonly property int fullWidth: count * barWidth + (count - 1) * gap
     readonly property list<real> values: Cava.downsample(count)
+    readonly property bool present: Mpris.players.values.some(p => p.trackTitle)
+    signal fxRequested
 
-    implicitWidth: Cava.active || menu.open ? fullWidth : 0
+    implicitWidth: Cava.active || present ? fullWidth : 0
     implicitHeight: 24
     anchors.verticalCenter: parent.verticalCenter
-    opacity: Cava.active ? 1 : menu.open ? 0.4 : 0
+    opacity: Cava.active ? 1 : present ? 0.4 : 0
     visible: implicitWidth > 0
 
     Behavior on implicitWidth { NumberAnimation { duration: Theme.anim * 1.4; easing.type: Easing.OutCubic } }
@@ -61,13 +64,17 @@ Item {
     MouseArea {
         anchors.fill: parent
         anchors.margins: -6
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.PointingHandCursor
-        onClicked: menu.toggle()
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton) {
+                root.fxRequested();
+                return;
+            }
+            const p = Mpris.players.values.find(p => p.isPlaying) ?? Mpris.players.values[0];
+            if (p?.canTogglePlaying)
+                p.togglePlaying();
+        }
         onWheel: wheel => MusicFx.setIntensity(MusicFx.intensity + (wheel.angleDelta.y > 0 ? 0.05 : -0.05))
-    }
-
-    MusicFxMenu {
-        id: menu
-        anchorItem: root
     }
 }
