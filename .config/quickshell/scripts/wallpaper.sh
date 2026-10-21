@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Sets the wallpaper. Images go to awww; videos loop in mpvpaper over awww, which holds a
-# poster of their first frame, so awww's transition hands over to the video without a jump.
+# poster of their first frame. Quickshell runs the transition into a video itself, over the
+# already playing player (see modules/wallpaper/WallpaperTransition.qml).
 # Usage:
 #   wallpaper.sh set FILE [POSTER]    switch to FILE; POSTER is where a video's first frame is kept
 #   wallpaper.sh play VIDEO           start VIDEO unless one is already playing
+#   wallpaper.sh freeze FRAME         pause the video that's on and save the frame it shows to FRAME
+#   wallpaper.sh start VIDEO POSTER   replace the video that's on, starting from POSTER in awww
 #   wallpaper.sh poster VIDEO POSTER  write VIDEO's first frame to POSTER unless it's up to date
 #   wallpaper.sh posters CACHE DIR    posters for every video under DIR, named by md5 of the path
 set -u
@@ -53,23 +56,55 @@ screenshot() {
     return 1
 }
 
-# Leaves awww showing the frame the video is paused on, so the next transition starts from it.
 # mpv can't screenshot frames that stay on the GPU, so it re-decodes the paused one with copy-back
 # first (playing that way all along costs several times the CPU); ffmpeg is the fallback
-stop() {
-    pgrep -x mpvpaper >/dev/null || return 0
+freeze() {
+    pgrep -x mpvpaper >/dev/null || return 1
     mpv '{"command":["set_property","pause",true]}' >/dev/null
-    local t video frame=$run-frame.jpg
+    local t video
     t=$(mpv '{"command":["get_property","time-pos"]}' | sed -n 's/.*"data":\([0-9.]*\).*/\1/p')
     video=$(cat "$run.video" 2>/dev/null)
     mpv '{"command":["set_property","hwdec","auto-copy-safe"]}' >/dev/null
-    if screenshot "$frame" || { [ -n "$t" ] && [ -f "$video" ] &&
-        ffmpeg -nostdin -v error -y -ss "$t" -i "$video" -frames:v 1 -q:v 2 "$frame"; }; then
+    screenshot "$1" || { [ -n "$t" ] && [ -f "$video" ] &&
+        ffmpeg -nostdin -v error -y -ss "$t" -i "$video" -frames:v 1 -q:v 2 "$1"; }
+}
+
+kill_player() {
+    pkill -x mpvpaper || return 0
+    local i
+    for i in $(seq 50); do
+        pgrep -x mpvpaper >/dev/null || break
+        sleep 0.02
+    done
+    rm -f "$sock" "$run.video"
+}
+
+# Leaves awww showing the frame the video is paused on, so the next transition starts from it
+stop() {
+    local frame=$run-frame.jpg
+    if freeze "$frame"; then
         awww img "$frame" --transition-type none
         sleep 0.15
     fi
-    pkill -x mpvpaper
-    rm -f "$sock" "$run.video"
+    kill_player
+}
+
+# Prints "poster" once awww holds it with the old player gone, then waits until the new one plays
+start() {
+    [ -f "$run.pid" ] && kill "$(cat "$run.pid")" 2>/dev/null
+    echo $$ >"$run.pid"
+    awww img "$2" --transition-type none
+    kill_player
+    echo poster
+    play "$1" || exit 1
+    local i
+    for i in $(seq 100); do
+        mpv '{"command":["get_property","playback-time"]}' |
+            sed -n 's/.*"data":\([0-9.]*\).*/\1/p' | awk '$1 > 0 { ok = 1 } END { exit !ok }' && break
+        sleep 0.03
+    done
+    echo ready
+    rm -f "$run.pid"
 }
 
 set_wallpaper() {
@@ -92,6 +127,8 @@ set_wallpaper() {
 case "${1:-}" in
 set) set_wallpaper "$2" "${3:-}" ;;
 play) play "$2" ;;
+freeze) freeze "$2" ;;
+start) start "$2" "$3" ;;
 poster) poster "$2" "$3" ;;
 posters)
     find "$3" -type f | while IFS= read -r f; do
@@ -99,7 +136,7 @@ posters)
     done
     ;;
 *)
-    sed -n '2,9s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,12s/^# \{0,1\}//p' "$0" >&2
     exit 1
     ;;
 esac

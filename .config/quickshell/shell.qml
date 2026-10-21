@@ -32,6 +32,7 @@ ShellRoot {
             id: desk
             required property var modelData
 
+            WallpaperTransition { screen: desk.modelData }
             WallpaperFx { screen: desk.modelData }
             DesktopVisualizer { screen: desk.modelData }
         }

@@ -126,8 +126,9 @@ Scope {
         const path = currentPath();
         if (!path)
             return;
-        // Leaving a video first freezes it to a still, which pushes the transition back
-        restore.interval = Wallpaper.video ? 1500 : 900;
+        // Leaving a video first freezes it to a still, which pushes the transition back. A new
+        // video takes as long as its player needs to start, so that switch reports when it's done
+        restore.interval = Wallpaper.isVideo(path) && path !== Wallpaper.current ? 4000 : Wallpaper.video ? 1500 : 900;
         Wallpaper.set(path);
         if (keepOpen)
             return;
@@ -147,6 +148,16 @@ Scope {
         id: restore
         interval: 900
         onTriggered: root.windowsFade("show")
+    }
+
+    Connections {
+        target: Wallpaper
+        function onSettled() {
+            if (restore.running) {
+                restore.stop();
+                root.windowsFade("show");
+            }
+        }
     }
 
     // Image folders first, then video ones

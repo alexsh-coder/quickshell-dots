@@ -539,6 +539,15 @@ hl.layer_rule({
     no_anim = true,
 })
 
+-- Quickshell's cover for a switch to a video: has to be full screen at once, and between switches
+-- it idles at 1x1, which an animation would only grow out of a corner
+hl.layer_rule({
+    name  = "wallpaper-transition",
+    match = { namespace = "^wallpaper-transition$" },
+
+    no_anim = true,
+})
+
 -- Quickshell overview starts and ends as an exact copy of the screen
 hl.layer_rule({
     name  = "overview",

@@ -4,7 +4,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Images are shown by awww, videos by mpvpaper on top of it (see scripts/wallpaper.sh)
+// Images are shown by awww, videos by mpvpaper on top of it (see scripts/wallpaper.sh).
+// Switching to a video, a still of the old wallpaper covers the screen (WallpaperTransition)
+// while the new player starts underneath, then a circle cut out of it reveals the video playing.
 Singleton {
     id: root
 
@@ -22,6 +24,20 @@ Singleton {
     property string image: ""
     // Bumped when new posters land, so thumbnails that failed to load can retry
     property int posters: 0
+
+    // The still shown over a video that's starting up, and how far the circle has cut through it
+    property string cover: ""
+    property real reveal: 0
+    property int coveredScreens: 0
+    property bool covered: false
+    property bool posterReady: false
+    readonly property string frame: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-wallpaper-cover.jpg"
+    // What the switch in progress started from
+    property string from: ""
+    property bool fromVideo: false
+
+    // A switch to a video has played out
+    signal settled
 
     function isVideo(path) {
         return /\.(mp4|webm|mkv|mov)$/i.test(path);
@@ -47,11 +63,15 @@ Singleton {
             Quickshell.execDetached([script, "play", path]);
             return;
         }
+        cancel();
+        from = image;
+        fromVideo = video;
         current = path;
         saved.setText(video ? path : "");
         switching.restart();
         if (video) {
             prepare();
+            transit();
         } else {
             image = path;
             Quickshell.execDetached([script, "set", path]);
@@ -65,6 +85,117 @@ Singleton {
         prep.path = current;
         prep.command = [script, "poster", current, poster(current)];
         prep.running = true;
+    }
+
+    // A new pick takes over from the switch still in progress
+    function cancel() {
+        freeze.running = false;
+        starter.running = false;
+        coverTimeout.stop();
+        revealAnim.stop();
+        cover = "";
+        reveal = 0;
+        covered = false;
+        posterReady = false;
+    }
+
+    // The old wallpaper goes up as a still: the image, or the frame its video is paused on
+    function transit() {
+        if (fromVideo) {
+            freeze.path = current;
+            freeze.running = true;
+        } else {
+            showCover(from);
+        }
+    }
+
+    function showCover(still) {
+        coveredScreens = 0;
+        cover = still;
+        if (still)
+            coverTimeout.restart();
+        else
+            covered = true;
+        startPlayer();
+    }
+
+    // Called by each screen's WallpaperTransition once the still is on it
+    function coverShown() {
+        if (++coveredScreens >= Quickshell.screens.length && coverTimeout.running) {
+            coverTimeout.stop();
+            covered = true;
+            startPlayer();
+        }
+    }
+
+    // Under the still: awww takes the poster, then the player starts and takes over from it
+    function startPlayer() {
+        if (!covered || !posterReady || starter.running)
+            return;
+        starter.path = current;
+        starter.command = [script, "start", current, poster(current)];
+        starter.running = true;
+    }
+
+    function startReveal() {
+        if (cover && !revealAnim.running && reveal === 0)
+            revealAnim.start();
+    }
+
+    // Both also exit when a newer switch stops them, which then must not touch it
+    Process {
+        id: freeze
+
+        property string path
+
+        command: [root.script, "freeze", root.frame]
+        onExited: code => {
+            if (path === root.current)
+                root.showCover(code === 0 ? root.frame : root.from);
+        }
+    }
+
+    Timer {
+        id: coverTimeout
+        interval: 500
+        onTriggered: {
+            root.covered = true;
+            root.startPlayer();
+        }
+    }
+
+    Process {
+        id: starter
+
+        property string path
+
+        stdout: SplitParser {
+            onRead: line => {
+                if (line === "poster")
+                    root.startReveal();
+            }
+        }
+        onExited: {
+            if (path === root.current)
+                root.startReveal();
+        }
+    }
+
+    // awww's grow, from the bottom with its default curve
+    NumberAnimation {
+        id: revealAnim
+        target: root
+        property: "reveal"
+        from: 0
+        to: 1
+        duration: 800
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: [0.54, 0, 0.34, 0.99, 1, 1]
+        onFinished: {
+            root.cover = "";
+            root.reveal = 0;
+            root.settled();
+        }
     }
 
     // awww briefly shows other stills while a switch plays out
@@ -88,7 +219,8 @@ Singleton {
                 return;
             root.image = root.poster(path);
             root.posters++;
-            Quickshell.execDetached([root.script, "set", path, root.image]);
+            root.posterReady = true;
+            root.startPlayer();
         }
     }
 
