@@ -26,7 +26,16 @@ Singleton {
         return Qt.tint(lightColor, Qt.alpha(darkColor, dark));
     }
 
-    onLightChanged: saved.setText(light ? "light" : "dark")
+    onLightChanged: {
+        saved.setText(light ? "light" : "dark");
+        if (ready)
+            sync();
+    }
+
+    // Pushes the scheme to GTK/Qt apps and the xdg portal
+    function sync() {
+        Quickshell.execDetached([Quickshell.shellDir + "/scripts/scheme.sh", light ? "light" : "dark"]);
+    }
 
     FileView {
         id: saved
@@ -53,5 +62,6 @@ Singleton {
     Component.onCompleted: {
         light = saved.text().trim() === "light";
         ready = true;
+        sync();
     }
 }
