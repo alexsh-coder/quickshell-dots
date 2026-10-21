@@ -37,9 +37,16 @@ Scope {
 
     // Super+Tab pressed again while open: releasing Super picks, like Alt+Tab
     property bool armed: false
-    property real anchorX: NaN
+    // The cursor is warped back to the centre near the edges, so travel is summed into virtualX
+    property bool tracking: false
+    property real virtualX: 0
+    property real anchorX: 0
     property real anchorTarget: 0
     property real lastX: 0
+    property bool warping: false
+    property bool warped: false
+    property real warpX: 0
+    property point startCursor
     property real wheelAcc: 0
 
     // Textures the cards borrow: what sits behind see-through windows, and the screen as it was
@@ -136,25 +143,48 @@ Scope {
         if (phase !== "open")
             return;
         setTarget(Math.round(target) + d);
-        anchorX = lastX;
+        anchorX = virtualX;
         anchorTarget = target;
     }
 
-    function mouseMoved(x) {
-        lastX = x;
-        if (isNaN(anchorX)) {
-            anchorX = x;
+    function toGlobal(x, y) {
+        return Qt.point(Math.round((monitor?.x ?? 0) + originX + x), Math.round((monitor?.y ?? 0) + originY + y));
+    }
+
+    function warpCursor(p) {
+        Hyprland.dispatch(`hl.dsp.cursor.move({ x = ${p.x}, y = ${p.y} })`);
+    }
+
+    function mouseMoved(x, y) {
+        if (!tracking) {
+            tracking = true;
+            startCursor = toGlobal(x, y);
+            lastX = virtualX = anchorX = x;
             anchorTarget = Math.round(target);
             return;
         }
+        // The jump caused by our own warp isn't movement
+        if (warping && Math.abs(x - warpX) < 40 && Math.abs(x - lastX) > 100) {
+            warping = false;
+            lastX = x;
+            return;
+        }
+        virtualX += x - lastX;
+        lastX = x;
         if (phase !== "open")
             return;
         // The ring follows the cursor, as if dragged
-        if (setTarget(anchorTarget - (x - anchorX) / pxPerWindow)) {
-            anchorX = x;
+        if (setTarget(anchorTarget - (virtualX - anchorX) / pxPerWindow)) {
+            anchorX = virtualX;
             anchorTarget = target;
         }
         settle.restart();
+        if (!warping && Math.abs(x - sceneW / 2) > sceneW * 0.3) {
+            warping = warped = true;
+            warpX = sceneW / 2;
+            warpReset.restart();
+            warpCursor(toGlobal(warpX, y));
+        }
     }
 
     function pick(i) {
@@ -180,7 +210,7 @@ Scope {
         progress = 0;
         target = pos = vel = 0;
         armed = false;
-        anchorX = NaN;
+        tracking = warping = warped = false;
         wheelAcc = 0;
         query.running = true;
         loadTimeout.restart();
@@ -235,6 +265,9 @@ Scope {
     function close(e) {
         if (phase !== "open")
             return;
+        // Hand the pointer back where it was picked up
+        if (warped)
+            warpCursor(startCursor);
         if (e && !e.onScreen) {
             const special = e.ws < 0;
             flatSet = entries
@@ -307,9 +340,16 @@ Scope {
         interval: 160
         onTriggered: {
             root.setTarget(Math.round(root.target));
-            root.anchorX = root.lastX;
+            root.anchorX = root.virtualX;
             root.anchorTarget = root.target;
         }
+    }
+
+    // In case the warp's motion event never shows up
+    Timer {
+        id: warpReset
+        interval: 250
+        onTriggered: root.warping = false
     }
 
     FrameAnimation {
@@ -500,7 +540,7 @@ Scope {
                 hoverEnabled: true
                 // The ring itself is the pointer here
                 cursorShape: Qt.BlankCursor
-                onPositionChanged: mouse => root.mouseMoved(mouse.x)
+                onPositionChanged: mouse => root.mouseMoved(mouse.x, mouse.y)
                 onClicked: root.close(null)
                 onWheel: wheel => {
                     root.wheelAcc += wheel.angleDelta.y || wheel.angleDelta.x;
