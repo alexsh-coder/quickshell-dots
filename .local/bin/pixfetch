@@ -4,47 +4,102 @@
 Kitty: crisp integer-scaled image via the graphics protocol.
 Elsewhere: truecolor half-block art, pokemon-colorscripts style.
 Extra arguments are passed through to fastfetch.
+PIXFETCH_ART=<file> pins the art (a shell keeps its picture across redraws),
+`pixfetch --pick` prints a random one. PIXFETCH_REDRAW=1 clears the screen and
+replays the rendered output atomically, from a short-lived cache.
 """
 import fcntl
 import hashlib
 import json
+import re
+import time
 import math
 import os
 import random
 import struct
+import subprocess
 import sys
 import termios
 from pathlib import Path
 
-from PIL import Image, ImageChops
+
+Image = ImageChops = None  # PIL is slow to import; only needed on a cache miss
 
 HOME = Path.home()
 ART_DIR = Path(os.environ.get("PIXFETCH_DIR", HOME / "Pictures/pixel-art"))
 CACHE = Path(os.environ.get("XDG_CACHE_HOME", HOME / ".cache")) / "pixfetch"
 ROWS = int(os.environ.get("PIXFETCH_ROWS", 17))
+PROMPT_ROWS = int(os.environ.get("PIXFETCH_PROMPT_ROWS", 3))  # starship: blank + path + input
 MAX_COLS = int(os.environ.get("PIXFETCH_MAX_COLS", 44))
 INFO_COLS = 28  # widest fastfetch line + logo padding is added on top
+INFO_ROWS = 17  # height of the fastfetch text block
+MIN_SIDE = 16  # narrower art beside the text -> art only
+MIN_ART = 8  # smaller than this in either direction -> print nothing
 CROP = float(os.environ.get("PIXFETCH_CROP", 0.55))  # 0 disables
 EXTS = {".png", ".gif", ".webp", ".bmp"}
 
 
-def fastfetch(*args):
-    os.execvp("fastfetch", ["fastfetch", *args, *sys.argv[1:]])
+CLEAR = b"\x1b_Ga=d,d=A\x1b\\\x1b[H\x1b[2J\x1b[3J"  # drop images, wipe screen and scrollback
+REDRAW_TTL = 300  # seconds a replayed redraw may be stale (uptime, memory)
+
+
+def fastfetch(*args, trim=False):
+    tty = sys.stdout.isatty()
+    redraw = tty and os.environ.get("PIXFETCH_REDRAW")
+    cmd = ["fastfetch", "--pipe", str(not tty).lower(), *args, *sys.argv[1:]]
+    cached = CACHE / ("out-" + hashlib.sha1(json.dumps(cmd).encode()).hexdigest()[:16])
+    if redraw and cached.exists() and time.time() - cached.stat().st_mtime < REDRAW_TTL:
+        out = cached.read_bytes()
+    else:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE)
+        out = proc.stdout
+        # fastfetch leaves one blank row under the logo; the prompt has its own.
+        if trim:
+            out = re.sub(rb"\n(?:\x1b\[[0-9;]*m| )*\n$", b"\n", out)
+        if redraw and proc.returncode == 0:
+            cached.write_bytes(out)
+    # Autowrap off while printing: in a narrow window lines get cut at the edge
+    # instead of wrapping and sliding the text off the art. One write, so a
+    # redraw never shows a blank screen in between.
+    head = b"\x1b[?7l" if tty else b""
+    if redraw:
+        head += CLEAR
+    sys.stdout.buffer.write(head + out + (b"\x1b[?7h" if tty else b""))
+    sys.stdout.flush()
+    sys.exit(0)
 
 
 def pick():
+    pinned = os.environ.get("PIXFETCH_ART")
+    if pinned and Path(pinned).is_file():
+        return Path(pinned)
     files = sorted(p for p in ART_DIR.rglob("*") if p.suffix.lower() in EXTS)
     if not files:
         return None
-    last = CACHE / "last"
-    prev = last.read_text() if last.exists() else ""
-    choice = random.choice([p for p in files if str(p) != prev] or files)
-    last.write_text(str(choice))
-    return choice
+    # Shuffle bag: every picture shows once before any repeats. The lock keeps
+    # windows opened at the same moment from drawing the same one.
+    with open(CACHE / "bag.lock", "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        state = CACHE / "bag.json"
+        try:
+            data = json.loads(state.read_text())
+        except (OSError, ValueError):
+            data = {}
+        known = {str(f) for f in files}
+        bag = [f for f in data.get("bag", []) if f in known]
+        last = data.get("last", "")
+        if not bag:
+            bag = [str(f) for f in files]
+            random.shuffle(bag)
+            if len(bag) > 1 and bag[-1] == last:  # draws from the end
+                bag[0], bag[-1] = bag[-1], bag[0]
+        choice = bag.pop()
+        state.write_text(json.dumps({"bag": bag, "last": choice}))
+    return Path(choice)
 
 
 def winsize():
-    """(columns, cell size in px or None)."""
+    """(columns, rows, cell size in px or None)."""
     for fd in (sys.stdout.fileno(), sys.stdin.fileno()):
         try:
             rows, cols, xpx, ypx = struct.unpack(
@@ -52,8 +107,8 @@ def winsize():
         except OSError:
             continue
         if cols and rows:
-            return cols, (xpx // cols, ypx // rows) if xpx and ypx else None
-    return 80, None
+            return cols, rows, (xpx // cols, ypx // rows) if xpx and ypx else None
+    return 80, 24, None
 
 
 def grid(img, axis):
@@ -95,10 +150,20 @@ def clear_background(img):
 
 
 def load(path):
+    global Image, ImageChops
+    from PIL import Image, ImageChops
+    # Preparing the source (grid detection, backdrop removal) is slow and does not
+    # depend on the window, so it is done once per file.
+    key = hashlib.sha1(json.dumps([str(path), path.stat().st_mtime, 1]).encode()).hexdigest()[:16]
+    prepared = CACHE / f"art-{key}.png"
+    if prepared.exists():
+        return Image.open(prepared).convert("RGBA")
     img = Image.open(path).convert("RGBA")
     img = clear_background(native(img))
     bbox = img.getchannel("A").getbbox()
-    return img.crop(bbox) if bbox else img
+    img = img.crop(bbox) if bbox else img
+    img.save(prepared, compress_level=1)
+    return img
 
 
 def fit(img, max_w, max_h):
@@ -115,10 +180,10 @@ def fit(img, max_w, max_h):
     return img.resize((max(1, round(w * s)), max(1, round(h * s))), Image.LANCZOS)
 
 
-def kitty(img, cw, ch, max_cols, out):
-    img = fit(img, max_cols * cw, ROWS * ch)
+def kitty(img, cw, ch, max_cols, rows, out):
+    img = fit(img, max_cols * cw, rows * ch)
     w, h = img.size
-    k = max(1, min(ROWS * ch // h, max_cols * cw // w))
+    k = max(1, min(rows * ch // h, max_cols * cw // w))
     img = img.resize((w * k, h * k), Image.NEAREST)
     cols, rows = -(-img.width // cw), -(-img.height // ch)
     # Pad to whole cells so the terminal never resamples (keeps pixels sharp).
@@ -128,8 +193,8 @@ def kitty(img, cw, ch, max_cols, out):
     return cols, rows
 
 
-def halfblocks(img, max_cols, out):
-    img = fit(img, max_cols, ROWS * 2)
+def halfblocks(img, max_cols, rows, out):
+    img = fit(img, max_cols, rows * 2)
     w, h = img.size
     px = img.load()
 
@@ -159,31 +224,47 @@ def halfblocks(img, max_cols, out):
 def main():
     CACHE.mkdir(parents=True, exist_ok=True)
     path = pick()
+    if sys.argv[1:] == ["--pick"]:
+        print(path or "")
+        return
     if path is None:
         fastfetch()
 
-    term_cols, cell = winsize()
+    term_cols, term_rows, cell = winsize()
     if os.environ.get("TERM") != "xterm-kitty":
         cell = None
-    # Lines wider than the window get re-wrapped and the text slides off the art.
+    # Keep the art and the prompt on screen together. Text beside the art only
+    # when both the width and the height allow it; otherwise the art alone.
+    free = term_rows - PROMPT_ROWS
     max_cols = min(MAX_COLS, term_cols - 5 - INFO_COLS)
-    if max_cols < 10:
-        fastfetch("--logo", "none")
-    key = json.dumps([str(path), path.stat().st_mtime, cell, ROWS, max_cols, CROP])
+    pos = ["--logo-padding-top", "0"]
+    if max_cols >= MIN_SIDE and free - 1 >= INFO_ROWS:
+        rows, extra = min(ROWS, free - 1), []
+    else:
+        # Art alone gets all the room there is.
+        rows, max_cols = free, term_cols - 3
+        extra = ["--structure", "break"]
+        if max_cols < MIN_ART or rows < MIN_ART:
+            # Nothing fits: a redraw still has to wipe the old art away.
+            if sys.stdout.isatty() and os.environ.get("PIXFETCH_REDRAW"):
+                sys.stdout.buffer.write(CLEAR)
+                sys.stdout.flush()
+            return
+    key = json.dumps([str(path), path.stat().st_mtime, cell, rows, max_cols, CROP])
     base = CACHE / hashlib.sha1(key.encode()).hexdigest()[:16]
 
     if cell:
         out, meta = base.with_suffix(".png"), base.with_suffix(".size")
         if not (out.exists() and meta.exists()):
-            meta.write_text("%d %d" % kitty(load(path), *cell, max_cols, out))
-        cols, rows = meta.read_text().split()
-        fastfetch("--logo-type", "kitty-direct", "--logo", str(out),
-                  "--logo-width", cols, "--logo-height", rows)
+            meta.write_text("%d %d" % kitty(load(path), *cell, max_cols, rows, out))
+        cols, nrows = meta.read_text().split()
+        fastfetch(*pos, *extra, "--logo-type", "kitty-direct", "--logo", str(out),
+                  "--logo-width", cols, "--logo-height", nrows, trim=bool(extra))
 
     out = base.with_suffix(".txt")
     if not out.exists():
-        halfblocks(load(path), max_cols, out)
-    fastfetch("--logo-type", "file-raw", "--logo", str(out))
+        halfblocks(load(path), max_cols, rows, out)
+    fastfetch(*pos, *extra, "--logo-type", "file-raw", "--logo", str(out), trim=bool(extra))
 
 
 if __name__ == "__main__":
