@@ -273,7 +273,7 @@ Item {
             width: parent.width
             height: root.rowHeight
             radius: Theme.radius - 2
-            color: row.net.connected ? Qt.alpha(Theme.accent, 0.12) : mouse.containsMouse || row.asked ? Theme.surface : "transparent"
+            color: row.net.connected ? Qt.alpha(Theme.accent, 0.12) : mouse.containsMouse || row.asked ? Theme.surface : Qt.alpha(Theme.surface, 0)
             Behavior on color { ColorAnimation { duration: Theme.anim } }
 
             NerdIcon {
@@ -336,7 +336,7 @@ Item {
                     width: 26
                     height: 26
                     radius: 13
-                    color: unlink.containsMouse ? Qt.alpha(Theme.urgent, 0.18) : "transparent"
+                    color: unlink.containsMouse ? Qt.alpha(Theme.urgent, 0.18) : Qt.alpha(Theme.urgent, 0)
                     Behavior on color { ColorAnimation { duration: Theme.anim } }
 
                     Icon {
@@ -459,7 +459,7 @@ Item {
         width: 26
         height: 26
         radius: 13
-        color: btnMouse.containsMouse ? Theme.muted : "transparent"
+        color: btnMouse.containsMouse ? Theme.muted : Qt.alpha(Theme.muted, 0)
         Behavior on color { ColorAnimation { duration: Theme.anim } }
 
         Icon {

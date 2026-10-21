@@ -21,7 +21,7 @@ Item {
     property string shownName: ""
     property real center: 0
     property real drawnCenter: center
-    readonly property Item page: ({ keyboard: keyboardPage, network: networkPage, bluetooth: bluetoothPage, volume: volumePage, power: powerPage, calendar: calendarPage, battery: batteryPage })[shownName] ?? null
+    readonly property Item page: ({ keyboard: keyboardPage, network: networkPage, vpn: vpnPage, bluetooth: bluetoothPage, volume: volumePage, power: powerPage, calendar: calendarPage, battery: batteryPage })[shownName] ?? null
 
     function show(name, item) {
         closeTimer.stop();
@@ -141,6 +141,7 @@ Item {
 
             Page { id: keyboardPage; name: "keyboard"; KeyboardPopout { popouts: root; here: parent.here } }
             Page { id: networkPage; name: "network"; NetworkPopout { popouts: root; here: parent.here } }
+            Page { id: vpnPage; name: "vpn"; VpnPopout { popouts: root; here: parent.here } }
             Page { id: bluetoothPage; name: "bluetooth"; BluetoothPopout { popouts: root; here: parent.here } }
             Page { id: volumePage; name: "volume"; VolumePopout { popouts: root; here: parent.here } }
             Page { id: batteryPage; name: "battery"; BatteryPopout { popouts: root; here: parent.here } }

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Wayland
 import qs.config
 import qs.modules.bar.popouts
@@ -30,6 +31,7 @@ PanelWindow {
     readonly property var triggers: [
         { name: "keyboard", item: kb },
         { name: "network", item: network },
+        { name: "vpn", item: vpn },
         { name: "bluetooth", item: bluetooth },
         { name: "volume", item: volume },
         { name: "battery", item: battery },
@@ -108,6 +110,22 @@ PanelWindow {
         onTriggered: if (root.pending) {
             popouts.show(root.pending.name, root.pending.item);
             root.pending = null;
+        }
+    }
+
+    // Opened from the keyboard (Ctrl+Alt+Del) on the focused monitor only
+    IpcHandler {
+        target: "power"
+        enabled: root.screen?.name === Hyprland.focusedMonitor?.name
+
+        function toggle(): void {
+            if (popouts.current === "power") {
+                popouts.close();
+                return;
+            }
+            popouts.close();
+            popouts.show("power", power);
+            popouts.pinned = true;
         }
     }
 
@@ -221,6 +239,7 @@ PanelWindow {
 
                     KbLayout { id: kb; lit: popouts.current === "keyboard" }
                     NetworkIcon { id: network; lit: popouts.current === "network" }
+                    VpnIcon { id: vpn; lit: popouts.current === "vpn" }
                     Bluetooth { id: bluetooth; lit: popouts.current === "bluetooth" }
                     Volume { id: volume; lit: popouts.current === "volume" }
                     Battery { id: battery; lit: popouts.current === "battery" }
