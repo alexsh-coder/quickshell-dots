@@ -110,6 +110,14 @@ Scope {
     }
 
     Connections {
+        target: NightMode
+        function onSwitched() {
+            root.showText(NightMode.enabled ? "bedtime" : "bedtime_off",
+                          NightMode.enabled ? "Night mode on" : "Night mode off");
+        }
+    }
+
+    Connections {
         target: Keyboard
         function onLayoutSwitched() { root.showText("keyboard", Keyboard.layout); }
         function onCapsToggled() { root.showText("keyboard_capslock", Keyboard.caps ? "Caps on" : "Caps off"); }
@@ -161,11 +169,6 @@ Scope {
 
         function caps(): void {
             Keyboard.checkCaps();
-        }
-
-        function night(state: string): void {
-            root.showText(state === "on" ? "bedtime" : "bedtime_off",
-                          state === "on" ? "Night mode on" : "Night mode off");
         }
     }
 

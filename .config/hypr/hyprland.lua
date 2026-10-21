@@ -49,7 +49,7 @@ hl.on("hyprland.start", function ()
     hl.exec_cmd("~/.config/hypr/scripts/respawn.sh /usr/lib/hyprpolkitagent/hyprpolkitagent")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    -- Night light daemon, starting with no tint; Super+Shift+N changes it.
+    -- Night light daemon, starting with no tint; Quickshell drives it (Super+Shift+N).
     hl.exec_cmd("~/.config/hypr/scripts/respawn.sh hyprsunset --identity")
     for _, cmd in ipairs(hardware.autostart or {}) do
         hl.exec_cmd(cmd)
@@ -293,7 +293,7 @@ hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/hard-
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/kitty-opacity-toggle.sh"))
 hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("qs ipc call theme toggle"))
-hl.bind(mainMod .. " + SHIFT + N", hl.dsp.exec_cmd("~/.config/hypr/scripts/night-mode-toggle.sh toggle"))
+hl.bind(mainMod .. " + SHIFT + N", hl.dsp.exec_cmd("qs ipc call night toggle"))
 hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V",      hl.dsp.exec_cmd("qs ipc call clipboard toggle"))
 hl.bind(mainMod .. " + N",      hl.dsp.global("quickshell:notifcenter"))

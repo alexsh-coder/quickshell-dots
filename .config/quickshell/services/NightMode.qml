@@ -4,24 +4,70 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Night light state, mirroring the hyprsunset toggle script
+// Night light through hyprsunset's IPC; Hyprland keeps the daemon running
 Singleton {
     id: root
 
     property bool enabled: false
+    readonly property int temperature: 4000
 
-    readonly property string script: (Quickshell.env("XDG_CONFIG_HOME") || Quickshell.env("HOME") + "/.config")
-                                     + "/hypr/scripts/night-mode-toggle.sh"
+    // A change made by the user, for the OSD
+    signal switched
 
     function apply(on: bool): void {
-        const ok = Quickshell.execDetached([script, on ? "on" : "off"]);
-        if (!ok)
-            console.warn("night mode: failed to start", script);
-        enabled = ok ? on : enabled;
+        enabled = on;
+        if (proc.running) {
+            proc.queued = true;
+            return;
+        }
+        // identity is a true bypass; 6500K still leaves a slight tint
+        proc.target = on;
+        proc.command = on ? ["hyprctl", "hyprsunset", "temperature", String(temperature)]
+                          : ["hyprctl", "hyprsunset", "identity"];
+        proc.running = true;
     }
 
     function toggle(): void {
         apply(!enabled);
+        switched();
+    }
+
+    Process {
+        id: proc
+
+        property bool target
+        property bool queued
+
+        onExited: code => {
+            if (code !== 0) {
+                console.warn("night mode: hyprsunset is not running");
+                root.enabled = false;
+                queued = false;
+                return;
+            }
+            saved.setText(target ? "on" : "off");
+            if (queued) {
+                queued = false;
+                if (target !== root.enabled)
+                    root.apply(root.enabled);
+            }
+        }
+    }
+
+    // Survives a shell restart within the session; hyprsunset starts untinted at login
+    FileView {
+        id: saved
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/qs-night-mode"
+        blockLoading: true
+        printErrors: false
+
+        property bool restored
+
+        onLoaded: {
+            if (!restored && text().trim() === "on")
+                root.apply(true);
+            restored = true;
+        }
     }
 
     IpcHandler {
@@ -31,23 +77,11 @@ Singleton {
             root.toggle();
         }
         function set(state: string): void {
-            root.apply(state === "on");
+            if ((state === "on") !== root.enabled)
+                root.toggle();
         }
         function get(): string {
             return root.enabled ? "on" : "off";
         }
-    }
-
-    // The script owns the real state; watching its file keeps the bar honest,
-    // including toggles made from a terminal
-    FileView {
-        id: state
-        path: Quickshell.env("XDG_RUNTIME_DIR") + "/hyprsunset-night-light"
-        watchChanges: true
-        blockLoading: true
-        printErrors: false
-
-        onFileChanged: reload()
-        onLoaded: root.enabled = text().trim() === "on"
     }
 }
