@@ -58,6 +58,10 @@ PanelWindow {
         return null;
     }
 
+    function trayAt(x) {
+        return tray.children.find(c => c.modelData && within(c, x)) ?? null;
+    }
+
     property var pending: null
 
     // Trigger under the pointer, for the hover pill
@@ -83,7 +87,7 @@ PanelWindow {
             return popouts.stay();
         }
         const t = triggerAt(p.x);
-        hovered = t?.item ?? null;
+        hovered = t?.item ?? trayAt(p.x);
         if (!t) {
             const item = itemAt(p.x);
             pending = null;
@@ -183,6 +187,7 @@ PanelWindow {
             color: Theme.bg
 
             Rectangle {
+                id: leftPill
                 anchors.left: parent.left
                 anchors.leftMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
@@ -211,6 +216,18 @@ PanelWindow {
                         }
                     }
                 }
+            }
+
+            // Tray background, drawn under the hover pill like the status group's
+            Rectangle {
+                anchors.left: leftPill.right
+                anchors.leftMargin: 8
+                anchors.verticalCenter: parent.verticalCenter
+                width: tray.width + 28
+                height: 30
+                radius: height / 2
+                color: Theme.surface
+                visible: tray.count > 0
             }
 
             // Background of the status group, drawn under the hover pill
@@ -253,6 +270,12 @@ PanelWindow {
                 Behavior on x { enabled: pill.opacity > 0; NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasizedDecel } }
                 Behavior on width { enabled: pill.opacity > 0; NumberAnimation { duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasizedDecel } }
                 Behavior on opacity { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+            }
+
+            Tray {
+                id: tray
+                x: leftPill.x + leftPill.width + 8 + 14
+                visible: count > 0
             }
 
             Row {
