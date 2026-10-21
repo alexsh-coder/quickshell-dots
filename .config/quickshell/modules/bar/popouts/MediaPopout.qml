@@ -284,12 +284,34 @@ Item {
                         elide: Text.ElideRight
                     }
 
-                    Label {
+                    Item {
                         width: parent.width
-                        text: root.player?.trackArtist ?? ""
-                        font.pixelSize: 14
-                        color: Theme.subtext
-                        elide: Text.ElideRight
+                        height: Math.max(artist.implicitHeight, like.visible ? like.height : 0)
+
+                        Label {
+                            id: artist
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - (like.visible ? like.width + 4 : 0)
+                            text: root.player?.trackArtist ?? ""
+                            font.pixelSize: 14
+                            color: Theme.subtext
+                            elide: Text.ElideRight
+                        }
+
+                        // Only Spotify's own window can tell and change whether a track is liked
+                        CtrlButton {
+                            id: like
+                            anchors.right: parent.right
+                            anchors.rightMargin: -6
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: SpotifyLike.known && root.player === SpotifyLike.player
+                            icon: "favorite"
+                            iconSize: 20
+                            diameter: 30
+                            fill: SpotifyLike.liked ? 1 : 0
+                            active: SpotifyLike.liked
+                            onClicked: SpotifyLike.toggle()
+                        }
                     }
                 }
             }
@@ -563,6 +585,7 @@ Item {
         property int iconSize: 22
         property int diameter: 38
         property bool active: false
+        property real fill: 1
         // Prev/next are always drawn in the text colour
         property bool plain: false
         signal clicked
@@ -583,8 +606,10 @@ Item {
             anchors.centerIn: parent
             text: btn.icon
             font.pixelSize: btn.iconSize
+            fill: btn.fill
             color: btn.plain ? Theme.text : btn.active ? Theme.accent : Theme.subtext
             Behavior on color { ColorAnimation { duration: Theme.anim } }
+            Behavior on fill { NumberAnimation { duration: Theme.anim } }
         }
 
         MouseArea {
