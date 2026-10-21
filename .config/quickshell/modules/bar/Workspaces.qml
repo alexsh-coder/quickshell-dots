@@ -19,11 +19,8 @@ Item {
     onActiveIdChanged: {
         if (activeId < 1)
             return;
-        // Keep one neighbour visible on each side of the active dot
-        if (activeId < first + 1)
-            first = Math.max(1, activeId - 1);
-        else if (activeId > first + count - 2)
-            first = activeId - count + 2;
+        // Exactly one dot to the right of the active one, rest on the left
+        first = Math.max(1, activeId - count + 2);
     }
 
     function go(id) {
