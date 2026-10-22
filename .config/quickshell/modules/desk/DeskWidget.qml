@@ -81,7 +81,7 @@ Item {
         VisualizerWidget {
             cfg: root.cfg
             sh: root.sh
-            active: root.live && !root.gone
+            active: (root.live || root.shown > 0) && !root.gone
         }
     }
 

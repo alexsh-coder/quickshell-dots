@@ -21,14 +21,25 @@ Singleton {
 
     property real bassAvg: 0
 
-    onActiveChanged: if (!active) reset()
+    // On pause the spectrum sinks to zero while the widgets fade out
+    property bool settling: false
+    onActiveChanged: settling = !active
 
-    function reset() {
-        values = Array(bars).fill(0);
-        level = 0;
-        bass = 0;
-        kick = 0;
-        bassAvg = 0;
+    FrameAnimation {
+        running: root.settling
+        onTriggered: {
+            const f = Math.pow(0.04, frameTime / 0.6);
+            root.values = root.values.map(v => v * f);
+            root.level *= f;
+            root.bass *= f;
+            root.kick *= f;
+            root.bassAvg *= f;
+            if (root.level < 0.002 && root.bass < 0.002 && Math.max(...root.values) < 0.002) {
+                root.values = Array(root.bars).fill(0);
+                root.level = root.bass = root.kick = root.bassAvg = 0;
+                root.settling = false;
+            }
+        }
     }
 
     // Averages the spectrum down to n bars, for small widgets
