@@ -386,6 +386,56 @@ vec4 swirl(vec2 uv) {
     return texTo(su) * m + texFrom(su) * (1.0 - m);
 }
 
+// Finer glitch: thin lines flicker over, each with its own jitter, on wavy drift with rare long tears,
+// split colour, smeared runs of pixels and grain
+vec4 signalSample(vec2 uv, bool next) {
+    return next ? texTo(uv) : texFrom(uv);
+}
+
+vec4 signal(vec2 uv) {
+    float amp = pow(sin(PI * t), 0.8);
+    float frame = floor(t * 30.0);
+    float y = uv.y * extent.y;
+    float line = floor(y / 2.0);
+    float r = hash(vec2(line, frame));
+
+    // Slow wavy drift, clusters of jittering lines, and now and then a long tear
+    float wave = (noise(vec2(uv.y * 24.0, t * 18.0)) - 0.5) * 0.05;
+    float busy = step(0.62, noise(vec2(uv.y * 55.0, t * 14.0)));
+    float jitter = (r - 0.5) * 0.02 * busy;
+    float tearBand = step(0.9, noise(vec2(uv.y * 9.0, floor(t * 16.0) * 3.1)));
+    float rip = tearBand * (hash(vec2(floor(uv.y * 9.0), frame)) - 0.5) * 0.18;
+    vec2 su = vec2(uv.x + (wave + jitter + rip) * amp, uv.y);
+
+    // Smeared runs: a stretch of the line repeats one pixel
+    if (r > 0.9 && amp > 0.2) {
+        float run = 1.0 / mix(8.0, 40.0, hash(vec2(line, frame + 1.0)));
+        su.x = floor(su.x / run) * run;
+    }
+
+    // Lines cross over one by one, gathered in loose bands
+    float order = hash(vec2(line * 1.7, frame * 0.5)) * 0.35 + noise(vec2(uv.y * 6.0, floor(t * 10.0))) * 0.65;
+    bool next = order < smoothstep(0.08, 0.92, t);
+    if (t > 0.97)
+        next = true;
+    if (t < 0.02)
+        next = false;
+
+    vec2 ca = vec2(0.008 + 0.01 * noise(vec2(uv.y * 4.0, t * 9.0)), 0.0015) * amp;
+    vec4 g = signalSample(su, next);
+    float red = signalSample(su + ca, next).r;
+    float blue = signalSample(su - ca, next).b;
+    vec4 c = vec4(red * g.a, g.g, blue * g.a, g.a);
+
+    float grain = (hash(uv * extent + t * 91.0) - 0.5) * 0.14 * amp;
+    float scan = 1.0 - 0.1 * amp * step(0.5, fract(y / 2.0));
+    float flicker = 1.0 + 0.12 * amp * (hash(vec2(frame, 5.3)) - 0.5);
+    c.rgb = (c.rgb * scan * flicker + grain * c.a);
+    if (r > 0.985)
+        c.rgb = mix(c.rgb, glow.rgb * c.a, 0.6 * amp);
+    return vec4(clamp(c.rgb, 0.0, 1.0), c.a);
+}
+
 void main() {
     vec2 uv = qt_TexCoord0;
     int m = int(mode + 0.5);
@@ -414,6 +464,8 @@ void main() {
         c = ripple(uv);
     else if (m == 12)
         c = swirl(uv);
+    else if (m == 13)
+        c = signal(uv);
     else
         c = circle(uv);
     fragColor = c * qt_Opacity;

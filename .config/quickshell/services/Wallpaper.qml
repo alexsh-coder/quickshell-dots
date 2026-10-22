@@ -40,7 +40,8 @@ Singleton {
         { name: "blinds", label: "Blinds", icon: "blinds", old: true },
         { name: "honeycomb", label: "Honeycomb", icon: "hexagon" },
         { name: "ripple", label: "Ripple", icon: "water", old: true },
-        { name: "swirl", label: "Swirl", icon: "cyclone", old: true }
+        { name: "swirl", label: "Swirl", icon: "cyclone", old: true },
+        { name: "signal", label: "Signal", icon: "settings_input_antenna", old: true }
     ]
 
     // Mode for the next switch: the chosen style, or any but the last one for "random"
