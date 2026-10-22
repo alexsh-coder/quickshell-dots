@@ -22,7 +22,13 @@ Qt/KDE apps.
   quiet while a panel already shows the same level.
 - **Lockscreen** over the blurred wallpaper with the playing track (`Super+L`).
 - **Clipboard history** picker (`Super+V`), pastes into the focused window on Enter.
-- **Wallpaper picker** (`Super+Shift+W`) for images and looping video wallpapers.
+- **Wallpaper picker** (`Super+Shift+W`) for images and looping video wallpapers,
+  switching with one of 13 shader transitions: circle, slide, wipe, fade, burn,
+  pixels, glitch, page curl, tear, blinds, honeycomb, ripple, swirl, or a random one.
+- **Settings** window (`Super+,`): wallpaper transition with live previews, slideshow,
+  resolution, refresh rate, scale and VRR (rolled back unless kept), night light
+  warmth, panel scale, gaps, borders, rounding, blur, shadows, window and workspace
+  animations, keyboard repeat, pointer, touchpad, cursor size, battery saver.
 - **Music effects**: desktop visualizers, wallpaper effects driven by the beat,
   synced desktop lyrics with a karaoke glow on the sung word.
 - **Light/dark scheme** toggle (`Super+Shift+D`), applied to GTK and Qt apps too.
@@ -108,6 +114,8 @@ cp ~/.config/hypr/hardware.lua.example ~/.config/hypr/hardware.lua
 
 `hardware.lua` holds per-machine settings (monitor scale, mouse, extra env,
 autostart) and is not tracked. Set `monitor_scale` before the first login.
+The settings window writes its Hyprland choices to `~/.config/hypr/settings.lua`
+(also not tracked), which `hyprland.lua` reads on top of its defaults.
 
 ### Terminal
 
@@ -181,6 +189,7 @@ real Caps Lock.
 | `Super+T` | terminal |
 | `Super+E` | file manager |
 | `Super+I` | quick settings |
+| `Super+,` | settings |
 | `Super+N` | notification center |
 | `Super+V` | clipboard history |
 | `Super+Tab` | overview |

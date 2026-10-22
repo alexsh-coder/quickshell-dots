@@ -11,12 +11,27 @@ local hw_ok, hardware = pcall(require, "hardware")
 if not hw_ok or type(hardware) ~= "table" then hardware = {} end
 local monitor_scale = hardware.monitor_scale or 1
 
+-- Choices made in Quickshell's settings window, written to settings.lua (gitignored).
+-- Anything it doesn't set keeps the values below.
+local ui_ok, ui = pcall(dofile, os.getenv("HOME") .. "/.config/hypr/settings.lua")
+if not ui_ok or type(ui) ~= "table" then ui = {} end
+
 hl.monitor({
     output   = "",
     mode     = "preferred",
     position = "auto",
     scale    = monitor_scale,
 })
+
+for output, m in pairs(ui.monitors or {}) do
+    hl.monitor({
+        output   = output,
+        mode     = m.mode or "preferred",
+        position = "auto",
+        scale    = m.scale or monitor_scale,
+        vrr      = m.vrr or 0,
+    })
+end
 
 
 ---------------------
@@ -37,7 +52,8 @@ hl.on("hyprland.start", function ()
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh waybar")  -- has segfaulted inside GTK
     -- Qt drops to its single-threaded render loop on NVIDIA (QTBUG-95817), which stutters the
     -- visualizer; other drivers are threaded already.
-    hl.exec_cmd("env QSG_RENDER_LOOP=threaded qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
+    -- QT_SCALE_FACTOR is the settings window's panel scale
+    hl.exec_cmd("env QSG_RENDER_LOOP=threaded QT_SCALE_FACTOR=" .. (ui.panel_scale or 1) .. " qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh dunst")
     -- OSD pill (volume/brightness/layout...); height above the bottom edge is per machine.
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh ~/.config/hypr/scripts/osd.py daemon --margin "
@@ -63,8 +79,9 @@ end)
 ---- ENVIRONMENT VARIABLES ----
 -------------------------------
 
-hl.env("XCURSOR_SIZE", "28")
-hl.env("HYPRCURSOR_SIZE", "28")
+local cursor_size = tostring(ui.cursor_size or 28)
+hl.env("XCURSOR_SIZE", cursor_size)
+hl.env("HYPRCURSOR_SIZE", cursor_size)
 -- Theme: accent-colored Bibata built by scripts/cursor_theme.py (which also
 -- writes cursor.lua); an empty/missing cursor.lua leaves Hyprland's default.
 local cursor_ok, cursor = pcall(dofile, os.getenv("HOME") .. "/.config/hypr/cursor.lua")
@@ -101,10 +118,10 @@ local accent = (ok and type(theme) == "table" and theme.accent) or "33ccff"
 
 hl.config({
     general = {
-        gaps_in  = 5,
-        gaps_out = 20,
+        gaps_in  = ui.gaps_in or 5,
+        gaps_out = ui.gaps_out or 20,
 
-        border_size = 2,
+        border_size = ui.border_size or 2,
 
         col = {
             active_border   = "rgba(" .. accent .. "ee)",
@@ -140,21 +157,22 @@ hl.config({
     },
 
     decoration = {
-        rounding       = 10,
+        rounding       = ui.rounding or 10,
         rounding_power = 2,
 
         active_opacity   = 1.0,
-        inactive_opacity = 1.0,
+        inactive_opacity = ui.inactive_opacity or 1.0,
 
+        -- ui.eco: the battery saver is on, see Quickshell's Settings service
         shadow = {
-            enabled      = true,
+            enabled      = ui.shadows ~= false and not ui.eco,
             range        = 4,
             render_power = 3,
             color        = 0xee1a1a1a,
         },
 
         blur = {
-            enabled  = true,
+            enabled  = ui.blur ~= false and not ui.eco,
             size     = 3,
             passes   = 1,
             vibrancy = 0.1696,
@@ -162,7 +180,7 @@ hl.config({
     },
 
     animations = {
-        enabled = true,
+        enabled = ui.animations ~= false,
     },
 })
 
@@ -174,24 +192,40 @@ hl.curve("quick",          { type = "bezier", points = { {0.15, 0},    {0.1, 1} 
 hl.curve("easy",           { type = "spring", mass = 1, stiffness = 238.1191, dampening = 24.21279333 })
 hl.curve("specialWorkSwitch", { type = "bezier", points = { {0.05, 0.7}, {0.1, 1} } })
 
-hl.animation({ leaf = "global",        enabled = true,  speed = 10,   bezier = "default" })
-hl.animation({ leaf = "border",        enabled = true,  speed = 5.39, bezier = "easeOutQuint" })
-hl.animation({ leaf = "windows",       enabled = true,  speed = 4.79, spring = "easy" })
-hl.animation({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "easy",         style = "popin 87%" })
-hl.animation({ leaf = "windowsOut",    enabled = true,  speed = 1.49, bezier = "linear",       style = "popin 87%" })
-hl.animation({ leaf = "fadeIn",        enabled = true,  speed = 1.73, bezier = "almostLinear" })
-hl.animation({ leaf = "fadeOut",       enabled = true,  speed = 1.46, bezier = "almostLinear" })
-hl.animation({ leaf = "fade",          enabled = true,  speed = 3.03, bezier = "quick" })
-hl.animation({ leaf = "layers",        enabled = true,  speed = 3.81, bezier = "easeOutQuint" })
-hl.animation({ leaf = "layersIn",      enabled = true,  speed = 4,    bezier = "easeOutQuint", style = "fade" })
-hl.animation({ leaf = "layersOut",     enabled = true,  speed = 1.5,  bezier = "linear",       style = "fade" })
-hl.animation({ leaf = "fadeLayersIn",  enabled = true,  speed = 1.79, bezier = "almostLinear" })
-hl.animation({ leaf = "fadeLayersOut", enabled = true,  speed = 1.39, bezier = "almostLinear" })
-hl.animation({ leaf = "workspaces",    enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesIn",  enabled = true,  speed = 1.21, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "workspacesOut", enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
-hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 4, bezier = "specialWorkSwitch", style = "slidefadevert 15%" })
-hl.animation({ leaf = "zoomFactor",    enabled = true,  speed = 7,    bezier = "quick" })
+-- Speeds are durations: the settings window's speed divides them. Window and workspace
+-- styles can be swapped there too
+local anim_speed = ui.anim_speed or 1
+local anim_styles = {
+    windowsIn     = ui.window_style,
+    windowsOut    = ui.window_style,
+    workspaces    = ui.workspace_style,
+    workspacesIn  = ui.workspace_style,
+    workspacesOut = ui.workspace_style,
+}
+local function animation(a)
+    a.speed = a.speed / anim_speed
+    a.style = anim_styles[a.leaf] or a.style
+    hl.animation(a)
+end
+
+animation({ leaf = "global",        enabled = true,  speed = 10,   bezier = "default" })
+animation({ leaf = "border",        enabled = true,  speed = 5.39, bezier = "easeOutQuint" })
+animation({ leaf = "windows",       enabled = true,  speed = 4.79, spring = "easy" })
+animation({ leaf = "windowsIn",     enabled = true,  speed = 4.1,  spring = "easy",         style = "popin 87%" })
+animation({ leaf = "windowsOut",    enabled = true,  speed = 1.49, bezier = "linear",       style = "popin 87%" })
+animation({ leaf = "fadeIn",        enabled = true,  speed = 1.73, bezier = "almostLinear" })
+animation({ leaf = "fadeOut",       enabled = true,  speed = 1.46, bezier = "almostLinear" })
+animation({ leaf = "fade",          enabled = true,  speed = 3.03, bezier = "quick" })
+animation({ leaf = "layers",        enabled = true,  speed = 3.81, bezier = "easeOutQuint" })
+animation({ leaf = "layersIn",      enabled = true,  speed = 4,    bezier = "easeOutQuint", style = "fade" })
+animation({ leaf = "layersOut",     enabled = true,  speed = 1.5,  bezier = "linear",       style = "fade" })
+animation({ leaf = "fadeLayersIn",  enabled = true,  speed = 1.79, bezier = "almostLinear" })
+animation({ leaf = "fadeLayersOut", enabled = true,  speed = 1.39, bezier = "almostLinear" })
+animation({ leaf = "workspaces",    enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
+animation({ leaf = "workspacesIn",  enabled = true,  speed = 1.21, bezier = "almostLinear", style = "fade" })
+animation({ leaf = "workspacesOut", enabled = true,  speed = 1.94, bezier = "almostLinear", style = "fade" })
+animation({ leaf = "specialWorkspace", enabled = true, speed = 4, bezier = "specialWorkSwitch", style = "slidefadevert 15%" })
+animation({ leaf = "zoomFactor",    enabled = true,  speed = 7,    bezier = "quick" })
 
 hl.config({
     dwindle = {
@@ -241,13 +275,16 @@ hl.config({
         numlock_by_default = false,
         kb_rules   = "",
 
+        repeat_rate  = ui.repeat_rate or 25,
+        repeat_delay = ui.repeat_delay or 600,
+
         follow_mouse  = 1,
-        sensitivity   = hardware.mouse_sensitivity or 0,
+        sensitivity   = ui.mouse_sensitivity or hardware.mouse_sensitivity or 0,
         accel_profile = hardware.mouse_accel_profile or "",
 
         touchpad = {
-            tap_to_click   = true,
-            natural_scroll = true,
+            tap_to_click   = ui.tap_to_click ~= false,
+            natural_scroll = ui.natural_scroll ~= false,
         },
     },
 })
@@ -303,6 +340,7 @@ hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V",      hl.dsp.exec_cmd("qs ipc call clipboard toggle"))
 hl.bind(mainMod .. " + N",      hl.dsp.global("quickshell:notifcenter"))
 hl.bind(mainMod .. " + I",      hl.dsp.exec_cmd("qs ipc call quicksettings toggle"))
+hl.bind(mainMod .. " + comma",  hl.dsp.exec_cmd("qs ipc call settings toggle"))
 hl.bind(mainMod .. " + TAB",    hl.dsp.global("quickshell:overview"))
 hl.bind(mainMod .. " + SHIFT + TAB", hl.dsp.global("quickshell:overview-back"))
 hl.bind(mainMod .. " + P",      hl.dsp.window.pseudo())

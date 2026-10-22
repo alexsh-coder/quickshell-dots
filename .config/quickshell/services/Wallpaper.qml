@@ -25,6 +25,37 @@ Singleton {
     // Edge the next switch grows from: bottom, or left/right when stepping through wallpapers
     property string origin: "bottom"
 
+    // Transition styles, in the order of their modes in shaders/wallswap.frag. Those with old set
+    // move or distort the old wallpaper, so they get a still of it when there is one
+    readonly property var transitions: [
+        { name: "circle", label: "Circle", icon: "radio_button_unchecked" },
+        { name: "slide", label: "Slide", icon: "view_carousel", old: true },
+        { name: "wipe", label: "Wipe", icon: "swipe_right" },
+        { name: "fade", label: "Fade", icon: "gradient" },
+        { name: "burn", label: "Burn", icon: "local_fire_department" },
+        { name: "pixels", label: "Pixels", icon: "grid_view", old: true },
+        { name: "glitch", label: "Glitch", icon: "broken_image", old: true },
+        { name: "curl", label: "Page curl", icon: "auto_stories", old: true },
+        { name: "tear", label: "Tear", icon: "content_cut", old: true },
+        { name: "blinds", label: "Blinds", icon: "blinds", old: true },
+        { name: "honeycomb", label: "Honeycomb", icon: "hexagon" },
+        { name: "ripple", label: "Ripple", icon: "water", old: true },
+        { name: "swirl", label: "Swirl", icon: "cyclone", old: true }
+    ]
+
+    // Mode for the next switch: the chosen style, or any but the last one for "random"
+    property int lastFx: 0
+    function pickFx() {
+        const i = transitions.findIndex(t => t.name === Settings.transition);
+        if (i >= 0)
+            return i;
+        let r = Math.floor(Math.random() * (transitions.length - 1));
+        return r >= lastFx ? r + 1 : r;
+    }
+
+    // Still of a video's current frame, for transitions that need the old wallpaper
+    readonly property string frozen: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-wallpaper-old.jpg"
+
     // What was picked, an image or a video
     property string current: ""
     readonly property bool video: isVideo(current)
@@ -93,23 +124,36 @@ Singleton {
             Quickshell.execDetached([script, "play", path]);
             return;
         }
-        // Videos, steps from the side and anything over a switch in progress are grown here,
-        // each over the one before (see grows); awww grows the rest itself
-        const stack = origin !== "bottom" || video || isVideo(path) || grows.count > 0;
+        const fx = pickFx();
+        lastFx = fx;
+        // What's on screen right now, if nothing is moving: what the transition starts from
+        const settledOld = grows.count === 0 && !native.running;
+        const old = !transitions[fx].old || !settledOld ? "" : video ? frozen : image;
+        // Videos, steps from the side, other styles and anything over a switch in progress are grown
+        // here, each over the one before (see grows); awww grows the rest itself
+        const stack = origin !== "bottom" || fx !== 0 || video || isVideo(path) || grows.count > 0;
         current = path;
         saved.setText(isVideo(path) || isMono(path) ? path : "");
         switching.restart();
         if (stack) {
             clock = Date.now();
-            stackGrow(isVideo(path) ? path : still(path));
+            stackGrow(isVideo(path) ? path : still(path), fx, old);
         }
         if (isVideo(path)) {
             prepare();
         } else {
             image = still(path);
-            if (!stack)
-                Quickshell.execDetached([script, "set", image, "", origin]);
+            if (!stack) {
+                native.restart();
+                Quickshell.execDetached([script, "set", image, "", origin, (growTime / 1000).toFixed(2)]);
+            }
         }
+    }
+
+    // awww's own grow is running
+    Timer {
+        id: native
+        interval: root.growTime + 100
     }
 
     // Switches in flight, oldest first: each grows a circle of its image or video over the ones below.
@@ -119,7 +163,7 @@ Singleton {
     property ListModel grows: ListModel {}
     property int growSeq: 0
     property real clock: 0
-    readonly property int growTime: 800
+    readonly property int growTime: Settings.transitionTime
     property int growDrop: -1
 
     // Linear 0..1 progress
@@ -139,8 +183,31 @@ Singleton {
     // A grow has covered the screen with path: what's under the grows can take it now
     signal growCovered(string path)
 
-    function stackGrow(img) {
-        grows.append({ gid: ++growSeq, path: img, under: image, origin: origin, t0: 0, at: 0, dir: 1, pos: 0, dur: 0 });
+    // old is the still under it for transitions that move it; for a video, its frame once frozen (wait)
+    function stackGrow(img, fx, old) {
+        const wait = old === frozen;
+        grows.append({ gid: ++growSeq, path: img, under: image, origin: origin, fx: fx, old: wait ? "" : old, wait: wait, t0: 0, at: 0, dir: 1, pos: 0, dur: 0 });
+        if (wait) {
+            freeze.gid = growSeq;
+            freeze.running = false;
+            freeze.running = true;
+        }
+    }
+
+    Process {
+        id: freeze
+
+        property int gid
+
+        command: [root.script, "freeze", root.frozen]
+        onExited: code => {
+            const i = root.growIndex(gid);
+            if (i < 0)
+                return;
+            if (code === 0)
+                root.grows.setProperty(i, "old", root.frozen);
+            root.grows.setProperty(i, "wait", false);
+        }
     }
 
     Timer {

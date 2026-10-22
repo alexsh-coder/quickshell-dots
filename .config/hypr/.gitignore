@@ -3,3 +3,4 @@ hardware.lua
 hyprland-gui.lua
 colors.lua
 cursor.lua
+settings.lua

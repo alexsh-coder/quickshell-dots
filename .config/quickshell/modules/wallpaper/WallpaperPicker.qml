@@ -122,6 +122,14 @@ Scope {
         Wallpaper.set(files.get(i, "filePath"));
     }
 
+    // Slideshow from the settings window
+    Timer {
+        interval: Math.max(1, Settings.slideshow) * 60000
+        repeat: true
+        running: Settings.slideshow > 0
+        onTriggered: root.applyRandom()
+    }
+
     // Next or previous in the tag last shown in the picker, wrapping around
     property real lastStep: 0
     function applyStep(by) {

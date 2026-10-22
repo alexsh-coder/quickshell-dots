@@ -123,6 +123,13 @@ Item {
                     }
                 }
                 RoundButton {
+                    icon: "settings"
+                    onClicked: {
+                        root.popouts.close();
+                        Settings.open = true;
+                    }
+                }
+                RoundButton {
                     icon: "lock"
                     onClicked: {
                         root.popouts.close();

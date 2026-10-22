@@ -49,6 +49,9 @@ PanelWindow {
 
             required property string path
             required property string origin
+            required property int fx
+            required property string old
+            required property bool wait
             required property real t0
             required property real at
             required property int dir
@@ -56,12 +59,13 @@ PanelWindow {
             required property int gid
 
             readonly property bool video: Wallpaper.isVideo(path)
-            readonly property bool side: origin !== "bottom"
-            readonly property real radius: Wallpaper.grown(t0, at, dir) * (side ? Math.hypot(width, height / 2) : Math.hypot(width / 2, height))
-            readonly property point center: side ? Qt.point(origin === "left" ? 0 : width, height / 2) : Qt.point(width / 2, height)
+            readonly property bool toReady: video ? videoLoader.playing : img.status === Image.Ready
+            readonly property bool oldReady: old === "" || oldImg.status === Image.Ready || oldImg.status === Image.Error
+            readonly property bool ready: toReady && oldReady && !wait
 
-            function loaded() {
-                if (!at)
+            // Starts once both ends are there
+            onReadyChanged: {
+                if (ready && !at)
                     Wallpaper.grows.setProperty(index, "at", Date.now());
             }
 
@@ -71,37 +75,51 @@ PanelWindow {
             scale: 1 + root.fxZoom
             visible: root.full
 
-            ShaderEffect {
-                readonly property Image source: img
-                readonly property real radius: grow.radius
-                readonly property point center: grow.center
-                readonly property size extent: Qt.size(width, height)
-                // The shader gets the whole decoded image, not the cropped part the Image would draw
-                readonly property size crop: Qt.size(Math.min(1, width / Math.max(1, img.paintedWidth)), Math.min(1, height / Math.max(1, img.paintedHeight)))
+            TransitionEffect {
+                anchors.fill: parent
+                visible: grow.ready
+                source: grow.video ? videoTexture : img
+                previous: oldImg.status === Image.Ready ? oldImg : img
+                hasPrevious: oldImg.status === Image.Ready
+                cropTo: grow.video ? Qt.size(1, 1) : cropOf(img)
+                cropFrom: cropOf(oldImg)
+                t: Wallpaper.growT(grow.t0, grow.at, grow.dir)
+                effect: grow.fx
+                origin: grow.origin
+            }
+
+            Image {
+                id: img
 
                 anchors.fill: parent
-                visible: !grow.video && img.status === Image.Ready
-                fragmentShader: Qt.resolvedUrl("../../shaders/wallgrow.frag.qsb")
+                visible: false
+                source: grow.video ? "" : "file://" + grow.path
+                sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: false
+                smooth: true
+            }
 
-                Image {
-                    id: img
+            // The wallpaper it replaces, for styles that move it
+            Image {
+                id: oldImg
 
-                    anchors.fill: parent
-                    visible: false
-                    source: grow.video ? "" : "file://" + grow.path
-                    sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    cache: false
-                    smooth: true
-                    onStatusChanged: {
-                        if (status === Image.Ready)
-                            grow.loaded();
-                    }
-                }
+                anchors.fill: parent
+                visible: false
+                source: grow.old === "" ? "" : "file://" + grow.old
+                sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: false
+                smooth: true
             }
 
             Loader {
+                id: videoLoader
+
+                property bool playing: false
+
                 anchors.fill: parent
                 active: grow.video
 
@@ -116,19 +134,19 @@ PanelWindow {
                             return;
                         Wallpaper.grows.setProperty(grow.index, "pos", position);
                         Wallpaper.grows.setProperty(grow.index, "dur", duration);
-                        grow.loaded();
-                    }
-
-                    layer.enabled: true
-                    layer.effect: ShaderEffect {
-                        readonly property real radius: grow.radius
-                        readonly property point center: grow.center
-                        readonly property size extent: Qt.size(width, height)
-                        readonly property size crop: Qt.size(1, 1)
-
-                        fragmentShader: Qt.resolvedUrl("../../shaders/wallgrow.frag.qsb")
+                        videoLoader.playing = true;
                     }
                 }
+            }
+
+            ShaderEffectSource {
+                id: videoTexture
+
+                anchors.fill: parent
+                visible: false
+                sourceItem: videoLoader.item
+                hideSource: true
+                live: true
             }
         }
     }

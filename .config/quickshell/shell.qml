@@ -12,6 +12,7 @@ import qs.modules.notifications
 import qs.modules.osd
 import qs.modules.overview
 import qs.modules.quicksettings
+import qs.modules.settings
 import qs.modules.wallpaper
 
 // 
@@ -55,4 +56,5 @@ ShellRoot {
     DeskEditor {}
     DeskEdge {}
     QuickSettingsCard {}
+    SettingsWindow {}
 }

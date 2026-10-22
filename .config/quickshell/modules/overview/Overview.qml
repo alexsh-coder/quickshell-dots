@@ -59,8 +59,10 @@ Scope {
     readonly property var selected: selectedIndex >= 0 ? entries[selectedIndex] : null
 
     readonly property var screen: Quickshell.screens.find(s => s.name === monitorName) ?? Quickshell.screens[0]
-    readonly property int originX: monitor?.reserved?.[0] ?? 0
-    readonly property int originY: monitor?.reserved?.[1] ?? 0
+    // Hyprland's pixels per overlay pixel: the panel scale (QT_SCALE_FACTOR) shrinks the overlay's
+    readonly property real ui: Number(Quickshell.env("QT_SCALE_FACTOR") || 1)
+    readonly property real originX: (monitor?.reserved?.[0] ?? 0) / ui
+    readonly property real originY: (monitor?.reserved?.[1] ?? 0) / ui
 
     // Scene geometry, in overlay pixels
     property real sceneW: 1
@@ -148,7 +150,7 @@ Scope {
     }
 
     function toGlobal(x, y) {
-        return Qt.point(Math.round((monitor?.x ?? 0) + originX + x), Math.round((monitor?.y ?? 0) + originY + y));
+        return Qt.point(Math.round((monitor?.x ?? 0) + (originX + x) * ui), Math.round((monitor?.y ?? 0) + (originY + y) * ui));
     }
 
     function warpCursor(p) {
@@ -232,10 +234,10 @@ Scope {
                 toplevel: tls.find(t => norm(t.address) === norm(c.address))?.wayland ?? null,
                 title: c.title,
                 appClass: c.class,
-                x: c.at[0] - mon.x - (mon.reserved?.[0] ?? 0),
-                y: c.at[1] - mon.y - (mon.reserved?.[1] ?? 0),
-                w: c.size[0],
-                h: c.size[1],
+                x: (c.at[0] - mon.x - (mon.reserved?.[0] ?? 0)) / ui,
+                y: (c.at[1] - mon.y - (mon.reserved?.[1] ?? 0)) / ui,
+                w: c.size[0] / ui,
+                h: c.size[1] / ui,
                 ws: c.workspace.id,
                 onScreen: c.monitor === mon.id && visibleWs.includes(c.workspace.id) && !c.hidden
             }));

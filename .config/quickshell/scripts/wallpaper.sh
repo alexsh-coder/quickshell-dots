@@ -3,8 +3,8 @@
 # poster of their first frame. Quickshell runs the transition into a video itself, over the
 # already playing player (see modules/wallpaper/WallpaperTransition.qml).
 # Usage:
-#   wallpaper.sh set FILE [POSTER] [POS]  switch to FILE, growing from POS (bottom, left, right);
-#                                     POSTER is where a video's first frame is kept
+#   wallpaper.sh set FILE [POSTER] [POS] [SECONDS]  switch to FILE, growing from POS (bottom, left,
+#                                     right) for SECONDS; POSTER is where a video's first frame is kept
 #   wallpaper.sh play VIDEO           start VIDEO unless one is already playing
 #   wallpaper.sh freeze FRAME         pause the video that's on and save the frame it shows to FRAME
 #   wallpaper.sh start VIDEO POSTER   replace the video that's on, starting from POSTER in awww
@@ -49,7 +49,7 @@ grow() {
         return
     fi
     awww img "$1" --transition-type grow --transition-pos "${2:-bottom}" \
-        --transition-duration 0.8 --transition-fps 60
+        --transition-duration "${3:-0.8}" --transition-fps 60
 }
 
 play() {
@@ -148,8 +148,8 @@ set_wallpaper() {
     if is_video "$1"; then
         poster "$1" "$2" || exit 1
         stop
-        grow "$2" "${3:-bottom}"
-        sleep 0.8
+        grow "$2" "${3:-bottom}" "${4:-0.8}"
+        sleep "${4:-0.8}"
         play "$1"
     elif [ "${3:-}" = none ]; then
         # Quickshell has grown it over the screen already: nothing to show under it on the way out
@@ -157,13 +157,13 @@ set_wallpaper() {
         kill_player
     else
         stop
-        grow "$1" "${3:-bottom}"
+        grow "$1" "${3:-bottom}" "${4:-0.8}"
     fi
     rm -f "$run.pid"
 }
 
 case "${1:-}" in
-set) set_wallpaper "$2" "${3:-}" "${4:-}" ;;
+set) set_wallpaper "$2" "${3:-}" "${4:-}" "${5:-}" ;;
 play) play "$2" ;;
 freeze) freeze "$2" ;;
 start) start "$2" "$3" ;;
@@ -181,7 +181,7 @@ mono)
     done
     ;;
 *)
-    sed -n '2,15s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,16s/^# \{0,1\}//p' "$0" >&2
     exit 1
     ;;
 esac

@@ -9,7 +9,10 @@ Singleton {
     id: root
 
     property bool enabled: false
-    readonly property int temperature: 4000
+    readonly property int temperature: Settings.nightTemp
+
+    // A new warmth from the settings window shows right away
+    onTemperatureChanged: if (enabled) apply(true)
 
     // A change made by the user, for the OSD
     signal switched
