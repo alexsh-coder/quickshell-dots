@@ -49,7 +49,7 @@ Row {
 
                 layer.enabled: true
                 layer.effect: ShaderEffect {
-                    property color color: Theme.accent
+                    property color color: Theme.barAccent
                     Behavior on color { ColorAnimation { duration: Theme.anim } }
                     fragmentShader: Qt.resolvedUrl("../../shaders/tint.frag.qsb")
                 }

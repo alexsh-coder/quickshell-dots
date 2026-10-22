@@ -31,7 +31,7 @@ Item {
                 : root.volume >= 0.5 ? "volume_up"
                 : root.volume > 0 ? "volume_down"
                 : "volume_mute"
-            color: root.lit ? Theme.accent : root.muted ? Theme.subtext : Theme.secondary
+            color: root.lit ? Theme.barAccent : root.muted ? Theme.subtext : Theme.secondary
             Behavior on color { ColorAnimation { duration: Theme.anim } }
         }
     }

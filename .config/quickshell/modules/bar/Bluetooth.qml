@@ -24,7 +24,7 @@ Item {
         text: !root.adapter?.enabled ? "bluetooth_disabled"
             : Bluetooth.devices.values.some(d => d.connected) ? "bluetooth_connected"
             : "bluetooth"
-        color: root.lit ? Theme.accent : Theme.secondary
+        color: root.lit ? Theme.barAccent : Theme.secondary
         Behavior on color { ColorAnimation { duration: Theme.anim } }
     }
 }

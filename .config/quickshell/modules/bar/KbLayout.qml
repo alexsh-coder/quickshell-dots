@@ -18,7 +18,7 @@ Item {
         text: (Keyboard.layout || "--").toLowerCase()
         font.pixelSize: 14
         font.weight: Font.Bold
-        color: parent.lit ? Theme.accent : Theme.secondary
+        color: parent.lit ? Theme.barAccent : Theme.secondary
         Behavior on color { ColorAnimation { duration: Theme.anim } }
     }
 }

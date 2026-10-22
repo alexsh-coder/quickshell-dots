@@ -23,7 +23,7 @@ Item {
         text: Net.ethernet ? "cable"
             : !Net.wifiOn || !Net.active ? "wifi_off"
             : parent.levels[Math.max(0, Math.min(4, Math.floor(Net.active.signalStrength * 5)))]
-        color: parent.lit ? Theme.accent : Theme.secondary
+        color: parent.lit ? Theme.barAccent : Theme.secondary
         Behavior on color { ColorAnimation { duration: Theme.anim } }
     }
 }

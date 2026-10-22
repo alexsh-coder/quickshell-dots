@@ -16,7 +16,7 @@ Item {
         anchors.centerIn: parent
         // nf-md power
         text: "\u{f0425}"
-        color: Theme.accent
+        color: Theme.barAccent
         scale: parent.lit ? 1.12 : 1
         Behavior on scale { NumberAnimation { duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
     }

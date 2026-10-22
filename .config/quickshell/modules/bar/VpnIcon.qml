@@ -19,7 +19,7 @@ Item {
         weight: 500
         fill: 0
         text: Vpn.on ? "vpn_key" : "vpn_key_off"
-        color: parent.lit ? Theme.accent : Theme.secondary
+        color: parent.lit ? Theme.barAccent : Theme.secondary
         Behavior on color { ColorAnimation { duration: Theme.anim } }
 
         SequentialAnimation on opacity {

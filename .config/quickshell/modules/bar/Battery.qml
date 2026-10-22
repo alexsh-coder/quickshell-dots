@@ -35,7 +35,7 @@ Row {
         font.pixelSize: Theme.barIcon
         weight: 500
         text: root.icon
-        color: root.low ? Theme.urgent : root.lit ? Theme.accent : Theme.secondary
+        color: root.low ? Theme.urgent : root.lit ? Theme.barAccent : Theme.secondary
         Behavior on color { ColorAnimation { duration: Theme.anim } }
     }
 }

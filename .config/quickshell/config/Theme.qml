@@ -18,7 +18,9 @@ Singleton {
     readonly property color urgent: Scheme.pick("#cf222e", "#ff6b81")
     // Bar's left pill: M3-style neutrals carrying the accent hue,
     // with the accent held to the chroma of soft anime/pastel wallpapers
-    readonly property color tintAccent: Scheme.pick(Accent.role(0.63, 0.14, 0, 0.14), Accent.color)
+    readonly property color tintAccent: Accent.barRole(Scheme.pick(Accent.role(0.63 + Accent.tweak.l, 0.14 + Accent.tweak.c, 0, 0.14 + Accent.tweak.c), Accent.color))
+    // Accent for the bar, with the wallpaper's own bar tweak on top
+    readonly property color barAccent: Accent.barColor
     readonly property color tintSubtext: Scheme.pick(Accent.role(0.71, 0.06, 0, 0.06), Accent.role(0.6, 0.045, 0, 0.045))
     readonly property color tintMuted: Scheme.pick(Accent.role(0.875, 0.035, 0, 0.035), Accent.role(0.36, 0.03, 0, 0.03))
     // Halo behind text drawn straight on the wallpaper
