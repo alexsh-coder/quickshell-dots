@@ -42,6 +42,7 @@ ShellRoot {
     }
 
     Notifications {}
+    BatteryAlert {}
     NotificationCenter {}
     Osd {}
     Overview {}
