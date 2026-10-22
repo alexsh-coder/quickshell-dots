@@ -223,6 +223,7 @@ Scope {
         const hidden = Hidden.ids.includes(entry.id);
         const items = [
             { action: "pin", icon: "push_pin", text: pinned ? "Unpin" : "Pin", hint: "Ctrl P" },
+            { action: "dock", icon: "dock_to_bottom", text: DockPins.has(entry.id) ? "Unpin from dock" : "Pin to dock", hint: "" },
             { action: "rename", icon: "edit", text: "Rename", hint: "F2" }
         ];
         if (Names.names[entry.id] !== undefined)
@@ -250,6 +251,8 @@ Scope {
         closeMenu();
         if (action === "pin")
             togglePin(entry);
+        else if (action === "dock")
+            DockPins.toggle(entry.id);
         else if (action === "rename")
             startRename(entry);
         else if (action === "reset") {

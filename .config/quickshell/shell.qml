@@ -4,6 +4,7 @@ import Quickshell
 import qs.modules.bar
 import qs.modules.clipboard
 import qs.modules.desk
+import qs.modules.dock
 import qs.modules.launcher
 import qs.modules.lock
 import qs.modules.musicfx
@@ -38,6 +39,7 @@ ShellRoot {
             WallpaperFx { screen: desk.modelData }
             VideoGlow { screen: desk.modelData }
             DeskLayer { screen: desk.modelData }
+            Dock { screen: desk.modelData }
         }
     }
 
