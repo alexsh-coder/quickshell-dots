@@ -330,6 +330,8 @@ Item {
 
                 // Centred greedy wrap; breaks after spaces and CJK characters
                 function layout() {
+                    if (!host)
+                        return;
                     const items = [];
                     for (let i = 0; i < wordRepeater.count; i++)
                     items.push(wordRepeater.itemAt(i));
@@ -435,7 +437,11 @@ Item {
                             opacity: host.has("glow") ? word.glow : 0
                             visible: opacity > 0
 
-                            Repeater {
+                            // Built only for the sung line: five blur layers per word are costly to create
+                            Loader {
+                                active: host.has("glow") && line.current
+                                asynchronous: true
+                                sourceComponent: Repeater {
                                 model: [8, 16, 32, 48, 64]
 
                                 LyricText {
@@ -454,6 +460,7 @@ Item {
                                         blur: 1
                                         blurMax: bloom.modelData
                                     }
+                                }
                                 }
                             }
 
