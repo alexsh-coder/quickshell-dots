@@ -12,6 +12,8 @@ Singleton {
     readonly property string unit: "sing-box"
     readonly property string testUrl: "https://www.gstatic.com/generate_204"
 
+    // The `vpn` helper and its sing-box unit aren't part of these dotfiles; without them VPN stays hidden
+    property bool available: false
     property bool on: false
     // Toggled but systemd hasn't caught up yet
     property bool busy: false
@@ -93,7 +95,15 @@ Singleton {
         }
     }
 
-    Component.onCompleted: loadSubs()
+    Process {
+        running: true
+        command: ["sh", "-c", `command -v vpn && systemctl cat ${root.unit}`]
+        onExited: code => {
+            root.available = code === 0;
+            if (root.available)
+                root.loadSubs();
+        }
+    }
 
     Process {
         id: subList
@@ -162,7 +172,7 @@ Singleton {
 
     Timer {
         interval: root.busy ? 1000 : 5000
-        running: true
+        running: root.available
         repeat: true
         triggeredOnStart: true
         onTriggered: if (!poller.running) poller.running = true

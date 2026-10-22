@@ -6,6 +6,7 @@ import qs.services
 Item {
     property bool lit: false
 
+    visible: Vpn.available
     anchors.verticalCenter: parent.verticalCenter
     implicitWidth: icon.implicitWidth
     implicitHeight: icon.implicitHeight

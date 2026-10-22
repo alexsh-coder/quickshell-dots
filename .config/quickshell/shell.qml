@@ -1,11 +1,11 @@
 //@ pragma UseQApplication
-//@ pragma IconTheme Suru++-Asprómauros
+//@ pragma IconTheme Suru++-Extra
 import Quickshell
 import qs.modules.bar
 import qs.modules.clipboard
+import qs.modules.desk
 import qs.modules.launcher
 import qs.modules.lock
-import qs.modules.lyrics
 import qs.modules.musicfx
 import qs.modules.notifications
 import qs.modules.osd
@@ -25,6 +25,8 @@ ShellRoot {
         }
     }
 
+    VideoFx {}
+
     Variants {
         model: Quickshell.screens
 
@@ -34,12 +36,9 @@ ShellRoot {
 
             WallpaperTransition { screen: desk.modelData }
             WallpaperFx { screen: desk.modelData }
-            DesktopVisualizer { screen: desk.modelData }
+            VideoGlow { screen: desk.modelData }
+            DeskLayer { screen: desk.modelData }
         }
-    }
-
-    DesktopLyrics {
-        screen: Quickshell.screens[0]
     }
 
     Notifications {}
@@ -50,5 +49,6 @@ ShellRoot {
     Clipboard {}
     Lock {}
     WallpaperPicker {}
+    DeskEditor {}
     QuickSettingsCard {}
 }

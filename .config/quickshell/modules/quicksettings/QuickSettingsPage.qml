@@ -114,6 +114,14 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
 
+                // Desktop widgets and effects editor
+                RoundButton {
+                    icon: "dashboard_customize"
+                    onClicked: {
+                        root.popouts.close();
+                        Desk.editing = true;
+                    }
+                }
                 RoundButton {
                     icon: "lock"
                     onClicked: {
@@ -196,6 +204,7 @@ Item {
             }
 
             Tile {
+                visible: Vpn.available
                 icon: Vpn.on ? "vpn_key" : "vpn_key_off"
                 title: "VPN"
                 detail: Vpn.busy ? (Vpn.on ? "Disconnecting…" : "Connecting…")
@@ -236,7 +245,7 @@ Item {
                 title: "Dark mode"
                 detail: on ? "On" : "Off"
                 on: !Scheme.light
-                onClicked: Scheme.light = !Scheme.light
+                onClicked: Scheme.toggle()
             }
 
             Tile {
@@ -250,10 +259,10 @@ Item {
             Tile {
                 icon: "equalizer"
                 title: "Visualizer"
-                detail: on ? MusicFx.style.charAt(0).toUpperCase() + MusicFx.style.slice(1) : "Off"
+                detail: on && Desk.main ? Desk.main.style.charAt(0).toUpperCase() + Desk.main.style.slice(1) : "Off"
                 on: MusicFx.desktop
                 page: "media"
-                onClicked: MusicFx.desktop = !MusicFx.desktop
+                onClicked: MusicFx.set("desktop", !MusicFx.desktop)
             }
 
             Tile {

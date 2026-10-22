@@ -17,7 +17,7 @@ else
 fi
 
 # The bar shows a recording indicator between these two calls
-gpu-screen-recorder "${target[@]}" -f 60 -a default_output -ac aac -o "$out" &
+gpu-screen-recorder "${target[@]}" -f 60 -fm cfr -q ultra -tune quality -a default_output -ac aac -ab 256 -o "$out" &
 pid=$!
 qs ipc call recorder started >/dev/null 2>&1
 wait "$pid"

@@ -10,7 +10,7 @@ Column {
     // Effect whose own strength slider is shown, opened by right-clicking it
     property string editing: ""
     readonly property var names: ({ desktop: "Visualizer", glow: "Glow", blur: "Blur", zoom: "Zoom", shake: "Shake" })
-    readonly property var styleIcons: ({ bars: "graphic_eq", wave: "airwave", mirror: "align_vertical_center", ring: "donut_large", nation: "album", flow: "stacked_line_chart" })
+    readonly property var styleIcons: ({ bars: "graphic_eq", wave: "airwave", mirror: "align_vertical_center", ring: "donut_large", nation: "album", particles: "auto_awesome" })
     // A slider is held
     readonly property bool busy: intensitySlider.pressed || strengthSlider.pressed
     // Tiles stay see-through over the blurred cover behind the panel
@@ -24,6 +24,8 @@ Column {
         if (editing)
             shownKey = editing;
     }
+
+    signal customize
 
     spacing: 16
 
@@ -85,7 +87,7 @@ Column {
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 checked: MusicFx.desktop
-                onToggled: MusicFx.desktop = !MusicFx.desktop
+                onToggled: MusicFx.set("desktop", !MusicFx.desktop)
             }
         }
 
@@ -101,8 +103,8 @@ Column {
                     id: chip
 
                     required property string modelData
-                    readonly property bool selected: MusicFx.desktop && MusicFx.style === modelData
-                    readonly property bool layered: MusicFx.desktop && !selected && MusicFx.layers.includes(modelData)
+                    readonly property bool selected: MusicFx.desktop && Desk.main?.style === modelData
+                    readonly property bool layered: MusicFx.desktop && !selected && MusicFx.hasLayer(modelData)
 
                     width: (parent.width - 12) / 3
                     height: 52
@@ -144,9 +146,9 @@ Column {
                                 if (!chip.selected)
                                     MusicFx.toggleLayer(chip.modelData);
                             } else {
-                                MusicFx.style = chip.modelData;
+                                MusicFx.setStyle(chip.modelData);
                             }
-                            MusicFx.desktop = true;
+                            MusicFx.set("desktop", true);
                         }
                     }
                 }
@@ -252,6 +254,43 @@ Column {
                     }
                 }
             }
+        }
+    }
+
+    Rectangle { width: parent.width; height: 1; color: Theme.muted }
+
+    // Everything else (where widgets sit, more visualizers, glow type) lives in the desktop editor
+    Rectangle {
+        width: parent.width
+        height: 44
+        radius: Theme.radius
+        color: customizeArea.containsMouse ? Theme.muted : root.tile
+        Behavior on color { ColorAnimation { duration: Theme.anim } }
+
+        Row {
+            anchors.verticalCenter: parent.verticalCenter
+            x: 12
+            spacing: 10
+
+            Icon { text: "dashboard_customize"; font.pixelSize: 20; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
+            Label { text: "Customize desktop"; anchors.verticalCenter: parent.verticalCenter }
+        }
+
+        Icon {
+            anchors.right: parent.right
+            anchors.rightMargin: 10
+            anchors.verticalCenter: parent.verticalCenter
+            text: "chevron_right"
+            font.pixelSize: 20
+            color: Theme.subtext
+        }
+
+        MouseArea {
+            id: customizeArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.customize()
         }
     }
 
@@ -415,7 +454,6 @@ Column {
             onPressed: mouse => slider.setFrom(mouse.x - 6)
             onPositionChanged: mouse => { if (pressed) slider.setFrom(mouse.x - 6); }
             onDoubleClicked: slider.moved(1)
-            onWheel: wheel => slider.moved(slider.value + (wheel.angleDelta.y > 0 ? 0.05 : -0.05))
         }
     }
 }

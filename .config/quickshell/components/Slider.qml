@@ -59,6 +59,5 @@ Item {
         cursorShape: Qt.PointingHandCursor
         onPressed: mouse => root.moved(root.clamp((mouse.x - 6) / root.width))
         onPositionChanged: mouse => { if (pressed) root.moved(root.clamp((mouse.x - 6) / root.width)); }
-        onWheel: wheel => root.moved(root.clamp(root.value + (wheel.angleDelta.y > 0 ? 0.05 : -0.05)))
     }
 }

@@ -3,12 +3,14 @@
 # poster of their first frame. Quickshell runs the transition into a video itself, over the
 # already playing player (see modules/wallpaper/WallpaperTransition.qml).
 # Usage:
-#   wallpaper.sh set FILE [POSTER]    switch to FILE; POSTER is where a video's first frame is kept
+#   wallpaper.sh set FILE [POSTER] [POS]  switch to FILE, growing from POS (bottom, left, right);
+#                                     POSTER is where a video's first frame is kept
 #   wallpaper.sh play VIDEO           start VIDEO unless one is already playing
 #   wallpaper.sh freeze FRAME         pause the video that's on and save the frame it shows to FRAME
 #   wallpaper.sh start VIDEO POSTER   replace the video that's on, starting from POSTER in awww
 #   wallpaper.sh poster VIDEO POSTER  write VIDEO's first frame to POSTER unless it's up to date
 #   wallpaper.sh posters CACHE DIR    posters for every video under DIR, named by md5 of the path
+#   wallpaper.sh mono CACHE DIR       negatives of every image under DIR, named by md5 of the path
 set -u
 
 run=${XDG_RUNTIME_DIR:-/tmp}/qs-wallpaper
@@ -27,8 +29,19 @@ poster() {
     ffmpeg -nostdin -v error -y -i "$1" -frames:v 1 -q:v 2 "$2.tmp.jpg" && mv -f "$2.tmp.jpg" "$2"
 }
 
+mono() {
+    local out=$2/$(printf '%s' "$1" | md5sum | cut -c1-32)-neg.png
+    [ -s "$out" ] && [ "$out" -nt "$1" ] && return 0
+    mkdir -p "$2"
+    magick "$1" -background black -flatten -alpha off -negate "$out.$$.png" && mv -f "$out.$$.png" "$out"
+}
+
 grow() {
-    awww img "$1" --transition-type grow --transition-pos bottom \
+    if [ "${2:-}" = none ]; then
+        awww img "$1" --transition-type none
+        return
+    fi
+    awww img "$1" --transition-type grow --transition-pos "${2:-bottom}" \
         --transition-duration 0.8 --transition-fps 60
 }
 
@@ -114,18 +127,18 @@ set_wallpaper() {
     if is_video "$1"; then
         poster "$1" "$2" || exit 1
         stop
-        grow "$2"
+        grow "$2" "${3:-bottom}"
         sleep 0.8
         play "$1"
     else
         stop
-        grow "$1"
+        grow "$1" "${3:-bottom}"
     fi
     rm -f "$run.pid"
 }
 
 case "${1:-}" in
-set) set_wallpaper "$2" "${3:-}" ;;
+set) set_wallpaper "$2" "${3:-}" "${4:-}" ;;
 play) play "$2" ;;
 freeze) freeze "$2" ;;
 start) start "$2" "$3" ;;
@@ -135,8 +148,13 @@ posters)
         is_video "$f" && poster "$f" "$2/$(printf '%s' "$f" | md5sum | cut -c1-32).jpg"
     done
     ;;
+mono)
+    find "$3" -type f | while IFS= read -r f; do
+        is_video "$f" || mono "$f" "$2"
+    done
+    ;;
 *)
-    sed -n '2,12s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,13s/^# \{0,1\}//p' "$0" >&2
     exit 1
     ;;
 esac

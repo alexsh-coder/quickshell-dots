@@ -90,4 +90,16 @@ Singleton {
         target: root.player
         function onPositionChanged() { root.update(); }
     }
+
+    IpcHandler {
+        target: "lyrics"
+
+        function toggle(): void {
+            MusicFx.lyrics = !MusicFx.lyrics;
+        }
+
+        function reload(): void {
+            root.reload();
+        }
+    }
 }

@@ -471,6 +471,7 @@ Scope {
                     source: wall.source
                     sourceSize: Qt.size(width, height)
                     fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
                     cache: false
                     layer.enabled: root.shown
                     layer.effect: MultiEffect {
@@ -489,6 +490,8 @@ Scope {
                     source: Wallpaper.image ? "file://" + Wallpaper.image : ""
                     sourceSize: Qt.size(width, height)
                     fillMode: Image.PreserveAspectCrop
+                    // Decoded off the main thread: a wallpaper switch would freeze the shell for a frame or few
+                    asynchronous: true
                     cache: false
                 }
 
@@ -498,6 +501,7 @@ Scope {
                     source: wall.source
                     sourceSize: Qt.size(width / 2, height / 2)
                     fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
                     cache: false
                     opacity: root.progress
                     layer.enabled: root.shown

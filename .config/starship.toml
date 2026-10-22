@@ -1,0 +1,27 @@
+# Minimal two-line prompt.
+# "blue" = kitty color4 = wallpaper accent (written by Quickshell), so it follows the rice.
+format = """$directory$git_branch$git_status$cmd_duration
+$character"""
+
+[directory]
+style = "bold blue"
+truncation_length = 4
+truncate_to_repo = false   # ~/.config is a git repo; keep the full ~/ path
+
+[git_branch]
+symbol = " "
+style = "bright-black"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "bright-black"
+format = "([$all_status$ahead_behind]($style) )"
+
+[cmd_duration]
+# only shows for commands that took longer than 2s
+style = "yellow"
+format = "[$duration]($style) "
+
+[character]
+success_symbol = "[❯](bold blue)"
+error_symbol = "[❯](bold blue)"

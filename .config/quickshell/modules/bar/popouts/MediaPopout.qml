@@ -28,10 +28,13 @@ Item {
     property real position: 0
 
     readonly property bool fx: popouts.fx
+    // The lyrics editor takes the panel, like the effects
+    property bool lyrics: false
+    property bool pinnedBefore: false
     readonly property real headHeight: hasTrack ? content.implicitHeight + 4 : empty.implicitHeight + 8
 
     implicitWidth: hasTrack ? 440 : fx ? 360 : 280
-    implicitHeight: Theme.padTop + (fx ? fxView.implicitHeight : headHeight) + Theme.pad
+    implicitHeight: Theme.padTop + (fx ? fxView.implicitHeight : lyrics ? lyricsView.implicitHeight : headHeight) + Theme.pad
 
     function sync() {
         position = player?.position ?? 0;
@@ -58,12 +61,29 @@ Item {
     onPlayerChanged: sync()
     onHereChanged: {
         sync();
-        if (!here)
+        if (!here) {
             volume.open = false;
+            lyrics = false;
+        }
+    }
+    onHasTrackChanged: if (!hasTrack) lyrics = false
+
+    // Typing and tapping need the keyboard, and the panel must stay while the pointer is away
+    onLyricsChanged: {
+        if (lyrics) {
+            pinnedBefore = popouts.pinned;
+            popouts.fx = false;
+            popouts.pinned = true;
+        } else {
+            if (here && !pinnedBefore)
+                popouts.pinned = false;
+            if (keyboard)
+                forceActiveFocus();
+        }
     }
 
     readonly property bool keyboard: here && popouts.pinned
-    onKeyboardChanged: if (keyboard) forceActiveFocus()
+    onKeyboardChanged: if (keyboard && !lyrics) forceActiveFocus()
 
     Keys.onPressed: event => {
         if (event.key === Qt.Key_Escape)
@@ -187,8 +207,8 @@ Item {
         id: playerView
 
         anchors.fill: parent
-        enabled: !root.fx
-        opacity: root.fx ? 0 : 1
+        enabled: !root.fx && !root.lyrics
+        opacity: root.fx || root.lyrics ? 0 : 1
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
 
@@ -273,9 +293,20 @@ Item {
                             onClicked: root.cycle()
                         }
 
-                        FxButton {
+                        Row {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
+                            spacing: 2
+
+                            CtrlButton {
+                                icon: "lyrics"
+                                iconSize: 18
+                                diameter: 28
+                                active: root.lyrics
+                                onClicked: root.lyrics = !root.lyrics
+                            }
+
+                            FxButton {}
                         }
                     }
 
@@ -642,10 +673,34 @@ Item {
         FxControls {
             id: fxControls
             width: parent.width
+            onCustomize: {
+                root.popouts.close();
+                Desk.editing = true;
+            }
         }
     }
 
-    onFxChanged: if (!fx) fxControls.editing = ""
+    LyricsEditor {
+        id: lyricsView
+
+        x: Theme.pad
+        y: Theme.padTop
+        width: parent.width - Theme.pad * 2
+        player: root.player
+        active: root.lyrics
+        enabled: root.lyrics
+        opacity: root.lyrics ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        onBack: root.lyrics = false
+    }
+
+    onFxChanged: {
+        if (!fx)
+            fxControls.editing = "";
+        else
+            lyrics = false;
+    }
 
     component FxButton: CtrlButton {
         icon: "tune"
@@ -700,60 +755,5 @@ Item {
         smooth: true
         mipmap: true
         Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
-    }
-
-    component CtrlButton: Item {
-        id: btn
-
-        property string icon
-        property int iconSize: 22
-        property int diameter: 38
-        property bool active: false
-        property real fill: 1
-        // Nerd Font glyph drawn instead of the Material icon
-        property string nerd
-        // Prev/next are always drawn in the text colour
-        property bool plain: false
-        signal clicked
-
-        width: diameter
-        height: diameter
-        opacity: enabled ? 1 : 0.35
-
-        Rectangle {
-            anchors.fill: parent
-            radius: width / 2
-            color: Qt.alpha(Theme.text, btnMouse.pressed ? 0.14 : 0.08)
-            opacity: btnMouse.containsMouse ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: Theme.anim } }
-        }
-
-        Icon {
-            anchors.centerIn: parent
-            visible: !btn.nerd
-            text: btn.icon
-            font.pixelSize: btn.iconSize
-            fill: btn.fill
-            color: btn.plain ? Theme.text : btn.active ? Theme.accent : Theme.subtext
-            Behavior on color { ColorAnimation { duration: Theme.anim } }
-            Behavior on fill { NumberAnimation { duration: Theme.anim } }
-        }
-
-        NerdIcon {
-            anchors.centerIn: parent
-            visible: !!btn.nerd
-            text: btn.nerd
-            font.pixelSize: btn.iconSize
-            color: btn.plain ? Theme.text : btn.active ? Theme.accent : Theme.subtext
-            Behavior on color { ColorAnimation { duration: Theme.anim } }
-        }
-
-        MouseArea {
-            id: btnMouse
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: btn.clicked()
-        }
     }
 }

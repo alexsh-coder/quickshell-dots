@@ -32,6 +32,10 @@ Singleton {
             sync();
     }
 
+    function toggle() {
+        light = !light;
+    }
+
     // Pushes the scheme to GTK/Qt apps and the xdg portal
     function sync() {
         Quickshell.execDetached([Quickshell.shellDir + "/scripts/scheme.sh", light ? "light" : "dark"]);
@@ -48,7 +52,7 @@ Singleton {
         target: "theme"
 
         function toggle(): void {
-            root.light = !root.light;
+            root.toggle();
         }
         function set(name: string): void {
             if (name === "light" || name === "dark")

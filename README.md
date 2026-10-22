@@ -33,7 +33,12 @@ Qt/KDE apps.
 .config/hypr/         Hyprland (Lua config), hypridle, hyprlock, helper scripts
 .config/quickshell/   the shell: shell.qml, modules/, services/, components/
 .config/fastfetch/    fastfetch config
+.config/kitty/        kitty, colours written by the shell into theme-colors.conf
+.config/starship.toml prompt
+.bashrc               starship and the fastfetch greeting
 .local/bin/pixfetch   fastfetch with a random pixel-art logo
+.local/bin/reddit-prep  re-encode a screen recording for a Reddit upload
+.local/share/icons/   Suru++-Extra, extra app icons over Suru++ Asprómauros
 ```
 
 ## Requirements
@@ -44,34 +49,124 @@ Arch Linux is what it runs on; other distros should work with the same programs.
   hyprpolkitagent, hyprpicker
 - quickshell (`quickshell-git`)
 - awww and mpvpaper for wallpapers, ffmpeg for video posters
-- matugen for the colour scheme
+- matugen for the colour scheme, kconfig (`kwriteconfig6`) to pass it to Qt apps
 - cava, playerctl
 - cliphist, wl-clipboard
 - brightnessctl
 - grim, slurp, imagemagick, gpu-screen-recorder for screenshots and recordings
-- kitty
-- python with PyGObject (Spotify like button over AT-SPI)
-- fonts: Maple Mono, CaskaydiaCove Nerd Font, Material Symbols Rounded,
-  Noto Color Emoji
+- kitty, starship, fastfetch for the terminal
+- jq, socat, curl, libnotify
+- python with PyGObject and AT-SPI (Spotify like button)
+- fonts: Maple Mono, CaskaydiaCove Nerd Font, JetBrainsMono Nerd Font,
+  Material Symbols Rounded, Noto Color Emoji
 - icon theme: Suru++ Asprómauros
 
-The VPN popout talks to a `vpn` helper for sing-box that is not part of this repo.
+On Arch, from the official repos and the AUR (with `yay` or `paru`):
+
+```sh
+sudo pacman -S --needed hyprland hypridle hyprlock hyprsunset hyprpolkitagent hyprpicker \
+    awww ffmpeg matugen kconfig cava playerctl cliphist wl-clipboard brightnessctl \
+    grim slurp imagemagick gpu-screen-recorder kitty jq socat curl libnotify \
+    python-gobject at-spi2-core starship fastfetch \
+    ttf-cascadia-code-nerd ttf-jetbrains-mono-nerd ttf-material-symbols-variable noto-fonts-emoji
+yay -S --needed quickshell-git mpvpaper maplemono-ttf
+```
+
+The icon theme is not packaged, install it from its repo:
+
+```sh
+git clone --depth 1 https://github.com/gusbemacbe/suru-plus-aspromauros /tmp/suru
+mkdir -p ~/.local/share/icons
+cp -r "/tmp/suru/Suru++-Asprómauros" ~/.local/share/icons/
+```
+
+The shell uses `Suru++-Extra` from this repo, a few app icons missing from Suru++
+on top of it. It is linked in during the install below.
+
+`Super+E` opens Dolphin, install it or change `fileManager` in `hyprland.lua`.
+
+The VPN tile and bar icon show up only when the `vpn` helper is installed, see
+[VPN](#vpn) below.
 
 ## Install
 
-Back up your own configs first, then link these in place:
+Back up your own configs first. If `~/.config/hypr` (or another target below)
+already exists, move it away: otherwise `ln` puts the link inside it, and `-sf`
+replaces your `~/.bashrc`.
 
 ```sh
 git clone https://github.com/alexsh-coder/quickshell-dots ~/dotfiles
+mkdir -p ~/.config ~/.local/share/icons ~/Pictures/Wallpapers ~/Videos/Wallpapers
 ln -s ~/dotfiles/.config/hypr       ~/.config/hypr
 ln -s ~/dotfiles/.config/quickshell ~/.config/quickshell
 ln -s ~/dotfiles/.config/fastfetch  ~/.config/fastfetch
+ln -s ~/dotfiles/.config/kitty      ~/.config/kitty
+ln -s ~/dotfiles/.config/starship.toml ~/.config/starship.toml
+ln -s ~/dotfiles/.local/share/icons/Suru++-Extra ~/.local/share/icons/Suru++-Extra
 cp ~/.config/hypr/hardware.lua.example ~/.config/hypr/hardware.lua
 ```
 
-`hardware.lua` holds per-machine settings (monitor scale, mouse, extra env) and is
-not tracked. Wallpapers are read from `~/Pictures/Wallpapers` and video wallpapers
-from `~/Videos/Wallpapers`.
+`hardware.lua` holds per-machine settings (monitor scale, mouse, extra env,
+autostart) and is not tracked. Set `monitor_scale` before the first login.
+
+### Terminal
+
+kitty with a translucent blurred background, colours following the wallpaper
+accent, a starship prompt and a fastfetch greeting in every new window:
+
+```sh
+mkdir -p ~/.local/bin
+ln -s  ~/dotfiles/.local/bin/pixfetch ~/.local/bin/pixfetch
+ln -s  ~/dotfiles/.local/bin/reddit-prep ~/.local/bin/reddit-prep
+ln -sf ~/dotfiles/.bashrc ~/.bashrc
+```
+
+`pixfetch` puts a random picture from `~/Pictures/pixel-art` (png, gif, webp) next
+to fastfetch, scaled crisply through the kitty graphics protocol. With the folder
+empty it shows the plain Arch logo.
+
+The pixel art from the screenshots is by
+[classic boy](https://www.pixiv.net/users/93692142), packed
+[here](https://drive.google.com/file/d/1jJ3tUKEdIqBdURpdIl1UZG3pO3yLckwi/view) (118 MB):
+
+```sh
+curl -fL -o /tmp/pixel-art.zip 'https://drive.usercontent.google.com/download?id=1jJ3tUKEdIqBdURpdIl1UZG3pO3yLckwi&export=download&confirm=t'
+unzip /tmp/pixel-art.zip -d ~/Pictures && rm /tmp/pixel-art.zip
+```
+
+Your own aliases go to `~/.bashrc.local`, it is sourced at the end. Font size per
+machine goes to `~/.config/kitty/machine.conf` (e.g. `font_size 16.0` on a 4K
+screen), it is not tracked.
+
+### Wallpapers
+
+Each folder inside `~/Pictures/Wallpapers` (images) and `~/Videos/Wallpapers`
+(videos) is a tab in the picker, files lying directly in them are not shown:
+
+```
+~/Pictures/Wallpapers/anime/sakura.png
+~/Videos/Wallpapers/loops/rain.mp4
+```
+
+### VPN
+
+Optional. `extras/vpn` holds a small helper that turns a VLESS subscription into a
+[sing-box](https://sing-box.sagernet.org) config with a TUN interface and a server
+picker. The bar icon and the quick settings tile drive it: on/off, server choice,
+latency test, adding and switching subscriptions.
+
+```sh
+sudo pacman -S --needed sing-box
+~/dotfiles/extras/vpn/install.sh
+vpn sub add 'https://your.provider/sub/...'
+vpn on
+```
+
+It installs `/usr/local/bin/vpn`, a timer that refreshes the subscription every
+6 hours, a polkit rule that lets the `wheel` group start and stop sing-box, and a
+sudoers rule for `vpn sub`. `vpn` without arguments shows the state, `vpn help`
+lists the commands. Subscriptions are kept in `/var/lib/sing-box`, readable by
+root only. sing-box has no XHTTP transport, such servers are skipped.
 
 Hyprland starts `qs` on login. Quickshell reloads itself when a file changes.
 

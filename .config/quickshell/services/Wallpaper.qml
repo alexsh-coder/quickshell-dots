@@ -15,7 +15,15 @@ Singleton {
     readonly property string videoDir: (Quickshell.env("XDG_VIDEOS_DIR") || home + "/Videos") + "/Wallpapers"
     readonly property var filters: ["*.jpg", "*.jpeg", "*.png", "*.webp", "*.gif", "*.bmp", "*.mp4", "*.webm", "*.mkv", "*.mov"]
     readonly property string posterDir: Quickshell.cachePath("posters")
+    // Images that hold up inverted: the picker flips each between itself and its negative
+    readonly property string monoDir: dir + "/Invertible/"
+    readonly property string monoCache: Quickshell.cachePath("mono")
+    property var inverted: ({})
+    readonly property bool mono: isMono(current)
     readonly property string script: Quickshell.shellDir + "/scripts/wallpaper.sh"
+
+    // Edge the next switch grows from: bottom, or left/right when stepping through wallpapers
+    property string origin: "bottom"
 
     // What was picked, an image or a video
     property string current: ""
@@ -32,6 +40,8 @@ Singleton {
     property bool covered: false
     property bool posterReady: false
     readonly property string frame: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-wallpaper-cover.jpg"
+    // mpvpaper's IPC socket (see scripts/wallpaper.sh)
+    readonly property string socket: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-wallpaper.sock"
     // What the switch in progress started from
     property string from: ""
     property bool fromVideo: false
@@ -47,9 +57,40 @@ Singleton {
         return posterDir + "/" + Qt.md5(path) + ".jpg";
     }
 
-    function thumb(path) {
-        return isVideo(path) ? poster(path) : path;
+    function isMono(path) {
+        return path.startsWith(monoDir) && !isVideo(path);
     }
+
+    function variant(path) {
+        return inverted[path] ? monoCache + "/" + Qt.md5(path) + "-neg.png" : path;
+    }
+
+    function invert(path) {
+        if (!isMono(path))
+            return;
+        const all = Object.assign({}, inverted);
+        if (all[path])
+            delete all[path];
+        else
+            all[path] = true;
+        inverted = all;
+        invertedFile.setText(JSON.stringify(all, null, 1));
+        if (path === current) {
+            image = still(path);
+            Quickshell.execDetached([script, "set", image]);
+        }
+    }
+
+    function thumb(path) {
+        return isVideo(path) ? poster(path) : isMono(path) ? variant(path) : path;
+    }
+
+    // What awww is given for an image
+    function still(path) {
+        return isMono(path) ? variant(path) : path;
+    }
+
+
 
     function refresh() {
         if (!switching.running)
@@ -57,24 +98,98 @@ Singleton {
         scan.running = true;
     }
 
-    function set(path) {
+    function set(path, edge) {
+        origin = edge ?? "bottom";
         // Picking the video that's on again only brings it back if its player is gone
         if (path === current && video) {
             Quickshell.execDetached([script, "play", path]);
             return;
         }
+        // Image to image from the side: grown here, each switch over the one before (see grows)
+        const stack = origin !== "bottom" && !video && !isVideo(path) && !cover;
         cancel();
         from = image;
         fromVideo = video;
         current = path;
-        saved.setText(video ? path : "");
+        saved.setText(video || isMono(path) ? path : "");
         switching.restart();
+        if (!stack)
+            grows.clear();
         if (video) {
             prepare();
             transit();
+        } else if (stack) {
+            const img = still(path);
+            clock = Date.now();
+            stackGrow(img);
+            image = img;
         } else {
-            image = path;
-            Quickshell.execDetached([script, "set", path]);
+            image = still(path);
+            Quickshell.execDetached([script, "set", image, "", origin]);
+        }
+    }
+
+    // Side switches in flight, oldest first: each grows a circle of its image over the ones below.
+    // Once one covers the screen awww takes it without a transition, and it and those under it go.
+    // Each runs from t0 at time at (0 until its image has loaded) in direction dir
+    property ListModel grows: ListModel {}
+    property int growSeq: 0
+    property real clock: 0
+    readonly property int growTime: 800
+    property int growDrop: -1
+
+    // Linear 0..1 progress
+    function growT(t0, at, dir, now) {
+        return at ? Math.min(1, Math.max(0, t0 + dir * ((now ?? clock) - at) / growTime)) : 0;
+    }
+
+    // Eased, for the circle's radius
+    function grown(t0, at, dir) {
+        const t = growT(t0, at, dir);
+        return -(Math.cos(Math.PI * t) - 1) / 2;
+    }
+
+    // A grow has covered the screen with path: what's under the grows can take it now
+    signal growCovered(string path)
+
+    function stackGrow(img) {
+        grows.append({ gid: ++growSeq, path: img, under: image, origin: origin, t0: 0, at: 0, dir: 1 });
+    }
+
+    Timer {
+        interval: 16
+        repeat: true
+        running: root.grows.count > 0
+        // Only checks for finished grows: clock itself ticks with the screen's frames (WallpaperTransition)
+        onTriggered: {
+            const now = Date.now();
+            let k = -1;
+            for (let i = root.grows.count - 1; i >= 0; i--) {
+                const g = root.grows.get(i);
+                const t = root.growT(g.t0, g.at, g.dir, now);
+                // Slid all the way back: the image under it is on screen already
+                if (g.at && g.dir < 0 && t <= 0)
+                    root.grows.remove(i);
+                else if (k < 0 && g.dir > 0 && t >= 1)
+                    k = i;
+            }
+            const g = k >= 0 ? root.grows.get(k) : null;
+            if (!g || g.gid <= root.growDrop)
+                return;
+            root.growDrop = g.gid;
+            root.growCovered(g.path);
+            Quickshell.execDetached([root.script, "set", g.path, "", "none"]);
+            growHandOff.restart();
+        }
+    }
+
+    // awww needs a moment to show the image before the grown copy over it goes
+    Timer {
+        id: growHandOff
+        interval: 300
+        onTriggered: {
+            while (root.grows.count && root.grows.get(0).gid <= root.growDrop)
+                root.grows.remove(0);
         }
     }
 
@@ -236,6 +351,11 @@ Singleton {
                     root.current = last;
                     root.image = still;
                     Quickshell.execDetached([root.script, "play", last]);
+                } else if (last && root.isMono(last) && (still === last || still.startsWith(root.monoCache))) {
+                    root.current = last;
+                    root.image = root.still(last);
+                    if (root.image !== still)
+                        Quickshell.execDetached([root.script, "set", root.image]);
                 } else {
                     root.current = root.image = still;
                 }
@@ -246,10 +366,16 @@ Singleton {
     Process {
         id: scan
         command: [root.script, "posters", root.posterDir, root.videoDir]
+        onExited: monoScan.running = true
+    }
+
+    Process {
+        id: monoScan
+        command: [root.script, "mono", root.monoCache, root.monoDir]
         onExited: root.posters++
     }
 
-    // The video that's on, so it comes back after a restart
+    // The video or black-and-white image that's on, so it comes back after a restart
     FileView {
         id: saved
         path: Quickshell.statePath("wallpaper-video")
@@ -257,5 +383,17 @@ Singleton {
         printErrors: false
     }
 
-    Component.onCompleted: refresh()
+    FileView {
+        id: invertedFile
+        path: Quickshell.statePath("inverted.json")
+        blockLoading: true
+        printErrors: false
+    }
+
+    Component.onCompleted: {
+        try {
+            inverted = JSON.parse(invertedFile.text() || "{}");
+        } catch (e) {}
+        refresh();
+    }
 }

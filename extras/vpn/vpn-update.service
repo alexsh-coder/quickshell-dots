@@ -1,0 +1,7 @@
+[Unit]
+Description=Refresh sing-box subscription
+After=network-online.target sing-box.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vpn update

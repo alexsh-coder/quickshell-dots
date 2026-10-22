@@ -194,7 +194,7 @@ def lrclib(artist, title, album, duration):
         if e.code != 404:
             raise
         items = get(base + "/search", {"artist_name": artist, "track_name": title})
-    plain = any(i.get("plainLyrics") for i in items)
+    plain = next((i["plainLyrics"] for i in items if i.get("plainLyrics")), "")
     items = [i for i in items if i.get("syncedLyrics")]
     if not items:
         return [], False, plain
@@ -203,7 +203,7 @@ def lrclib(artist, title, album, duration):
     return parse_lrc(items[0]["syncedLyrics"])[0], exact, plain
 
 
-# Returns (lines, plain): plain tells whether unsynced text exists on lrclib.
+# Returns (lines, plain): plain is lrclib's unsynced text, if it has any.
 # Raises when nothing was found and a source failed, so a miss isn't mistaken for "no lyrics"
 def fetch(artist, title, album, duration):
     mine = local(artist, title, duration)
@@ -219,7 +219,7 @@ def fetch(artist, title, album, duration):
         try:
             synced, exact, plain = synced.result()
         except Exception as e:
-            synced, exact, plain, error = [], False, False, e
+            synced, exact, plain, error = [], False, "", e
     reference = " ".join(l["text"] for l in synced) if exact else ""
     lines = kugou_pick(krc, reference) or synced
     if not lines and not plain and error:

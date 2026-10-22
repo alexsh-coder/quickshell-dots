@@ -102,8 +102,9 @@ Scope {
 
             x: Math.round((parent.width - width) / 2)
             y: Math.round((parent.height - height) / 2)
-            width: pageArea.width
-            height: header.height + pageArea.height
+            // One target per page switch, so the morph never restarts midway
+            width: pageArea.current.implicitWidth
+            height: (detail ? header.height : 0) + pageArea.current.implicitHeight
             radius: Theme.radius + 6
             color: Qt.alpha(Theme.bg, 0.85)
             border.width: 1
@@ -144,10 +145,9 @@ Scope {
                 id: header
 
                 width: parent.width
-                height: card.detail ? 48 : 0
+                height: 48
                 opacity: card.detail ? 1 : 0
                 visible: opacity > 0
-                Behavior on height { NumberAnimation { duration: Theme.animPanel; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasized } }
                 Behavior on opacity { NumberAnimation { duration: Theme.anim } }
 
                 Rectangle {
@@ -193,9 +193,15 @@ Scope {
 
                 readonly property Item current: ({ quick: quickPage, network: networkPage, bluetooth: bluetoothPage, vpn: vpnPage, media: mediaPage, power: powerPage })[root.page] ?? quickPage
 
-                y: header.height
-                width: current.implicitWidth
+                // Moves in step with the card, which reads its target height
+                y: card.detail ? header.height : 0
+                // Follows the card as it morphs, so the pages stay centered
+                width: card.width
                 height: current.implicitHeight
+                Behavior on y {
+                    enabled: win.visible
+                    NumberAnimation { duration: Theme.animPanel; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasized }
+                }
 
                 Page { id: quickPage; name: "quick"; QuickSettingsPage { popouts: host; here: parent.here } }
                 Page { id: networkPage; name: "network"; NetworkPopout { popouts: host; here: parent.here } }

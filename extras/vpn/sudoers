@@ -1,0 +1,2 @@
+# The VPN popout manages subscriptions through `sudo -n vpn sub ...`
+%wheel ALL=(root) NOPASSWD: /usr/local/bin/vpn sub *

@@ -30,15 +30,18 @@ DECAY = 0.9995
 # Below this the room is treated as silent instead of being amplified into noise
 FLOOR = 0.002
 # Above 1 the scale expands: the bulk of the ring stays near the disc and peaks stand out
-POWER = 2.5
+POWER = 2.0
 # Each point is divided by its own average level, to this power: evens out the circle a little
 # while a kick that always sits on one note still towers over the rest
 WHITEN = 0.2
 # Power averaged over this many frames before anything else: steadies the bins without delaying hits much
 AVERAGE = 8
+# Gaussian blur along the spectrum, in points, before anything is expanded: merges close harmonics
+# into one smooth lobe instead of a bunch of needles
+SMOOTH = 3.5
 # Narrows the lobes: each point is scaled by (itself / the highest point within SHARP_REACH)^SHARP,
 # so a peak keeps its height while its shoulders and the rest of the ring sink towards the disc
-SHARP_REACH, SHARP = 4, 1.5
+SHARP_REACH, SHARP = 8, 1.0
 # Instant rise, eased fall: kills the frame-to-frame shimmer without blunting hits
 RELEASE = 0.85
 
@@ -97,6 +100,11 @@ def main():
         # Floor keeps silent bins from being blown up into noise
         norm = np.maximum(level, level.max() * 0.05 + 1e-9) ** WHITEN
         layers = [np.sqrt(np.interp(targets, grid, e)) / norm for e in layers]
+        if SMOOTH > 0:
+            half = int(SMOOTH * 3)
+            kern = np.exp(-0.5 * (np.arange(-half, half + 1) / SMOOTH) ** 2)
+            kern /= kern.sum()
+            layers = [np.convolve(np.concatenate([m[half:0:-1], m, m[-2:-half - 2:-1]]), kern, "valid") for m in layers]
 
         peak = max(peak * DECAY, layers[0].max(), FLOOR)
         # The gain and the averages know nothing for the first moments: ease in instead of a blob

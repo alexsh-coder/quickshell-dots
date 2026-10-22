@@ -10,35 +10,8 @@ alias grep='grep --color=auto'
 PS1='[\u@\h \W]\$ '
 export PATH="$HOME/.local/bin:$PATH"
 
-alias hproxy='export http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809'
-alias ytermusic='http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 command ytermusic'
-
-alias hycfg='nvim ~/.config/hypr/hyprland.lua'
-
-# Dotfiles: bare repo in ~/.dotfiles, work tree = ~ (use instead of git for configs)
-alias dotfiles='git --git-dir=$HOME/.dotfiles --work-tree=$HOME'
-
-export EDITOR=nvim
-export VISUAL=nvim
-
-# yazi: `y` opens yazi; on quit (q) the shell cd's to where you ended up (Q = quit without cd)
-y() {
-	local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
-	command yazi "$@" --cwd-file="$tmp"
-	IFS= read -r -d '' cwd < "$tmp"
-	[ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd"
-	rm -f -- "$tmp"
-}
-
 # starship prompt (config: ~/.config/starship.toml)
-eval "$(starship init bash)"
-
-# zoxide: learns visited dirs; `z foo` jumps in shell, Z inside yazi
-eval "$(zoxide init bash)"
-
-eval "$(fzf --bash)"
-
-tldrr() { tldr -L ru "$@" 2>/dev/null || tldr "$@"; }
+command -v starship >/dev/null && eval "$(starship init bash)"
 
 # cmatrix paints its background ANSI black (color0); make that see-through in kitty while it runs
 cmatrix() {
@@ -47,12 +20,8 @@ cmatrix() {
     printf '\e]21;transparent_background_color1\e\\'
 }
 
-# open man pages in neovim instead of less
-export MANPAGER='nvim +Man!'
-  
-
 # fastfetch greeting: only interactive kitty, once per window (not in nested shells)
-if [[ $- == *i* && $TERM == xterm-kitty && -z $FASTFETCH_SHOWN ]]; then
+if [[ $- == *i* && $TERM == xterm-kitty && -z $FASTFETCH_SHOWN ]] && command -v pixfetch >/dev/null; then
     export FASTFETCH_SHOWN=1
     # greeting: random pixel art from ~/Pictures/pixel-art; plain `fastfetch` keeps the Arch logo
     # Re-lay the greeting out on resize (text beside the art <-> art only), but only
@@ -77,10 +46,6 @@ if [[ $- == *i* && $TERM == xterm-kitty && -z $FASTFETCH_SHOWN ]]; then
     trap __ff_winch WINCH
     PIXFETCH_ART=$__ff_art pixfetch
 fi
-
-# nchat: separate Telegram accounts, one config dir each
-alias tg1='nchat'
-alias tg2='nchat -d ~/.config/nchat-2'
 
 # Machine-local, untracked additions
 [ -f ~/.bashrc.local ] && . ~/.bashrc.local

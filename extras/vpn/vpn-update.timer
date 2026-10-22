@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh sing-box subscription every 6 hours
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=6h
+
+[Install]
+WantedBy=timers.target

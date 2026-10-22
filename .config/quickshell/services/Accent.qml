@@ -22,7 +22,15 @@ Singleton {
     readonly property color base: mix(from, to, progress)
     // Wallpaper tweaks apply on top: hue and chroma to every role, lightness to the accent itself
     readonly property color tunedBase: shift(base, tweak.h, tweak.c, 0)
-    readonly property color color: Scheme.dark >= 1 ? shift(tunedBase, 0, 0, tweak.l) : lightAccent(tunedBase, lightL + (tweak.l || 0) + (targetL - lightL) * Scheme.dark)
+    // Grayscale wallpaper: no hue to take, so the accent is black or white against the bar
+    property bool gray: false
+    readonly property bool mono: Wallpaper.mono || gray
+    readonly property color monoLight: "#1a1a1a"
+    readonly property color monoDark: "#f2f2f2"
+    // Drawn straight on the wallpaper (visualizers): a grayscale one gets the opposite of its own brightness
+    property bool wallLight: false
+    readonly property color onWall: mono ? (wallLight ? monoLight : monoDark) : color
+    readonly property color color: mono ? Scheme.pick(monoLight, monoDark) : Scheme.dark >= 1 ? shift(tunedBase, 0, 0, tweak.l) : lightAccent(tunedBase, lightL + (tweak.l || 0) + (targetL - lightL) * Scheme.dark)
     // M3-style roles: secondary is a muted accent, tertiary sits 60° away in hue
     readonly property color secondary: role(0.5 + 0.34 * Scheme.dark, 0.05, 0)
     readonly property color tertiary: role(0.56 + 0.26 * Scheme.dark, 0.1 + 0.07 * (1 - Scheme.dark), -60 + 120 * Scheme.dark)
@@ -40,7 +48,7 @@ Singleton {
 
     function role(L, C, shift, cap) {
         const [l, c, h] = toOklch(tunedBase);
-        return fromOklch(L, Math.min(C, Math.max(c, cap || 0)), (h + shift + 360) % 360);
+        return fromOklch(L, mono ? 0 : Math.min(C, Math.max(c, cap || 0)), (h + shift + 360) % 360);
     }
 
     // Per-wallpaper nudges in OKLCH, keyed by wallpaper path, then by scope (both, light, dark):
@@ -104,6 +112,7 @@ Singleton {
     property real progress: 1
 
     property string wanted: ""
+    property string sources: ""
     property string ranFor: ""
 
     function pick(path) {
@@ -123,6 +132,17 @@ Singleton {
         progress = 0;
         anim.restart();
         saved.setText(next.toString());
+    }
+
+    // Mean OKLCH lightness of a histogram
+    function brightness(text) {
+        const re = /(\d+):.*?(#[0-9a-fA-F]{6})/g;
+        let m, n = 0, sum = 0;
+        while ((m = re.exec(text))) {
+            n += +m[1];
+            sum += +m[1] * toOklch(Qt.color(m[2]))[0];
+        }
+        return n ? sum / n : 0;
     }
 
     // Parses an ImageMagick histogram ("count: (r,g,b) #hex ..." per line)
@@ -244,7 +264,7 @@ Singleton {
         stdout: StdioCollector {
             onStreamFinished: {
                 if (root.ranFor === root.wanted) {
-                    root.fade(root.fromSources(text));
+                    root.sources = text;
                     histogram.exec(["magick", root.ranFor, "-resize", "128x128", "-colors", "12", "-depth", "8", "-format", "%c", "histogram:info:-"]);
                 } else
                     root.pick(root.wanted);
@@ -255,7 +275,13 @@ Singleton {
     Process {
         id: histogram
         stdout: StdioCollector {
-            onStreamFinished: root.palette = root.weigh(text)
+            // matugen falls back to Google blue on gray images, so the histogram decides
+            onStreamFinished: {
+                root.palette = root.weigh(text);
+                root.wallLight = root.brightness(text) > 0.5;
+                root.gray = root.palette.length === 0;
+                root.fade(root.mono ? root.monoDark : root.fromSources(root.sources));
+            }
         }
     }
 
@@ -372,7 +398,7 @@ Singleton {
 
     // KDE/Qt apps (Dolphin etc. via QT_QPA_PLATFORMTHEME=kde) and GTK apps take the settled accent,
     // not every frame of the fade: each apply repaints all of them
-    readonly property color settled: Scheme.light ? lightAccent(shift(to, tweak.h, tweak.c, 0), lightL + tweak.l) : shift(to, tweak.h, tweak.c, tweak.l)
+    readonly property color settled: mono ? (Scheme.light ? monoLight : monoDark) : Scheme.light ? lightAccent(shift(to, tweak.h, tweak.c, 0), lightL + tweak.l) : shift(to, tweak.h, tweak.c, tweak.l)
     property bool kdeDirty: false
 
     function pushKde() {
@@ -384,9 +410,11 @@ Singleton {
         const rgb = [c.r, c.g, c.b].map(v => Math.round(v * 255)).join(",");
         // AccentColor with --notify makes kded's gtkconfig regenerate GTK colors.css,
         // which Firefox/Zen read as the system AccentColor.
-        // plasma-apply-colorscheme -a signals the palette change before kdeglobals is written,
+        // With -a plasma-apply-colorscheme only sets the accent and ignores the scheme name,
+        // so the scheme goes in a separate call first.
+        // It signals the palette change before kdeglobals is written,
         // so running Qt apps (Telegram etc.) reload the old colors; signal again once it's on disk
-        kde.command = ["sh", "-c", 'plasma-apply-colorscheme -a "$1" "$2" && kwriteconfig6 --file kdeglobals --group General --key AccentColor --notify "$3" && dbus-send --session --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:0 int32:0', "sh", c.toString(), Scheme.light ? "BreezeLight" : "BreezeDark", rgb];
+        kde.command = ["sh", "-c", 'plasma-apply-colorscheme "$2" && plasma-apply-colorscheme -a "$1" && kwriteconfig6 --file kdeglobals --group General --key AccentColor --notify "$3" && dbus-send --session --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:0 int32:0', "sh", c.toString(), Scheme.light ? "BreezeLight" : "BreezeDark", rgb];
         kde.running = true;
     }
 
@@ -403,8 +431,6 @@ Singleton {
     }
 
     Component.onCompleted: {
-        const last = saved.text().trim();
-        if (/^#[0-9a-fA-F]{6}$/.test(last))
         try {
             const all = JSON.parse(tweakFile.text() || "{}");
             // Flat entries predate scopes and mean both
@@ -413,6 +439,8 @@ Singleton {
                     all[p] = { both: all[p] };
             tweaks = all;
         } catch (e) {}
+        const last = saved.text().trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(last))
             from = to = last;
         pushBorder();
         pushKitty();

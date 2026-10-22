@@ -9,6 +9,8 @@ Singleton {
     id: root
 
     property bool active: false
+    // Desktop widgets showing the stats, counted so several can come and go
+    property int users: 0
     property real cpu: 0
     property real ram: 0
     property real gpu: -1
@@ -18,7 +20,7 @@ Singleton {
 
     Timer {
         interval: 1500
-        running: root.active
+        running: root.active || root.users > 0
         repeat: true
         triggeredOnStart: true
         onTriggered: {

@@ -3,21 +3,44 @@ import QtQuick.Effects
 import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import Quickshell.Widgets
 import qs.config
 import qs.services
 
-// Full-screen spectrum on the desktop layer: under windows, click-through
-PanelWindow {
+// Music visualizer filling its widget rect. Strips (bars, wave, mirror) span the rect; round styles
+// (ring, nation) sit in its centre, sized by its shorter side; particles fly out of its centre
+Item {
     id: root
 
-    readonly property bool active: MusicFx.desktop && Cava.active
-    readonly property real gain: MusicFx.gain("desktop")
+    property var cfg: ({})
+    // Screen height: sizes are relative to it, so a style looks the same in any rect
+    property real sh: 1080
+    property bool active: false
+
+    readonly property string style: cfg.style ?? "bars"
+    readonly property color ink: Theme.paint(cfg.color)
+    readonly property real gain: (cfg.gain ?? 1)
     readonly property list<real> values: Cava.values.map(v => Math.min(1, v * gain))
     readonly property int n: Cava.bars
+    // Bars and mirror: the spectrum stretched or squeezed to the chosen count
+    readonly property int count: Math.max(2, Math.round(cfg.count ?? n))
+    readonly property var resampled: {
+        const v = Array.from(values), out = [];
+        for (let i = 0; i < count; i++) {
+            const m = i / (count - 1) * (n - 1), j = Math.floor(m), f = m - j;
+            out.push((v[j] ?? 0) * (1 - f) + (v[Math.min(j + 1, n - 1)] ?? 0) * f);
+        }
+        return out;
+    }
+    readonly property real gap: cfg.gap ?? 6
+    readonly property bool solid: cfg.fill === "solid"
     readonly property real w: width
     readonly property real h: height
+    readonly property real cx: width / 2
+    readonly property real cy: height / 2
+    // Round styles: 1 when the rect's shorter side is 0.6 screen heights
+    readonly property real k: Math.min(width, height) / (sh * 0.6)
+    readonly property bool fromTop: cfg.align === "top"
     // Gaussian over neighbouring bars, so curves roll instead of spiking
     readonly property list<real> kernel: [0.05, 0.12, 0.2, 0.26, 0.2, 0.12, 0.05]
 
@@ -54,98 +77,49 @@ PanelWindow {
         return Math.max(0, Math.min(1, v));
     }
 
-    // Spectral flux onset detection: the summed rise of cur over prev across a band range, against an
-    // adaptive threshold; d is the detector's state, b its bands. Straight from the raw spectrum, so
-    // hits fire without smoothing lag. Returns a pulse that jumps on a hit and decays quickly.
-    function onset(d, b, cur, prev) {
-        let f = 0;
-        for (let j = b.lo; j < b.hi; j++)
-            f += Math.max(0, cur[j] - prev[j]);
-        f /= b.hi - b.lo;
-        const threshold = d.mean * 2 + b.floor;
-        d.mean = d.mean * 0.9 + f * 0.1;
-        d.peak = Math.max(f, d.peak * 0.997);
-        d.age++;
-        let hit = 0;
-        // Strength relative to recent peaks, so loud and soft hits differ. After a refractory
-        // gap a new hit fires; right after one the same hit keeps growing to its peak.
-        if (f > threshold && (d.age > 6 || d.age < 3)) {
-            hit = f / d.peak * (b.gain ?? 1);
-            if (d.age > 6)
-                d.age = 0;
-        }
-        d.charge = Math.min(1, Math.max(d.charge * 0.6, hit));
-        return d.charge;
+    // Halo on the bass, when the preset's glow is the visualizer's own
+    layer.enabled: active && MusicFx.glow
+    layer.effect: MultiEffect {
+        shadowEnabled: true
+        shadowColor: root.ink
+        shadowBlur: 1
+        shadowOpacity: Math.min(1, (0.35 + Cava.bass * 0.65) * MusicFx.gain("glow"))
+        shadowScale: 1.02
     }
 
-    visible: active || stage.opacity > 0
-
-    WlrLayershell.namespace: "visualizer"
-    WlrLayershell.layer: WlrLayer.Bottom
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-    }
-    color: "transparent"
-    mask: Region {}
-
-    Item {
-        id: stage
-
+    Loader {
         anchors.fill: parent
-        opacity: root.active ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: Theme.anim * 2 } }
-
-        layer.enabled: MusicFx.glow
-        layer.effect: MultiEffect {
-            shadowEnabled: true
-            shadowColor: Theme.accent
-            shadowBlur: 1
-            shadowOpacity: Math.min(1, (0.35 + Cava.bass * 0.65) * MusicFx.gain("glow"))
-            shadowScale: 1.02
-        }
-
-        // Extra layers first so they sit behind the main style
-        Repeater {
-            model: root.visible ? MusicFx.layers.filter(l => l !== MusicFx.style).concat([MusicFx.style]) : []
-
-            Loader {
-                required property string modelData
-
-                anchors.fill: parent
-                sourceComponent: ({ bars: bars, wave: wave, mirror: mirror, ring: ring, nation: nation, flow: flow })[modelData] ?? null
-            }
-        }
+        active: root.active
+        sourceComponent: ({ bars: bars, wave: wave, mirror: mirror, ring: ring, nation: nation, particles: particles })[root.style] ?? null
     }
 
-    // Spectrum along the bottom edge
+    // Spectrum along the bottom (or top) of the rect
     Component {
         id: bars
 
-        Row {
-            readonly property real barW: (root.w - spacing * (root.n + 1)) / root.n
+        Item {
+            Row {
+                id: strip
 
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 6
-            x: spacing
-            spacing: 6
+                readonly property real barW: Math.max(1, (root.w - spacing * (root.count - 1)) / root.count)
 
-            Repeater {
-                model: root.n
+                height: root.h
+                spacing: Math.min(root.gap, root.w / root.count * 0.8)
 
-                Rectangle {
-                    required property int index
+                Repeater {
+                    model: root.count
 
-                    anchors.bottom: parent.bottom
-                    width: parent.barW
-                    height: Math.max(4, root.values[index] * root.h * 0.16)
-                    radius: Math.min(width / 2, 6)
-                    color: Qt.alpha(Theme.accent, 0.35 + root.values[index] * 0.5)
-                    Behavior on height { NumberAnimation { duration: 50 } }
+                    Rectangle {
+                        required property int index
+                        readonly property real v: root.resampled[index] ?? 0
+
+                        y: root.fromTop ? 0 : strip.height - height
+                        width: strip.barW
+                        height: Math.max(4, v * root.h)
+                        radius: width / 2 * (root.cfg.round ?? 1)
+                        color: Qt.alpha(root.ink, root.solid ? 1 : 0.35 + v * 0.5)
+                        Behavior on height { NumberAnimation { duration: root.cfg.ease ?? 50 } }
+                    }
                 }
             }
         }
@@ -159,7 +133,7 @@ PanelWindow {
             id: shape
 
             readonly property int res: 160
-            readonly property real peak: root.h * 0.2
+            readonly property real peak: root.h - 4
             property var levels: []
             property var points: []
 
@@ -169,13 +143,15 @@ PanelWindow {
             }
 
             function rebuild() {
-                levels = root.smoothed(levels, 0.55);
-                const pts = [Qt.point(0, root.h)];
+                levels = root.smoothed(levels, root.cfg.smooth ?? 0.55);
+                // Hanging from the top edge when the widget says so
+                const base = root.fromTop ? 0 : root.h, dir = root.fromTop ? 1 : -1;
+                const pts = [Qt.point(0, base)];
                 for (let i = 0; i <= res; i++) {
                     const t = i / res;
-                    pts.push(Qt.point(t * root.w, root.h - 4 - sample(t) * peak));
+                    pts.push(Qt.point(t * root.w, base + dir * (4 + sample(t) * peak)));
                 }
-                pts.push(Qt.point(root.w, root.h));
+                pts.push(Qt.point(root.w, base));
                 points = pts;
             }
 
@@ -184,76 +160,80 @@ PanelWindow {
                 function onValuesChanged() { shape.rebuild(); }
             }
 
-            anchors.fill: parent
             preferredRendererType: Shape.CurveRenderer
 
             ShapePath {
-                strokeWidth: 2
-                strokeColor: Theme.accent
+                strokeWidth: root.cfg.thickness ?? 2
+                strokeColor: (root.cfg.thickness ?? 2) > 0 ? root.ink : "transparent"
                 fillGradient: LinearGradient {
-                    x1: 0; y1: root.h - shape.peak
-                    x2: 0; y2: root.h
-                    GradientStop { position: 0; color: Qt.alpha(Theme.accent, 0.45) }
-                    GradientStop { position: 1; color: Qt.alpha(Theme.accent, 0.05) }
+                    x1: 0; y1: root.fromTop ? shape.peak : root.h - shape.peak
+                    x2: 0; y2: root.fromTop ? 0 : root.h
+                    GradientStop { position: 0; color: Qt.alpha(root.ink, root.cfg.fillAlpha ?? 0.45) }
+                    GradientStop { position: 1; color: Qt.alpha(root.ink, (root.cfg.fillAlpha ?? 0.45) / 9) }
                 }
                 PathPolyline { path: shape.points }
             }
         }
     }
 
-    // Big version of the bar waveform, centered on screen
+    // Bars growing both ways from the middle line, bass in the centre
     Component {
         id: mirror
 
-        // One bar per band on each side, sized to span the whole screen
-        Row {
-            readonly property int count: root.n * 2
-            readonly property real barW: (root.w - spacing * (count + 1)) / count
+        Item {
+            Row {
+                id: pairs
 
-            anchors.centerIn: parent
-            spacing: 6
+                // One bar per band on each side
+                readonly property int count: root.count * 2
+                readonly property real barW: Math.max(1, (root.w - spacing * (count - 1)) / count)
 
-            Repeater {
-                model: parent.count
+                height: root.h
+                spacing: Math.min(root.gap, root.w / count * 0.8)
 
-                Rectangle {
-                    required property int index
+                Repeater {
+                    model: pairs.count
 
-                    // Bass in the middle, highs out at both edges
-                    readonly property real v: root.values[Math.floor(Math.abs(index - (root.n - 0.5)))] ?? 0
+                    Rectangle {
+                        required property int index
 
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: parent.barW
-                    height: Math.max(width, v * root.h * 0.3)
-                    radius: width / 2
-                    color: Theme.accent
-                    opacity: 0.5 + v * 0.5
-                    Behavior on height { NumberAnimation { duration: 50 } }
+                        // Bass in the middle, highs out at both edges
+                        readonly property real v: root.resampled[Math.floor(Math.abs(index - (root.count - 0.5)))] ?? 0
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: pairs.barW
+                        height: Math.max(width, v * root.h)
+                        radius: width / 2 * (root.cfg.round ?? 1)
+                        color: root.ink
+                        opacity: root.solid ? 1 : 0.5 + v * 0.5
+                        Behavior on height { NumberAnimation { duration: root.cfg.ease ?? 50 } }
+                    }
                 }
             }
         }
     }
 
-    // Radial spectrum around the screen center, pulsing with the bass
+    // Radial spectrum, pulsing with the bass
     Component {
         id: ring
 
         Item {
             id: ringItem
 
-            readonly property int count: 96
-            readonly property real radius: root.h * (0.14 + Cava.bass * 0.015)
-
-            anchors.fill: parent
+            readonly property int count: Math.round(root.cfg.ringCount ?? 96)
+            readonly property real spike: root.cfg.ringWidth ?? 4
+            readonly property real radius: root.sh * (0.14 * (root.cfg.ringSize ?? 1) + Cava.bass * 0.015) * root.k
 
             Rectangle {
-                anchors.centerIn: parent
+                visible: root.cfg.ringLine ?? true
+                x: root.cx - width / 2
+                y: root.cy - height / 2
                 width: ringItem.radius * 2 - 12
                 height: width
                 radius: width / 2
                 color: "transparent"
                 border.width: 2
-                border.color: Qt.alpha(Theme.accent, 0.35 + Cava.bass * 0.5)
+                border.color: Qt.alpha(root.ink, 0.35 + Cava.bass * 0.5)
             }
 
             Repeater {
@@ -264,17 +244,17 @@ PanelWindow {
 
                     // Mirrored left/right so the ring stays symmetric
                     readonly property real v: root.values[Math.round(Math.abs(index / ringItem.count * 2 - 1) * (root.n - 1))] ?? 0
-                    readonly property real len: Math.max(4, v * root.h * 0.14)
+                    readonly property real len: Math.max(4, v * root.sh * 0.14 * root.k)
 
-                    x: root.w / 2 - width / 2
-                    y: root.h / 2 - ringItem.radius - len
-                    width: 4
+                    x: root.cx - width / 2
+                    y: root.cy - ringItem.radius - len
+                    width: ringItem.spike
                     height: len
-                    radius: 2
-                    color: Theme.accent
+                    radius: width / 2
+                    color: root.ink
                     opacity: 0.5 + v * 0.5
                     transform: Rotation {
-                        origin.x: 2
+                        origin.x: ringItem.spike / 2
                         origin.y: ringItem.radius + len
                         angle: index / ringItem.count * 360 + 180
                     }
@@ -297,7 +277,7 @@ PanelWindow {
             readonly property int res: 240
             // Swells with the bass and punches out on kicks
             readonly property real pulse: 1 + Cava.bass * 0.1 + Cava.kick * 0.08
-            readonly property real radius: root.h * 0.13 * pulse
+            readonly property real radius: root.sh * 0.13 * pulse * root.k
             // Spectrum height in ring radii at full level
             readonly property real lift: 1.45
             // Soft ceiling in ring radii: small bumps grow as they are, long lobes level off near it
@@ -314,8 +294,10 @@ PanelWindow {
             // and blend in OKLab so hand-offs pass through soft in-between tones instead of a rainbow
             readonly property int stopCount: 12
             readonly property var stops: {
+                if (Accent.mono || (root.cfg.color ?? "auto") !== "auto")
+                    return Array(stopCount).fill(root.ink);
                 const hd = (a, b) => Math.abs((a - b + 540) % 360 - 180);
-                const pal = Accent.palette.length ? Accent.palette.slice(0, 6) : [{ w: 1, h: Accent.toOklch(Theme.accent)[2] }];
+                const pal = Accent.palette.length ? Accent.palette.slice(0, 6) : [{ w: 1, h: Accent.toOklch(root.ink)[2] }];
                 const order = [pal[0]], rest = pal.slice(1);
                 while (rest.length) {
                     const last = order[order.length - 1].h;
@@ -347,12 +329,12 @@ PanelWindow {
                 return out;
             }
             // Distance outside the white ring, in px, at which the palette runs out
-            readonly property real reach: root.h * 0.03
+            readonly property real reach: root.sh * 0.03 * root.k
 
             property var paths: []
 
             // Ring geometry lives in a box around the centre, so the MSAA layer stays small
-            readonly property real box: (root.h * 0.13 * 1.18 * (2 + lift * (1 + (layers - 1) * spread)) + layers * gap) * 2 + 8
+            readonly property real box: (root.sh * 0.13 * root.k * 1.18 * (2 + lift * (1 + (layers - 1) * spread)) + layers * gap) * 2 + 8
             // Static angle table: sin, cos and where along the spectrum each sample reads (0 top, 1 bottom)
             readonly property var table: {
                 const rows = [];
@@ -363,7 +345,7 @@ PanelWindow {
                 return rows;
             }
             // Triangle blur around the circle, standing in for the template's glow-softened edges
-            readonly property var blur: [1, 2, 3, 2, 1].map(w => w / 9)
+            readonly property var blur: [1, 2, 3, 4, 5, 4, 3, 2, 1].map(w => w / 25)
 
             function ringPath(spec, depth) {
                 const c = box / 2, base = radius + depth * gap, reachPx = radius * lift * (1 + depth * spread);
@@ -378,7 +360,7 @@ PanelWindow {
                 for (let i = 0; i <= res; i++) {
                     let d = 0;
                     for (let j = 0; j < blur.length; j++)
-                        d += disp[(i + j - 2 + res) % res] * blur[j];
+                        d += disp[(i + j - 4 + res) % res] * blur[j];
                     const rad = base + d, r = table[i % res];
                     pts.push(Qt.point(c + r.s * rad, c - r.c * rad));
                 }
@@ -392,8 +374,6 @@ PanelWindow {
                 paths = specs.map((sp, k) => ringPath(sp, k));
             }
 
-            anchors.fill: parent
-
             Process {
                 running: root.active
                 command: ["python3", Quickshell.shellDir + "/scripts/nation-fft.py"]
@@ -403,7 +383,8 @@ PanelWindow {
             }
 
             Item {
-                anchors.centerIn: parent
+                x: root.cx - width / 2
+                y: root.cy - height / 2
                 width: rings.box
                 height: rings.box
                 layer.enabled: true
@@ -479,12 +460,13 @@ PanelWindow {
                 required property int k
 
                 position: k / (rings.stopCount - 1)
-                color: rings.stops[k] ?? Theme.accent
+                color: rings.stops[k] ?? root.ink
             }
 
             // Cover art, or an accent disc when the player has none
             Rectangle {
-                anchors.centerIn: parent
+                x: root.cx - width / 2
+                y: root.cy - height / 2
                 width: rings.radius * 2 + 2
                 height: width
                 radius: width / 2
@@ -597,213 +579,49 @@ PanelWindow {
         asynchronous: true
     }
 
-    // Recent per-column values as a ring-buffer texture for the shader styles: one row per frame,
-    // row `head` the newest. Only new rows are drawn: writing Canvas ImageData pixel by pixel goes
-    // through a slow per-pixel call, a few dozen fillRects are cheap.
-    component History: Item {
-        id: hist
-
-        required property int cols
-        required property int rows
-        property int head: 0
-        property var pending: []
-        readonly property var texture: ShaderEffectSource {
-            sourceItem: canvas
-            hideSource: true
-            smooth: true
-            wrapMode: ShaderEffectSource.Repeat
-            textureSize: Qt.size(hist.cols, hist.rows)
-        }
-
-        // One [r, g, b] in 0..1 per column
-        function push(row) {
-            head = (head + rows - 1) % rows;
-            pending.push({ at: head, row: row });
-            canvas.requestPaint();
-        }
-
-        Canvas {
-            id: canvas
-
-            width: hist.cols
-            height: hist.rows
-            renderTarget: Canvas.Image
-            onPaint: {
-                const ctx = getContext("2d");
-                for (const p of hist.pending) {
-                    for (let c = 0; c < hist.cols; c++) {
-                        const [r, g, b] = p.row[c];
-                        ctx.fillStyle = `rgb(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)})`;
-                        ctx.fillRect(c, p.at, 1, 1);
-                    }
-                }
-                hist.pending = [];
-            }
-        }
-    }
-
-    // Flat spectrogram of neon ribbons, one per frequency band with the bass at the bottom. Time runs
-    // out from the centre: the live sound is born in the middle and drifts to both edges, and hits in
-    // each band fire pulses that race outwards along its ribbon. Drawn by ribbons.frag.
+    // Particles flying out of the centre, Trap Nation style. They drift at rest and rush outwards on
+    // the bass, with kicks as bursts; the speed is integrated here so the motion never jumps.
+    // Drawn by particles.frag, in units of the rect's height
     Component {
-        id: flow
+        id: particles
 
-        Item {
-            id: strip
-
-            readonly property int count: 7
-            readonly property int rows: 100
-            // Log-spaced cava bands grouped per ribbon, bottom first
-            readonly property var bands: Array.from({ length: count }, (_, k) => {
-                const lo = Math.floor(k * root.n / count * 0.85), hi = Math.floor((k + 1) * root.n / count * 0.85);
-                return { lo: lo, hi: Math.max(lo + 1, hi), floor: 0.02 };
-            })
-            readonly property var detectors: bands.map(() => ({ mean: 0, peak: 0.05, age: 99, charge: 0 }))
-            property var raw: []
-            property var average: []
-
-            function rebuild() {
-                const cur = Array.from(root.values), prev = raw.length === root.n ? raw : cur;
-                const row = [], avg = [];
-                for (let k = 0; k < count; k++) {
-                    const b = bands[k];
-                    let lv = 0;
-                    for (let j = b.lo; j < b.hi; j++)
-                        lv += cur[j];
-                    lv /= b.hi - b.lo;
-                    // Relative to the band's own average, so every ribbon moves, not just the loud bass
-                    const a = average[k] ?? lv;
-                    avg.push(a * 0.98 + lv * 0.02);
-                    const body = Math.tanh(lv * Math.pow(lv / (a + 0.05), 1.5) * 1.2);
-                    row.push([body, root.onset(detectors[k], b, cur, prev), 0]);
-                }
-                raw = cur;
-                average = avg;
-                trail.push(row);
-            }
-
-            anchors.fill: parent
-
-            Connections {
-                target: root
-                function onValuesChanged() { strip.rebuild(); }
-            }
-
-            History {
-                id: trail
-
-                cols: strip.count
-                rows: strip.rows
-            }
-
-            ShaderEffect {
-                // Lane layout in screen heights, from the bottom ribbon up
-                readonly property real aspect: width / height
-                readonly property real pixel: 1 / height
-                readonly property real laneBase: 0.9
-                readonly property real laneGap: 0.045
-                readonly property real lanes: strip.count
-                readonly property real halfSpan: aspect * 0.48
-                readonly property real head: trail.head
-                readonly property real rows: strip.rows
-                readonly property color accent: Theme.accent
-                readonly property color highlight: Theme.text
-                readonly property var history: trail.texture
-
-                anchors.fill: parent
-                fragmentShader: Qt.resolvedUrl("../../shaders/ribbons.frag.qsb")
-            }
-        }
-    }
-
-    // Legacy, not in the style list. Spectrogram terrain in the spirit of Unknown Pleasures: the recent spectrum lies on a floor as a
-    // smooth glowing landscape receding to the horizon. The front edge is the live spectrum, the past
-    // scrolls away frame by frame, and hits light the ground up so the beat ripples into the distance.
-    // History goes to the GPU as a small ring-buffer texture and terrain.frag ray-marches it.
-    Component {
-        id: terrain
-
-        Item {
+        ShaderEffect {
             id: field
 
-            // Texture size: columns across half the width (mirrored in the shader), one row per frame
-            readonly property int cols: 40
-            readonly property int rows: 90
-            readonly property real span: (root.n - 1) * 0.8
+            // Cells per layer around the circle, matching the shader
+            readonly property var sectors: [70, 110, 170]
+            // Parallax: nearer layers move faster
+            readonly property var rates: [1.4, 1, 0.7]
+            property real speed: 0.12
+            property vector4d offsets: Qt.vector4d(0, 0, 0, 0)
 
-            // Hits light the ground up: the kick from the low bands, snares and claps from broadband flux
-            readonly property var bands: [{ lo: 16, hi: 40, floor: 0.01, gain: 0.7 }, { lo: 0, hi: 6, floor: 0.03, gain: 1 }]
-            readonly property var detectors: bands.map(() => ({ mean: 0, peak: 0.05, age: 99, charge: 0 }))
-            property var raw: []
-            property var levels: []
-            // Slow per-band average, each band is shown relative to it so the whole width has relief
-            property var average: []
+            readonly property real aspect: width / height
+            readonly property real pixel: 1 / height
+            readonly property real inner: 0.12
+            readonly property real level: Math.min(1, Cava.level * root.gain)
+            readonly property point origin: Qt.point(0, 0)
+            // Spread 1 matches the old full-screen field, whatever the rect's height
+            readonly property real zoom: (root.cfg.spread ?? 1) * root.sh / Math.max(1, height)
+            readonly property real density: root.cfg.pDensity ?? 1
+            readonly property real dotScale: root.cfg.pSize ?? 1
+            readonly property color accent: root.ink
+            readonly property color highlight: Theme.text
 
-            function profile() {
-                const rel = [], avg = [];
-                for (let i = 0; i < root.n; i++) {
-                    const a = average[i] ?? levels[i];
-                    avg.push(a * 0.98 + levels[i] * 0.02);
-                    // Bands rising above their own average stand out. Soft saturation keeps loud peaks
-                    // round instead of flat-topped, the power keeps quiet parts flat.
-                    rel.push(Math.pow(Math.tanh(levels[i] * Math.pow(levels[i] / (a + 0.05), 1.5) * 1.6), 1.1));
+            fragmentShader: Qt.resolvedUrl("../../shaders/particles.frag.qsb")
+
+            FrameAnimation {
+                running: root.active && root.visible
+                onTriggered: {
+                    const dt = Math.min(frameTime, 0.05);
+                    const target = (0.12 + (Cava.bass * 1.1 + Cava.kick * 2.2) * root.gain) * (root.cfg.pSpeed ?? 1);
+                    // Fast to speed up, slower to settle back
+                    field.speed += (target - field.speed) * Math.min(1, dt * (target > field.speed ? 14 : 3));
+                    const o = [field.offsets.x, field.offsets.y, field.offsets.z];
+                    // Shift in log radius, in cells; wrapped at the shader's hash period
+                    for (let i = 0; i < 3; i++)
+                        o[i] = (o[i] + dt * field.speed * field.rates[i] * field.sectors[i] / (Math.PI * 2)) % 4096;
+                    field.offsets = Qt.vector4d(o[0], o[1], o[2], 0);
                 }
-                average = avg;
-                const out = [];
-                for (let c = 0; c < cols; c++)
-                    out.push(root.spline(rel, c / (cols - 1) * span));
-                return out;
-            }
-
-            function rebuild() {
-                levels = root.smoothed(levels, 0.2);
-                const cur = Array.from(root.values), prev = raw.length === root.n ? raw : cur;
-                let glow = 0;
-                for (let p = 0; p < bands.length; p++)
-                    glow = Math.max(glow, root.onset(detectors[p], bands[p], cur, prev));
-                raw = cur;
-
-                const row = profile();
-                // Height as high and low bytes in red and blue, the glow in green
-                trail.push(row.map(v => {
-                    const x = Math.min(1, v) * 255, hi = Math.floor(x);
-                    return [hi / 255, glow, Math.round((x - hi) * 255) / 255];
-                }));
-            }
-
-            anchors.fill: parent
-
-            Connections {
-                target: root
-                function onValuesChanged() { field.rebuild(); }
-            }
-
-            History {
-                id: trail
-
-                cols: field.cols
-                rows: field.rows
-            }
-
-            ShaderEffect {
-                // World units are screen heights; the camera looks down +z with focal length 1
-                readonly property real aspect: width / height
-                readonly property real pixel: 1 / height
-                readonly property real horizon: 0.56
-                readonly property real eye: 0.4
-                readonly property real amp: 0.3
-                readonly property real halfWidth: 0.85
-                readonly property real zNear: 1
-                readonly property real zFar: 4.4
-                readonly property real head: trail.head
-                readonly property real rows: field.rows
-                readonly property color accent: Theme.accent
-                readonly property color highlight: Theme.text
-                readonly property color shade: Theme.bg
-                readonly property var history: trail.texture
-
-                anchors.fill: parent
-                fragmentShader: Qt.resolvedUrl("../../shaders/terrain.frag.qsb")
             }
         }
     }

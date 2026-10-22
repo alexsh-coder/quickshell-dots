@@ -1,0 +1,401 @@
+#!/usr/bin/env python3
+"""vpn — sing-box wrapper: subscription -> config, on/off, server switching."""
+import base64, json, os, socket, subprocess, sys, time, uuid
+import urllib.parse as up
+import urllib.request as ur
+
+ETC = "/etc/sing-box"
+STATE = "/var/lib/sing-box"
+SUB = f"{ETC}/subscription"  # active url, kept for older tooling
+SUBS = f"{STATE}/subs.json"  # outside ETC: `sing-box -C` loads every *.json there as config
+CONF = f"{ETC}/config.json"
+API = "http://127.0.0.1:9090"
+UA = "sing-box"
+SOCKS_PORT, HTTP_PORT = 10808, 10809
+TEST_URL = "https://www.gstatic.com/generate_204"
+
+
+def sh(*cmd, check=True, **kw):
+    return subprocess.run(cmd, check=check, **kw)
+
+
+def need_root():
+    if os.geteuid() != 0:
+        os.execvp("sudo", ["sudo", sys.executable, os.path.abspath(__file__), *sys.argv[1:]])
+
+
+def port_open(port):
+    with socket.socket() as s:
+        s.settimeout(0.5)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def fetch(url, proxy=None, headers=False):
+    handlers = [ur.ProxyHandler({"http": proxy, "https": proxy} if proxy else {})]
+    req = ur.Request(url, headers={"User-Agent": UA})
+    with ur.build_opener(*handlers).open(req, timeout=30) as r:
+        return (r.read(), r.headers) if headers else r.read()
+
+
+def parse_vless(uri):
+    u = up.urlsplit(uri)
+    q = dict(up.parse_qsl(u.query))
+    name = up.unquote(u.fragment) or u.hostname
+    net, sec = q.get("type", "tcp"), q.get("security", "none")
+    if net not in ("tcp", "ws", "grpc", "httpupgrade", "http"):
+        return None, f"{name}: transport '{net}' is not supported by sing-box"
+    ob = {"type": "vless", "tag": name, "server": u.hostname, "server_port": u.port or 443,
+          "uuid": up.unquote(u.username)}
+    if q.get("flow"):
+        ob["flow"] = q["flow"]
+    if sec in ("tls", "reality"):
+        tls = {"enabled": True, "server_name": q.get("sni") or u.hostname}
+        if q.get("fp"):
+            tls["utls"] = {"enabled": True, "fingerprint": q["fp"]}
+        if q.get("alpn"):
+            tls["alpn"] = q["alpn"].split(",")
+        if sec == "reality":
+            tls["reality"] = {"enabled": True, "public_key": q.get("pbk", ""), "short_id": q.get("sid", "")}
+        ob["tls"] = tls
+    if net == "ws":
+        tr = {"type": "ws", "path": q.get("path", "/")}
+        if q.get("host"):
+            tr["headers"] = {"Host": q["host"]}
+        ob["transport"] = tr
+    elif net == "grpc":
+        ob["transport"] = {"type": "grpc", "service_name": q.get("serviceName", "")}
+    elif net in ("httpupgrade", "http"):
+        ob["transport"] = {"type": net, "path": q.get("path", "/"), **({"host": q["host"]} if q.get("host") else {})}
+    return ob, None
+
+
+def parse_subscription(raw):
+    text = raw.decode().strip()
+    if "://" not in text:
+        text = base64.b64decode(text + "=" * (-len(text) % 4)).decode()
+    outbounds, skipped = [], []
+    for line in text.split():
+        if line.startswith("vless://"):
+            ob, err = parse_vless(line)
+        else:
+            ob, err = None, f"{line.split('://')[0]}: protocol is not supported"
+        if ob:
+            outbounds.append(ob)
+        else:
+            skipped.append(err)
+    return outbounds, skipped
+
+
+def build_config(servers, tun=True):
+    tags = [s["tag"] for s in servers]
+    inbounds = [
+        {"type": "mixed", "tag": "socks-in", "listen": "127.0.0.1", "listen_port": SOCKS_PORT},
+        {"type": "mixed", "tag": "http-in", "listen": "127.0.0.1", "listen_port": HTTP_PORT},
+    ]
+    if tun:
+        inbounds.insert(0, {"type": "tun", "tag": "tun-in", "interface_name": "sing-tun",
+                            "address": ["172.19.0.1/30"], "auto_route": True,
+                            "strict_route": True, "stack": "mixed"})
+    return {
+        "log": {"level": "warn", "timestamp": True},
+        "dns": {
+            "servers": [
+                {"type": "https", "tag": "remote", "server": "1.1.1.1", "detour": "proxy"},
+                {"type": "local", "tag": "local"},
+            ],
+            "final": "remote",
+            "strategy": "ipv4_only",
+        },
+        "inbounds": inbounds,
+        "outbounds": [
+            {"type": "selector", "tag": "proxy", "outbounds": ["auto", *tags], "default": "auto"},
+            {"type": "urltest", "tag": "auto", "outbounds": tags, "url": TEST_URL, "interval": "5m"},
+            *servers,
+            {"type": "direct", "tag": "direct"},
+        ],
+        "route": {
+            "rules": [
+                {"action": "sniff"},
+                {"protocol": "dns", "action": "hijack-dns"},
+                {"ip_is_private": True, "outbound": "direct"},
+            ],
+            "final": "proxy",
+            "auto_detect_interface": True,
+            "default_domain_resolver": "local",
+        },
+        "experimental": {
+            "cache_file": {"enabled": True},
+            "clash_api": {
+                "external_controller": "127.0.0.1:9090",
+                "external_ui": "ui",
+                "external_ui_download_url": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip",
+                "external_ui_download_detour": "proxy",
+            },
+        },
+    }
+
+
+def active():
+    return sh("systemctl", "is-active", "--quiet", "sing-box", check=False).returncode == 0
+
+
+def api(path, data=None, method=None):
+    req = ur.Request(API + path, method=method, data=json.dumps(data).encode() if data else None,
+                     headers={"Content-Type": "application/json"})
+    with ur.build_opener(ur.ProxyHandler({})).open(req, timeout=10) as r:
+        body = r.read()
+        return json.loads(body) if body else None
+
+
+def write_secret(path, text, group=None):
+    tmp = path + ".new"
+    with open(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o640 if group else 0o600), "w") as f:
+        f.write(text)
+    if group:
+        sh("chown", f"root:{group}", tmp)
+    return tmp
+
+
+def load_subs():
+    if os.path.exists(SUBS):
+        return json.load(open(SUBS))
+    db = {"active": None, "subs": []}
+    if os.path.exists(SUB) and (url := open(SUB).read().strip()):
+        sid = uuid.uuid4().hex[:8]
+        db = {"active": sid, "subs": [{"id": sid, "name": up.urlsplit(url).hostname or "subscription", "url": url}]}
+        save_subs(db)
+    return db
+
+
+def save_subs(db):
+    os.replace(write_secret(SUBS, json.dumps(db, indent=2, ensure_ascii=False)), SUBS)
+    act = next((x for x in db["subs"] if x["id"] == db["active"]), None)
+    if act:
+        os.replace(write_secret(SUB, act["url"] + "\n"), SUB)
+    elif os.path.exists(SUB):
+        os.remove(SUB)
+
+
+def active_sub(db):
+    return next((x for x in db["subs"] if x["id"] == db["active"]), None)
+
+
+def pull(url):
+    proxy = f"http://127.0.0.1:{HTTP_PORT}" if port_open(HTTP_PORT) else None
+    try:
+        raw, hdr = fetch(url, proxy, headers=True)
+    except Exception as e:
+        sys.exit(f"cannot fetch subscription ({e})" + ("" if proxy else " — try with vpn on"))
+    servers, skipped = parse_subscription(raw)
+    for sk in skipped:
+        print(f"skip  {sk}")
+    if not servers:
+        sys.exit("no usable servers in subscription")
+    return servers, hdr
+
+
+def apply_servers(servers):
+    new = json.dumps(build_config(servers), indent=2, ensure_ascii=False)
+    old = open(CONF).read() if os.path.exists(CONF) else ""
+    if new == old:
+        print(f"up to date, {len(servers)} servers")
+        return
+    tmp = write_secret(CONF, new, "sing-box")
+    sh("sing-box", "check", "-c", tmp)
+    os.replace(tmp, CONF)
+    print(f"config updated, {len(servers)} servers")
+    if active():
+        sh("systemctl", "reload", "sing-box")
+
+
+def title_of(hdr, url):
+    t = hdr.get("profile-title") or ""
+    if t.startswith("base64:"):
+        try:
+            t = base64.b64decode(t[7:]).decode()
+        except Exception:
+            t = ""
+    return t.strip() or up.urlsplit(url).hostname or "subscription"
+
+
+def cmd_update():
+    need_root()
+    db = load_subs()
+    sub = active_sub(db)
+    if not sub:
+        sys.exit("no subscription — add one with `vpn sub add URL`")
+    servers, _ = pull(sub["url"])
+    sub["servers"] = len(servers)
+    save_subs(db)
+    apply_servers(servers)
+
+
+def find_sub(db, ref):
+    hit = next((x for x in db["subs"] if x["id"] == ref), None)
+    hit = hit or next((x for x in db["subs"] if x["name"].lower() == ref.lower()), None)
+    hit = hit or next((x for x in db["subs"] if ref.lower() in x["name"].lower()), None)
+    if not hit:
+        sys.exit(f"no subscription matching '{ref}'")
+    return hit
+
+
+def switch_to(db, sub):
+    servers, _ = pull(sub["url"])
+    sub["servers"] = len(servers)
+    db["active"] = sub["id"]
+    save_subs(db)
+    apply_servers(servers)
+
+
+def cmd_sub(a):
+    sub_cmd = a[0] if a else "list"
+    if sub_cmd == "list" and "--json" in a:
+        db = load_subs()
+        json.dump({"active": db["active"], "subs": [
+            {"id": x["id"], "name": x["name"], "host": up.urlsplit(x["url"]).hostname, "servers": x.get("servers")}
+            for x in db["subs"]]}, sys.stdout, ensure_ascii=False)
+        print()
+        return
+    need_root()
+    db = load_subs()
+    if sub_cmd == "list":
+        for x in db["subs"]:
+            print(f"{'*' if x['id'] == db['active'] else ' '} {x['id']}  {x['name']}  ({x.get('servers', '?')} servers)")
+    elif sub_cmd == "add" and len(a) > 1:
+        url = a[1]
+        if not url.startswith(("http://", "https://")):
+            sys.exit("subscription must be an http(s) url")
+        if any(x["url"] == url for x in db["subs"]):
+            sys.exit("already added")
+        servers, hdr = pull(url)
+        sub = {"id": uuid.uuid4().hex[:8], "name": " ".join(a[2:]) or title_of(hdr, url), "url": url,
+               "servers": len(servers)}
+        db["subs"].append(sub)
+        db["active"] = sub["id"]
+        save_subs(db)
+        apply_servers(servers)
+        print(f"added {sub['name']}")
+    elif sub_cmd == "use" and len(a) > 1:
+        switch_to(db, find_sub(db, " ".join(a[1:])))
+    elif sub_cmd == "rename" and len(a) > 2:
+        find_sub(db, a[1])["name"] = " ".join(a[2:])
+        save_subs(db)
+    elif sub_cmd in ("rm", "remove") and len(a) > 1:
+        sub = find_sub(db, " ".join(a[1:]))
+        db["subs"].remove(sub)
+        if sub["id"] == db["active"]:
+            if db["subs"]:
+                switch_to(db, db["subs"][0])
+            else:
+                db["active"] = None
+                sh("systemctl", "disable", "--now", "sing-box", check=False)
+                if os.path.exists(CONF):
+                    os.remove(CONF)
+        save_subs(db)
+        print(f"removed {sub['name']}")
+    else:
+        print("usage: vpn sub [list [--json] | add URL [NAME] | use REF | rename REF NAME | rm REF]")
+
+
+def wait_online(timeout=20):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            fetch(TEST_URL, f"http://127.0.0.1:{HTTP_PORT}")
+            return True
+        except Exception:
+            time.sleep(1)
+    return False
+
+
+def cmd_on():
+    need_root()
+    if not os.path.exists(CONF) or os.path.getsize(CONF) < 100:
+        cmd_update()
+    sh("systemctl", "enable", "--now", "sing-box")
+    print("online" if wait_online() else "started, but no connectivity yet — see `vpn log`")
+
+
+def cmd_off():
+    need_root()
+    sh("systemctl", "disable", "--now", "sing-box")
+    print("off")
+
+
+def cmd_restart():
+    need_root()
+    sh("systemctl", "restart", "sing-box")
+    print("online" if wait_online() else "restarted, but no connectivity yet — see `vpn log`")
+
+
+def servers_state():
+    p = api("/proxies/proxy")
+    auto = api("/proxies/auto")
+    return p["now"], p["all"], auto["now"]
+
+
+def cmd_status():
+    if not active():
+        print("vpn: off")
+        return
+    try:
+        now, _, auto_now = servers_state()
+    except Exception as e:
+        print(f"vpn: on (api unavailable: {e})")
+        return
+    print(f"vpn: on  —  {now}" + (f" → {auto_now}" if now == "auto" else ""))
+
+
+def cmd_list():
+    now, names, auto_now = servers_state()
+    for i, n in enumerate(names):
+        try:
+            d = api(f"/proxies/{up.quote(n)}/delay?timeout=3000&url={up.quote(TEST_URL)}")["delay"]
+            ms = f"{d} ms"
+        except Exception:
+            ms = "timeout"
+        mark = "*" if n == now else " "
+        extra = f"  ({auto_now})" if n == "auto" else ""
+        print(f"{mark} {i}  {n}{extra}  {'' if n == 'auto' else ms}")
+
+
+def cmd_use(arg):
+    _, names, _ = servers_state()
+    name = names[int(arg)] if arg.isdigit() and int(arg) < len(names) else next(
+        (n for n in names if arg.lower() in n.lower()), None)
+    if not name:
+        sys.exit(f"no server matching '{arg}'")
+    api("/proxies/proxy", {"name": name}, "PUT")
+    print(f"using {name}")
+
+
+USAGE = """usage: vpn [command]
+  status          show state and current server (default)
+  on | off        start / stop sing-box (and autostart)
+  restart         restart sing-box
+  list            list servers with latency
+  use N|NAME      switch server (number from list or part of name; 'auto' = fastest)
+  update          refetch subscription and rebuild config
+  sub ...         manage subscriptions: list | add URL [NAME] | use REF | rename REF NAME | rm REF
+  ui              open web dashboard
+  log             follow sing-box log"""
+
+
+def main():
+    a = sys.argv[1:] or ["status"]
+    c = a[0]
+    if c == "status": cmd_status()
+    elif c == "on": cmd_on()
+    elif c == "off": cmd_off()
+    elif c == "restart": cmd_restart()
+    elif c == "list": cmd_list()
+    elif c == "use" and len(a) > 1: cmd_use(" ".join(a[1:]))
+    elif c == "update": cmd_update()
+    elif c == "sub": cmd_sub(a[1:])
+    elif c == "ui": sh("xdg-open", f"{API}/ui/")
+    elif c == "log": os.execvp("journalctl", ["journalctl", "-u", "sing-box", "-f", "-n", "50"])
+    else: print(USAGE)
+
+
+if __name__ == "__main__":
+    main()

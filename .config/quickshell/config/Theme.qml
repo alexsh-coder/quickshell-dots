@@ -10,16 +10,19 @@ Singleton {
     readonly property color tertiary: Accent.tertiary
     // Dark is GitHub Dark-based, light follows GitHub Primer light
     readonly property bool light: Scheme.light
-    readonly property color bg: Scheme.pick("#ffffff", "#0d1117")
-    readonly property color surface: Scheme.pick("#f6f8fa", "#161c24")
+    readonly property color bg: Scheme.pick("#ffffff", Accent.mono ? "#0d0d0d" : "#0d1117")
+    readonly property color surface: Scheme.pick(Accent.mono ? "#f2f2f2" : "#f6f8fa", Accent.mono ? "#1a1a1a" : "#161c24")
     readonly property color text: Scheme.pick("#1f2328", "#e6edf3")
     readonly property color subtext: Scheme.pick("#59636e", "#8b949e")
     readonly property color muted: Scheme.pick("#d1d9e0", "#30363d")
     readonly property color urgent: Scheme.pick("#cf222e", "#ff6b81")
     // Bar's left pill: M3-style neutrals carrying the accent hue,
     // with the accent held to the chroma of soft anime/pastel wallpapers
-    readonly property color tintAccent: Accent.barRole(Scheme.pick(Accent.role(0.63 + Accent.tweak.l, 0.14 + Accent.tweak.c, 0, 0.14 + Accent.tweak.c), Accent.color))
+    readonly property color tintAccent: Accent.mono ? Accent.color : Accent.barRole(Scheme.pick(Accent.role(0.63 + Accent.tweak.l, 0.14 + Accent.tweak.c, 0, 0.14 + Accent.tweak.c), Accent.color))
     // Accent for the bar, with the wallpaper's own bar tweak on top
+    readonly property color wallAccent: Accent.onWall
+    // Music effects: the wallpaper's own contrast color unless the preset picks another
+    readonly property color fxColor: paint(MusicFx.color)
     readonly property color barAccent: Accent.barColor
     readonly property color tintSubtext: Scheme.pick(Accent.role(0.71, 0.06, 0, 0.06), Accent.role(0.6, 0.045, 0, 0.045))
     readonly property color tintMuted: Scheme.pick(Accent.role(0.875, 0.035, 0, 0.035), Accent.role(0.36, 0.03, 0, 0.03))
@@ -51,4 +54,9 @@ Singleton {
     readonly property list<real> spatial: [0.38, 1.21, 0.22, 1, 1, 1]
     readonly property int animSpatial: 500
     readonly property int osdMargin: 56
+
+    // A widget's color setting: "auto" is the wallpaper's own contrast color
+    function paint(name) {
+        return ({ accent: Accent.color, white: "#ffffff", black: "#000000" })[name] ?? Accent.onWall;
+    }
 }

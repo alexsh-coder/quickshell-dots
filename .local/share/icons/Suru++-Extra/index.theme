@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=Suru++ Extra
+Comment=Extra app icons on top of Suru++ Asprómauros
+Inherits=Suru++-Asprómauros,hicolor
+Directories=apps
+
+[apps]
+Context=Applications
+Size=512
+MinSize=8
+MaxSize=512
+Type=Scalable

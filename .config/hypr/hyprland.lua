@@ -35,7 +35,9 @@ local menu        = "qs ipc call launcher toggle"
 
 hl.on("hyprland.start", function ()
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh waybar")  -- has segfaulted inside GTK
-    hl.exec_cmd("qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
+    -- Qt drops to its single-threaded render loop on NVIDIA (QTBUG-95817), which stutters the
+    -- visualizer; other drivers are threaded already.
+    hl.exec_cmd("env QSG_RENDER_LOOP=threaded qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh dunst")
     -- OSD pill (volume/brightness/layout...); height above the bottom edge is per machine.
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh ~/.config/hypr/scripts/osd.py daemon --margin "
@@ -291,6 +293,9 @@ hl.bind(mainMod .. " + Q",      hl.dsp.window.close())
 hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/hard-kill.sh"))
 -- [lab-qs] hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("python3 ~/.config/hypr/scripts/wallpaper_carousel.py"))
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"))
+hl.bind(mainMod .. " + ALT + bracketright", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
+hl.bind(mainMod .. " + ALT + bracketleft",  hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
+hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("qs ipc call desk toggle"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/kitty-opacity-toggle.sh"))
 hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("qs ipc call theme toggle"))
 hl.bind(mainMod .. " + SHIFT + N", hl.dsp.exec_cmd("qs ipc call night toggle"))
@@ -544,6 +549,14 @@ hl.layer_rule({
 hl.layer_rule({
     name  = "wallpaper-transition",
     match = { namespace = "^wallpaper-transition$" },
+
+    no_anim = true,
+})
+
+-- Quickshell's music glow over a video wallpaper idles at 1x1 the same way
+hl.layer_rule({
+    name  = "wallpaper-glow",
+    match = { namespace = "^wallpaper-glow$" },
 
     no_anim = true,
 })

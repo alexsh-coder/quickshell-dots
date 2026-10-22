@@ -18,37 +18,6 @@ Scope {
     // +1 when moving down the tag list, -1 up; picks the strip's slide-in direction
     property int slideDir: 1
 
-    // Accent tuning for the applied wallpaper (A): accent and bar nudges in OKLCH
-    property bool tuning: false
-    property int tuneRow: 0
-    // Which scheme the edits go to; the effective tweak is both + the current scheme's own
-    property string tuneScope: "both"
-    readonly property var tuneScopes: ["both", "light", "dark"]
-    readonly property var tuneRows: [
-        { key: "h", group: "Accent", label: "Hue", lim: 60, step: 2, scale: 1, unit: "°" },
-        { key: "c", group: "Accent", label: "Chroma", lim: 0.08, step: 0.005, scale: 100, unit: "" },
-        { key: "l", group: "Accent", label: "Lightness", lim: 0.3, step: 0.01, scale: 100, unit: "" },
-        { key: "bh", group: "Bar", label: "Hue", lim: 60, step: 2, scale: 1, unit: "°" },
-        { key: "bc", group: "Bar", label: "Chroma", lim: 0.08, step: 0.005, scale: 100, unit: "" },
-        { key: "bl", group: "Bar", label: "Lightness", lim: 0.3, step: 0.01, scale: 100, unit: "" }
-    ]
-
-    function tuneSet(row, v) {
-        const r = tuneRows[row];
-        v = Math.max(-r.lim, Math.min(r.lim, Math.round(v / r.step) * r.step));
-        Accent.setTweak(tuneScope, r.key, Math.abs(v) < r.step / 2 ? 0 : +v.toFixed(4));
-    }
-
-    function tuneReset() {
-        for (let i = 0; i < tuneRows.length; i++)
-            tuneSet(i, 0);
-    }
-
-    function tuneStep(by) {
-        const r = tuneRows[tuneRow];
-        tuneSet(tuneRow, (Accent.scopeTweak(tuneScope)[r.key] || 0) + by * r.step);
-    }
-
     readonly property int thumbW: 288
     readonly property int thumbH: 162
     readonly property int gap: 8
@@ -69,10 +38,20 @@ Scope {
         Qt.callLater(() => keys.forceActiveFocus());
     }
 
-    function hide() {
+    // keepWindows: the desktop editor takes over with the windows still out of the way
+    function hide(keepWindows) {
         open = false;
-        tuning = false;
-        windowsFade("show");
+        if (!keepWindows)
+            windowsFade("show");
+    }
+
+    // Applies the picked wallpaper if it isn't yet, then hands over to the desktop editor
+    function customize() {
+        const path = currentPath();
+        if (path && path !== Wallpaper.current)
+            Wallpaper.set(path);
+        hide(true);
+        Desk.editing = true;
     }
 
     function windowsFade(mode) {
@@ -143,6 +122,18 @@ Scope {
         Wallpaper.set(files.get(i, "filePath"));
     }
 
+    // Next or previous in the tag last shown in the picker, wrapping around
+    property real lastStep: 0
+    function applyStep(by) {
+        // A little pause between steps, so holding the key doesn't flood the screen with circles
+        const now = Date.now();
+        if (n === 0 || now - lastStep < 200)
+            return;
+        lastStep = now;
+        const cur = files.indexOf("file://" + Wallpaper.current);
+        Wallpaper.set(files.get(cur < 0 ? 0 : (cur + by + n) % n, "filePath"), by > 0 ? "right" : "left");
+    }
+
     function switchTag(by) {
         if (tags.length < 2)
             return;
@@ -192,8 +183,12 @@ Scope {
         }
     }
 
-    // Image folders first, then video ones
+    // Image folders first, then video ones. A missing folder makes FolderListModel
+    // list the working directory instead, so anything outside it is dropped
+    // Bumped on any change in the folder lists: renames keep the count, which alone wouldn't refresh tags
+    property int tagRev: 0
     readonly property var tags: {
+        tagRev;
         const out = [];
         for (const [m, dir] of [[imageTags, Wallpaper.dir], [videoTags, Wallpaper.videoDir]])
             for (let i = 0; i < m.count; i++) {
@@ -206,6 +201,10 @@ Scope {
 
     FolderListModel {
         id: imageTags
+        onDataChanged: root.tagRev++
+        onRowsInserted: root.tagRev++
+        onRowsRemoved: root.tagRev++
+        onModelReset: root.tagRev++
         folder: "file://" + Wallpaper.dir
         showFiles: false
         showDotAndDotDot: false
@@ -214,14 +213,25 @@ Scope {
 
     FolderListModel {
         id: videoTags
+        onDataChanged: root.tagRev++
+        onRowsInserted: root.tagRev++
+        onRowsRemoved: root.tagRev++
+        onModelReset: root.tagRev++
         folder: "file://" + Wallpaper.videoDir
         showFiles: false
         showDotAndDotDot: false
         sortField: FolderListModel.Name
     }
 
+    // Tiles read files by index; two tags with the same count reuse them, so they need a nudge
+    property int fileRev: 0
+
     FolderListModel {
         id: files
+        onDataChanged: root.fileRev++
+        onRowsInserted: root.fileRev++
+        onRowsRemoved: root.fileRev++
+        onModelReset: root.fileRev++
         folder: root.tagPath ? "file://" + root.tagPath : ""
         showDirs: false
         caseSensitive: false
@@ -255,7 +265,10 @@ Scope {
         function close(): void { root.hide(); }
         // Picks from the tag last shown in the picker, so it never wanders into another folder
         function random(): void { root.applyRandom(); }
+        function next(): void { root.applyStep(1); }
+        function prev(): void { root.applyStep(-1); }
         function set(path: string): void { Wallpaper.set(path); }
+        function invert(): void { Wallpaper.invert(Wallpaper.current); }
     }
 
     PanelWindow {
@@ -283,45 +296,19 @@ Scope {
             id: keys
             focus: true
             Keys.onPressed: event => {
+                // E opens the desktop editor for this wallpaper (RU "У", same scancode)
+                if (event.key === Qt.Key_E || event.nativeScanCode === 26) {
+                    root.customize();
+                    event.accepted = true;
+                    return;
+                }
+                // I inverts an image from the Invertible folder (RU "Ш", same scancode)
+                if (event.key === Qt.Key_I || event.nativeScanCode === 31) {
+                    Wallpaper.invert(root.currentPath());
+                    event.accepted = true;
+                    return;
+                }
                 // R on any layout (RU "К" is a different key, same scancode)
-                // A toggles accent tuning (RU "Ф", same scancode)
-                if (event.key === Qt.Key_A || event.nativeScanCode === 38) {
-                    root.tuning = !root.tuning;
-                    event.accepted = true;
-                    return;
-                }
-                if (root.tuning) {
-                    switch (event.key) {
-                    case Qt.Key_Escape:
-                        root.tuning = false;
-                        break;
-                    case Qt.Key_Tab:
-                    case Qt.Key_Backtab:
-                        root.tuneScope = root.tuneScopes[(root.tuneScopes.indexOf(root.tuneScope) + (event.key === Qt.Key_Backtab ? 2 : 1)) % 3];
-                        break;
-                    case Qt.Key_Up:
-                        root.tuneRow = (root.tuneRow + root.tuneRows.length - 1) % root.tuneRows.length;
-                        break;
-                    case Qt.Key_Down:
-                        root.tuneRow = (root.tuneRow + 1) % root.tuneRows.length;
-                        break;
-                    case Qt.Key_Left:
-                    case Qt.Key_Right:
-                        root.tuneStep((event.key === Qt.Key_Left ? -1 : 1) * (event.modifiers & Qt.ShiftModifier ? 5 : 1));
-                        break;
-                    case Qt.Key_Backspace:
-                    case Qt.Key_Delete:
-                        if (event.modifiers & Qt.ShiftModifier)
-                            root.tuneReset();
-                        else
-                            root.tuneSet(root.tuneRow, 0);
-                        break;
-                    default:
-                        return;
-                    }
-                    event.accepted = true;
-                    return;
-                }
                 if (event.key === Qt.Key_R || event.nativeScanCode === 27) {
                     root.pickRandom();
                     event.accepted = true;
@@ -358,179 +345,6 @@ Scope {
         }
 
         Item {
-        Rectangle {
-            id: tuner
-
-            readonly property bool shown: root.open && root.tuning
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            y: panel.y - height - 12 + (shown ? 0 : 12)
-            width: 480
-            height: tuneCol.implicitHeight + 2 * Theme.pad
-            radius: Theme.radius
-            color: Theme.bg
-            border.width: 1
-            border.color: Theme.muted
-            visible: opacity > 0
-            opacity: shown ? 1 : 0
-            Behavior on opacity { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
-
-            MouseArea {
-                anchors.fill: parent
-            }
-
-            Column {
-                id: tuneCol
-
-                x: Theme.pad
-                y: Theme.pad
-                width: parent.width - 2 * Theme.pad
-                spacing: 6
-
-                Row {
-                    width: parent.width
-                    spacing: 10
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 14
-                        height: 14
-                        radius: 7
-                        color: Theme.accent
-                    }
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 14
-                        height: 14
-                        radius: 7
-                        color: Theme.barAccent
-                    }
-
-                    Label {
-                        font.pixelSize: 13
-                        color: Theme.subtext
-                        text: "Accent for " + root.prettify(Wallpaper.current.split("/").pop().replace(/\.[^.]*$/, ""))
-                        width: parent.width - 48
-                        elide: Text.ElideRight
-                    }
-                }
-
-                Item {
-                    width: parent.width
-                    height: 24 + 8
-
-                    Row {
-                        spacing: 6
-
-                        Repeater {
-                            model: root.tuneScopes
-
-                            Rectangle {
-                                id: chip
-
-                                required property string modelData
-                                readonly property bool on: root.tuneScope === modelData
-
-                                width: chipText.implicitWidth + 20
-                                height: 24
-                                radius: 12
-                                color: on ? Theme.accent : "transparent"
-                                border.width: 1
-                                border.color: on ? Theme.accent : Theme.muted
-
-                                Label {
-                                    id: chipText
-                                    anchors.centerIn: parent
-                                    font.pixelSize: 12
-                                    color: chip.on ? Theme.bg : Theme.subtext
-                                    text: chip.modelData === "both" ? "Both themes" : chip.modelData === "light" ? "Light" : "Dark"
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    onClicked: root.tuneScope = chip.modelData
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.right: parent.right
-                        width: resetText.implicitWidth + 20
-                        height: 24
-                        radius: 12
-                        color: resetArea.containsMouse ? Theme.muted : "transparent"
-                        border.width: 1
-                        border.color: Theme.muted
-
-                        Label {
-                            id: resetText
-                            anchors.centerIn: parent
-                            font.pixelSize: 12
-                            color: Theme.subtext
-                            text: "Reset"
-                        }
-
-                        MouseArea {
-                            id: resetArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onClicked: root.tuneReset()
-                        }
-                    }
-                }
-
-                Repeater {
-                    model: root.tuneRows
-
-                    Row {
-                        id: tuneLine
-
-                        required property int index
-                        required property var modelData
-                        readonly property real value: Accent.scopeTweak(root.tuneScope)[modelData.key] || 0
-
-                        spacing: 10
-                        height: 26
-
-                        Label {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 150
-                            font.pixelSize: 13
-                            color: tuneLine.index === root.tuneRow ? Theme.accent : Theme.subtext
-                            text: tuneLine.modelData.group + " · " + tuneLine.modelData.label
-                        }
-
-                        Slider {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: tuneCol.width - 226
-                            dim: tuneLine.index !== root.tuneRow
-                            value: (tuneLine.value / tuneLine.modelData.lim + 1) / 2
-                            onMoved: v => {
-                                root.tuneRow = tuneLine.index;
-                                root.tuneSet(tuneLine.index, (v * 2 - 1) * tuneLine.modelData.lim);
-                            }
-                        }
-
-                        Label {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 46
-                            horizontalAlignment: Text.AlignRight
-                            font.pixelSize: 13
-                            text: (tuneLine.value > 0 ? "+" : "") + +(tuneLine.value * tuneLine.modelData.scale).toFixed(1) + tuneLine.modelData.unit
-                        }
-                    }
-                }
-
-                Label {
-                    font.pixelSize: 12
-                    color: Theme.subtext
-                    text: "↑↓ row  ←→ adjust  Tab theme  ⌫ reset (Shift: all)  A close"
-                }
-            }
-        }
-
             id: panel
 
             readonly property int margin: 28
@@ -549,14 +363,14 @@ Scope {
                 }
             }
 
-            // No backdrop, so a soft shadow keeps thumbnails and text readable on any wallpaper
+            // No backdrop, so a dense halo in the scheme's contrast color keeps text and thumbnails
+            // readable on any wallpaper (same as the desktop lyrics)
             layer.enabled: true
             layer.effect: MultiEffect {
                 shadowEnabled: true
-                shadowColor: "black"
-                shadowOpacity: 0.7
-                shadowBlur: 0.8
-                shadowVerticalOffset: 2
+                shadowColor: Theme.halo
+                shadowOpacity: 0.85
+                shadowBlur: 0.45
             }
 
             MouseArea {
@@ -693,7 +507,7 @@ Scope {
 
                             required property int index
                             readonly property int real: index % root.n
-                            readonly property string filePath: files.get(real, "filePath")
+                            readonly property string filePath: (root.fileRev, files.get(real, "filePath") ?? "")
                             readonly property bool selected: ListView.isCurrentItem
                             readonly property bool applied: filePath === Wallpaper.current
                             // 0 at the center of the screen, 1 at the strip's edges
@@ -749,6 +563,67 @@ Scope {
                                 Behavior on border.color { ColorAnimation { duration: Theme.anim } }
                             }
 
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (tile.selected)
+                                        root.apply();
+                                    else
+                                        strip.currentIndex = tile.index;
+                                }
+                            }
+
+                            Rectangle {
+                                visible: tile.selected && Wallpaper.isMono(tile.filePath)
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.margins: 8
+                                width: 24
+                                height: 24
+                                radius: 12
+                                color: invertArea.containsMouse ? Theme.accent : Qt.alpha(Theme.bg, 0.8)
+
+                                Icon {
+                                    anchors.centerIn: parent
+                                    text: "invert_colors"
+                                    font.pixelSize: 16
+                                    color: invertArea.containsMouse ? Theme.bg : Theme.text
+                                }
+
+                                MouseArea {
+                                    id: invertArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: Wallpaper.invert(tile.filePath)
+                                }
+                            }
+
+                            // Desktop widgets and effects for this wallpaper (E)
+                            Rectangle {
+                                visible: tile.selected
+                                anchors.left: parent.left
+                                anchors.bottom: parent.bottom
+                                anchors.margins: 8
+                                width: 24
+                                height: 24
+                                radius: 12
+                                color: editArea.containsMouse ? Theme.accent : Qt.alpha(Theme.bg, 0.8)
+
+                                Icon {
+                                    anchors.centerIn: parent
+                                    text: "dashboard_customize"
+                                    font.pixelSize: 15
+                                    color: editArea.containsMouse ? Theme.bg : Theme.text
+                                }
+
+                                MouseArea {
+                                    id: editArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: root.customize()
+                                }
+                            }
+
                             Rectangle {
                                 visible: tile.applied
                                 anchors.right: parent.right
@@ -764,16 +639,6 @@ Scope {
                                     text: "check"
                                     font.pixelSize: 18
                                     color: Theme.bg
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    if (tile.selected)
-                                        root.apply();
-                                    else
-                                        strip.currentIndex = tile.index;
                                 }
                             }
                         }
@@ -808,7 +673,7 @@ Scope {
                     font.pixelSize: 14
                     text: root.n === 0
                           ? (root.tags.length === 0 ? "No folders in " + Wallpaper.dir + " or " + Wallpaper.videoDir : "Nothing here")
-                          : root.prettify(files.get(strip.currentIndex % root.n, "fileBaseName") ?? "")
+                          : root.prettify((root.fileRev, files.get(strip.currentIndex % root.n, "fileBaseName") ?? ""))
                 }
 
                 Label {

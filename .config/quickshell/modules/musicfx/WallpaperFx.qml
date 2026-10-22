@@ -6,7 +6,7 @@ import qs.config
 import qs.services
 
 // Music-reactive copy of the wallpaper on top of awww: zoom on the bass, blur and shake on kicks,
-// accent glow from the bottom edge. Only mapped while music plays, so awww shows through otherwise.
+// accent glow (see GlowOverlay). Only mapped while music plays, so awww shows through otherwise.
 PanelWindow {
     id: root
 
@@ -38,9 +38,18 @@ PanelWindow {
 
     Connections {
         target: Wallpaper
+        // Side switches grow over this copy (WallpaperTransition): it stays on and takes the image
+        // once one has covered it, instead of dropping out mid-zoom
         function onImageChanged() {
+            if (Wallpaper.grows.count > 0)
+                return;
             root.swapping = true;
             swap.restart();
+        }
+        function onGrowCovered(path) {
+            swap.stop();
+            root.swapping = false;
+            root.source = path;
         }
     }
 
@@ -96,16 +105,9 @@ PanelWindow {
             }
         }
 
-        Rectangle {
-            visible: MusicFx.glow
-            anchors.bottom: parent.bottom
-            width: parent.width
-            height: parent.height * 0.45
-            opacity: Math.min(1, Cava.bass * 0.9 * MusicFx.gain("glow"))
-            gradient: Gradient {
-                GradientStop { position: 0; color: "transparent" }
-                GradientStop { position: 1; color: Qt.alpha(Theme.accent, 0.35) }
-            }
+        GlowOverlay {
+            anchors.fill: parent
+            strength: MusicFx.glow ? Math.min(1, Cava.bass * 0.9 * MusicFx.gain("glow")) : 0
         }
     }
 }
