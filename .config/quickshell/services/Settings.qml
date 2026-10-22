@@ -15,6 +15,12 @@ Singleton {
 
     property alias transition: adapter.transition
     property alias transitionTime: adapter.transitionTime
+    property alias transitionFrom: adapter.transitionFrom
+    // Styles left out of "random" and "random-glitch"
+    readonly property var randomSkip: adapter.randomSkip
+    readonly property var glitchSkip: adapter.glitchSkip
+    // Own lengths of some styles, ms; the rest take transitionTime
+    readonly property var durations: adapter.durations
     property alias slideshow: adapter.slideshow
     property alias panelScale: adapter.panelScale
     property alias nightTemp: adapter.nightTemp
@@ -62,6 +68,34 @@ Singleton {
         adapter.hypr = all;
         if (key === "cursor_size")
             Quickshell.execDetached(["hyprctl", "setcursor", Quickshell.env("XCURSOR_THEME") || "default", String(value)]);
+    }
+
+    function durationOf(name) {
+        return adapter.durations[name] ?? adapter.transitionTime;
+    }
+
+    // ms, or null back to the default
+    function setDuration(name, ms) {
+        const all = Object.assign({}, adapter.durations);
+        if (ms === null)
+            delete all[name];
+        else
+            all[name] = ms;
+        adapter.durations = all;
+    }
+
+    // Puts a style in or out of its group's random pick
+    function toggleRandom(glitch, name) {
+        const skip = (glitch ? adapter.glitchSkip : adapter.randomSkip).slice();
+        const i = skip.indexOf(name);
+        if (i >= 0)
+            skip.splice(i, 1);
+        else
+            skip.push(name);
+        if (glitch)
+            adapter.glitchSkip = skip;
+        else
+            adapter.randomSkip = skip;
     }
 
     // A monitor's mode ("3840x2160@60.00"), scale and VRR, kept once a change is confirmed
@@ -161,6 +195,11 @@ Singleton {
             id: adapter
             property string transition: "circle"
             property int transitionTime: 800
+            // "edge", or "cursor" to start where the pointer is
+            property string transitionFrom: "edge"
+            property var randomSkip: []
+            property var glitchSkip: []
+            property var durations: ({})
             // Minutes between random wallpapers, 0 for off
             property int slideshow: 0
             property real panelScale: 1
@@ -186,6 +225,10 @@ Singleton {
         }
         function transition(name: string): void {
             adapter.transition = name;
+        }
+        // "edge" or "cursor"
+        function from(where: string): void {
+            adapter.transitionFrom = where;
         }
         // A Hyprland option by its settings.lua name; value is JSON ("12", "true", "\"slide\"")
         function hypr(key: string, value: string): void {

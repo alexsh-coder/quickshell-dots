@@ -1,6 +1,7 @@
 import QtQuick
 import QtMultimedia
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.services
 
@@ -12,6 +13,9 @@ PanelWindow {
 
     readonly property bool active: Wallpaper.grows.count > 0
     readonly property real dpr: screen?.devicePixelRatio || 1
+    // Hyprland's monitor, for placing the cursor; ui is the panel scale (QT_SCALE_FACTOR)
+    readonly property var monitor: Hyprland.monitorFor(screen)
+    readonly property real ui: Number(Quickshell.env("QT_SCALE_FACTOR") || 1)
     // Drawn only once at full size: a layer made while still 1x1 stretches one pixel over the screen
     readonly property bool full: active && width >= screen.width && height >= screen.height
 
@@ -52,6 +56,9 @@ PanelWindow {
             required property int fx
             required property string old
             required property bool wait
+            required property real px
+            required property real py
+            required property int ms
             required property real t0
             required property real at
             required property int dir
@@ -83,9 +90,10 @@ PanelWindow {
                 hasPrevious: oldImg.status === Image.Ready
                 cropTo: grow.video ? Qt.size(1, 1) : cropOf(img)
                 cropFrom: cropOf(oldImg)
-                t: Wallpaper.growT(grow.t0, grow.at, grow.dir)
+                t: Wallpaper.growT(grow.t0, grow.at, grow.dir, undefined, grow.ms)
                 effect: grow.fx
                 origin: grow.origin
+                cursor: grow.px > -1e5 ? Qt.point((grow.px - (root.monitor?.x ?? 0)) / root.ui, (grow.py - (root.monitor?.y ?? 0)) / root.ui) : Qt.point(-1e6, -1e6)
             }
 
             Image {

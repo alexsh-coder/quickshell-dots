@@ -25,6 +25,9 @@ Column {
     property int round: 0
     property real t: 0
 
+    // Each style with its shader mode
+    readonly property var styles: Wallpaper.transitions.map((t, i) => Object.assign({ mode: i }, t))
+
     spacing: 6
 
     onShownChanged: if (shown) others.running = true
@@ -78,120 +81,196 @@ Column {
 
     Label {
         width: parent.width
-        text: "How a new wallpaper replaces the old one, from the picker or Super+Alt+[ and ]"
+        text: "How a new wallpaper replaces the old one, from the picker or Super+Alt+[ and ]. With Random picked, the corner checks choose what it picks from"
         font.pixelSize: 12
         color: Theme.subtext
         wrapMode: Text.Wrap
         bottomPadding: 6
     }
 
-    Grid {
-        columns: root.columns
-        spacing: root.gap
+    // Transitions, then glitches
+    Repeater {
+        model: [
+            { title: "", styles: root.styles.filter(t => !t.glitch).concat([{ name: "random", label: "Random", icon: "shuffle", mode: -1 }]) },
+            { title: "Glitch", styles: root.styles.filter(t => t.glitch).concat([{ name: "random-glitch", label: "Random", icon: "shuffle", mode: -1 }]) }
+        ]
 
-        Repeater {
-            model: Wallpaper.transitions.concat([{ name: "random", label: "Random", icon: "shuffle" }])
+        Column {
+            id: group
 
-            Item {
-                id: tile
+            required property var modelData
 
-                required property var modelData
-                required property int index
-                readonly property bool on: Settings.transition === modelData.name
-                readonly property bool random: modelData.name === "random"
+            spacing: 6
 
-                width: root.tileWidth
-                height: root.tileHeight + 26
+            SectionTitle {
+                visible: group.modelData.title !== ""
+                text: group.modelData.title
+            }
 
-                Rectangle {
-                    id: frame
+            Grid {
+                id: gallery
 
-                    width: parent.width
-                    height: root.tileHeight
-                    radius: Theme.radius
-                    color: Theme.surface
-                    border.width: tile.on ? 2 : 0
-                    border.color: Theme.accent
-                    scale: area.pressed ? 0.97 : 1
-                    Behavior on scale { NumberAnimation { duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
+                columns: root.columns
+                spacing: root.gap
+
+                Repeater {
+                    model: group.modelData.styles
 
                     Item {
-                        id: view
+                        id: tile
 
-                        anchors.fill: parent
-                        anchors.margins: tile.on ? 3 : 0
-                        layer.enabled: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: corners
-                            maskThresholdMin: 0.5
-                            maskSpreadAtMin: 1
+                        required property var modelData
+                        readonly property bool on: Settings.transition === modelData.name
+                        readonly property bool random: modelData.mode < 0
+                        readonly property bool glitch: !!modelData.glitch || modelData.name === "random-glitch"
+                        // Its group's random is picked: the badge puts it in or out of the pick
+                        readonly property bool picking: !random && Settings.transition === (glitch ? "random-glitch" : "random")
+                        readonly property bool inPool: !(glitch ? Settings.glitchSkip : Settings.randomSkip).includes(modelData.name)
+                        readonly property var pool: random ? Wallpaper.randomPool(glitch) : []
+
+                        opacity: picking && !inPool ? 0.45 : 1
+                        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
+
+                        width: root.tileWidth
+                        height: root.tileHeight + 26
+
+                        Rectangle {
+                            id: frame
+
+                            width: parent.width
+                            height: root.tileHeight
+                            radius: Theme.radius
+                            color: Theme.surface
+                            border.width: tile.on ? 2 : 0
+                            border.color: Theme.accent
+                            scale: area.pressed ? 0.97 : 1
+                            Behavior on scale { NumberAnimation { duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
+
+                            Item {
+                                id: view
+
+                                anchors.fill: parent
+                                anchors.margins: tile.on ? 3 : 0
+                                layer.enabled: true
+                                layer.effect: MultiEffect {
+                                    maskEnabled: true
+                                    maskSource: corners
+                                    maskThresholdMin: 0.5
+                                    maskSpreadAtMin: 1
+                                }
+
+                                Image {
+                                    anchors.fill: parent
+                                    source: (root.flip ? picB : picA).source
+                                    sourceSize: Qt.size(480, 300)
+                                    fillMode: Image.PreserveAspectCrop
+                                }
+
+                                TransitionEffect {
+                                    anchors.fill: parent
+                                    source: root.flip ? picA : picB
+                                    previous: root.flip ? picB : picA
+                                    hasPrevious: true
+                                    cropTo: cropOf(root.flip ? picA : picB)
+                                    cropFrom: cropOf(root.flip ? picB : picA)
+                                    t: root.t
+                                    // Random shows each style it picks from in turn
+                                    effect: tile.random ? tile.pool[root.round % tile.pool.length] : tile.modelData.mode
+                                    origin: "right"
+                                    cursor: Settings.transitionFrom === "cursor" ? Qt.point(width * 0.68, height * 0.42) : Qt.point(-1e6, -1e6)
+                                }
+                            }
+
+                            Rectangle {
+                                id: corners
+                                anchors.fill: view
+                                radius: Theme.radius - (tile.on ? 3 : 0)
+                                visible: false
+                                layer.enabled: true
+                            }
                         }
 
-                        Image {
+                        Row {
+                            anchors.top: frame.bottom
+                            anchors.topMargin: 6
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 4
+
+                            Icon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: tile.modelData.icon
+                                font.pixelSize: 15
+                                fill: tile.on ? 1 : 0
+                                color: tile.on ? Theme.accent : Theme.subtext
+                            }
+                            Label {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: tile.modelData.label + (Settings.durations[tile.modelData.name] !== undefined
+                                    ? " · " + (Settings.durations[tile.modelData.name] / 1000).toFixed(1) + " s" : "")
+                                font.pixelSize: 12
+                                font.weight: tile.on ? Font.DemiBold : Font.Medium
+                                color: tile.on ? Theme.accent : Theme.text
+                            }
+                        }
+
+                        MouseArea {
+                            id: area
                             anchors.fill: parent
-                            source: (root.flip ? picB : picA).source
-                            sourceSize: Qt.size(480, 300)
-                            fillMode: Image.PreserveAspectCrop
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: Settings.transition = tile.modelData.name
                         }
 
-                        TransitionEffect {
-                            anchors.fill: parent
-                            source: root.flip ? picA : picB
-                            previous: root.flip ? picB : picA
-                            hasPrevious: true
-                            cropTo: cropOf(root.flip ? picA : picB)
-                            cropFrom: cropOf(root.flip ? picB : picA)
-                            t: root.t
-                            // Random shows each style in turn
-                            effect: tile.random ? root.round % Wallpaper.transitions.length : tile.index
-                            origin: "right"
+                        Rectangle {
+                            anchors.right: frame.right
+                            anchors.top: frame.top
+                            anchors.margins: 7
+                            width: 24
+                            height: 24
+                            radius: 12
+                            visible: tile.picking
+                            color: tile.inPool ? Theme.accent : Qt.alpha(Theme.bg, 0.7)
+                            border.width: tile.inPool ? 0 : 1.5
+                            border.color: Theme.text
+                            Behavior on color { ColorAnimation { duration: Theme.anim } }
+
+                            Icon {
+                                anchors.centerIn: parent
+                                visible: tile.inPool
+                                text: "check"
+                                font.pixelSize: 17
+                                color: Theme.bg
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                anchors.margins: -4
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: Settings.toggleRandom(tile.glitch, tile.modelData.name)
+                            }
                         }
                     }
-
-                    Rectangle {
-                        id: corners
-                        anchors.fill: view
-                        radius: Theme.radius - (tile.on ? 3 : 0)
-                        visible: false
-                        layer.enabled: true
-                    }
-                }
-
-                Row {
-                    anchors.top: frame.bottom
-                    anchors.topMargin: 6
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: 4
-
-                    Icon {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: tile.modelData.icon
-                        font.pixelSize: 15
-                        fill: tile.on ? 1 : 0
-                        color: tile.on ? Theme.accent : Theme.subtext
-                    }
-                    Label {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: tile.modelData.label
-                        font.pixelSize: 12
-                        font.weight: tile.on ? Font.DemiBold : Font.Medium
-                        color: tile.on ? Theme.accent : Theme.text
-                    }
-                }
-
-                MouseArea {
-                    id: area
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: Settings.transition = tile.modelData.name
                 }
             }
         }
     }
 
     SettingRow {
-        label: "Duration"
+        label: "Start from"
+        hint: "The screen edge, or wherever the pointer is"
+
+        Chips {
+            current: Settings.transitionFrom
+            model: [
+                { value: "edge", label: "Edge" },
+                { value: "cursor", label: "Cursor" }
+            ]
+            onPicked: v => Settings.transitionFrom = v
+        }
+    }
+
+    SettingRow {
+        label: "Default duration"
+        hint: "For every transition without its own"
 
         ValueSlider {
             from: 0.3
@@ -200,6 +279,39 @@ Column {
             value: Settings.transitionTime / 1000
             format: v => v.toFixed(1) + " s"
             onMoved: v => Settings.transitionTime = Math.round(v * 1000)
+        }
+    }
+
+    // The picked style's own length
+    SettingRow {
+        id: own
+
+        readonly property var style: Wallpaper.transitions.find(t => t.name === Settings.transition) ?? null
+        readonly property bool custom: style !== null && Settings.durations[style.name] !== undefined
+
+        visible: style !== null
+        label: (style?.label ?? "") + " duration"
+        hint: custom ? "Its own length" : "Uses the default"
+
+        Row {
+            spacing: 10
+
+            PillButton {
+                anchors.verticalCenter: parent.verticalCenter
+                visible: own.custom
+                text: "Reset"
+                onClicked: Settings.setDuration(own.style.name, null)
+            }
+
+            ValueSlider {
+                anchors.verticalCenter: parent.verticalCenter
+                from: 0.2
+                to: 3
+                step: 0.1
+                value: own.style ? Settings.durationOf(own.style.name) / 1000 : 0
+                format: v => v.toFixed(1) + " s"
+                onMoved: v => Settings.setDuration(own.style.name, Math.round(v * 1000))
+            }
         }
     }
 

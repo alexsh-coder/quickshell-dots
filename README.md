@@ -23,9 +23,11 @@ Qt/KDE apps.
 - **Lockscreen** over the blurred wallpaper with the playing track (`Super+L`).
 - **Clipboard history** picker (`Super+V`), pastes into the focused window on Enter.
 - **Wallpaper picker** (`Super+Shift+W`) for images and looping video wallpapers,
-  switching with one of 14 shader transitions: circle, slide, wipe, fade, burn,
-  pixels, glitch, page curl, tear, blinds, honeycomb, ripple, swirl, signal (a finer,
-  VHS-like glitch), or a random one.
+  switching with one of 28 shader transitions, from the screen edge or from the cursor:
+  circle, slide, wipe, fade, burn, pixels, page curl, tear, blinds, honeycomb, ripple,
+  swirl, dust, dream, black hole, kaleidoscope, RGB split, watercolor, speed lines,
+  flip tiles, sakura, and glitches (glitch, signal, datamosh, pixel sort, corrupt,
+  slices, CRT), or a random one.
 - **Settings** window (`Super+,`): wallpaper transition with live previews, slideshow,
   resolution, refresh rate, scale and VRR (rolled back unless kept), night light
   warmth, panel scale, gaps, borders, rounding, blur, shadows, window and workspace

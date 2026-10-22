@@ -26,7 +26,8 @@ Singleton {
     property string origin: "bottom"
 
     // Transition styles, in the order of their modes in shaders/wallswap.frag. Those with old set
-    // move or distort the old wallpaper, so they get a still of it when there is one
+    // move or distort the old wallpaper, so they get a still of it when there is one; glitch ones
+    // are listed apart in the settings window
     readonly property var transitions: [
         { name: "circle", label: "Circle", icon: "radio_button_unchecked" },
         { name: "slide", label: "Slide", icon: "view_carousel", old: true },
@@ -34,24 +35,49 @@ Singleton {
         { name: "fade", label: "Fade", icon: "gradient" },
         { name: "burn", label: "Burn", icon: "local_fire_department" },
         { name: "pixels", label: "Pixels", icon: "grid_view", old: true },
-        { name: "glitch", label: "Glitch", icon: "broken_image", old: true },
+        { name: "glitch", label: "Glitch", icon: "broken_image", old: true, glitch: true },
         { name: "curl", label: "Page curl", icon: "auto_stories", old: true },
         { name: "tear", label: "Tear", icon: "content_cut", old: true },
         { name: "blinds", label: "Blinds", icon: "blinds", old: true },
         { name: "honeycomb", label: "Honeycomb", icon: "hexagon" },
         { name: "ripple", label: "Ripple", icon: "water", old: true },
         { name: "swirl", label: "Swirl", icon: "cyclone", old: true },
-        { name: "signal", label: "Signal", icon: "settings_input_antenna", old: true }
+        { name: "signal", label: "Signal", icon: "settings_input_antenna", old: true, glitch: true },
+        { name: "dust", label: "Dust", icon: "grain", old: true },
+        { name: "dream", label: "Dream", icon: "blur_on", old: true },
+        { name: "lens", label: "Black hole", icon: "trip_origin", old: true },
+        { name: "kaleido", label: "Kaleidoscope", icon: "filter_vintage", old: true },
+        { name: "rgb", label: "RGB split", icon: "invert_colors", old: true },
+        { name: "watercolor", label: "Watercolor", icon: "water_drop" },
+        { name: "speedlines", label: "Speed lines", icon: "speed" },
+        { name: "tiles", label: "Flip tiles", icon: "flip", old: true },
+        { name: "sakura", label: "Sakura", icon: "local_florist" },
+        { name: "datamosh", label: "Datamosh", icon: "movie", old: true, glitch: true },
+        { name: "pixelsort", label: "Pixel sort", icon: "bar_chart", old: true, glitch: true },
+        { name: "corrupt", label: "Corrupt", icon: "report", old: true, glitch: true },
+        { name: "slices", label: "Slices", icon: "view_stream", old: true, glitch: true },
+        { name: "crt", label: "CRT", icon: "tv", old: true, glitch: true }
     ]
 
-    // Mode for the next switch: the chosen style, or any but the last one for "random"
+    // Modes "random" (glitch false) or "random-glitch" picks from: its group, minus those left out
+    // in the settings window, or the whole group if that leaves none
+    function randomPool(glitch) {
+        const skip = glitch ? Settings.glitchSkip : Settings.randomSkip;
+        const group = transitions.map((t, i) => i).filter(i => !!transitions[i].glitch === glitch);
+        const pool = group.filter(i => !skip.includes(transitions[i].name));
+        return pool.length ? pool : group;
+    }
+
+    // Mode for the next switch: the chosen style, or a random one other than the last
     property int lastFx: 0
     function pickFx() {
         const i = transitions.findIndex(t => t.name === Settings.transition);
         if (i >= 0)
             return i;
-        let r = Math.floor(Math.random() * (transitions.length - 1));
-        return r >= lastFx ? r + 1 : r;
+        let pool = randomPool(Settings.transition === "random-glitch");
+        if (pool.length > 1)
+            pool = pool.filter(m => m !== lastFx);
+        return pool[Math.floor(Math.random() * pool.length)];
     }
 
     // Still of a video's current frame, for transitions that need the old wallpaper
@@ -118,7 +144,37 @@ Singleton {
         scan.running = true;
     }
 
+    // Starting from the cursor asks Hyprland where it is first
     function set(path, edge) {
+        if (Settings.transitionFrom !== "cursor")
+            return void apply(path, edge, null);
+        cursor.path = path;
+        cursor.edge = edge ?? "bottom";
+        cursor.running = false;
+        cursor.running = true;
+    }
+
+    Process {
+        id: cursor
+
+        property string path
+        property string edge
+
+        command: ["hyprctl", "cursorpos", "-j"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let p = null;
+                try {
+                    const c = JSON.parse(text);
+                    p = Qt.point(c.x, c.y);
+                } catch (e) {}
+                root.apply(cursor.path, cursor.edge, p);
+            }
+        }
+    }
+
+    // point: where the cursor is, in Hyprland's global pixels, when the switch starts there
+    function apply(path, edge, point) {
         origin = edge ?? "bottom";
         // Picking the video that's on again only brings it back if its player is gone
         if (path === current && video) {
@@ -132,13 +188,13 @@ Singleton {
         const old = !transitions[fx].old || !settledOld ? "" : video ? frozen : image;
         // Videos, steps from the side, other styles and anything over a switch in progress are grown
         // here, each over the one before (see grows); awww grows the rest itself
-        const stack = origin !== "bottom" || fx !== 0 || video || isVideo(path) || grows.count > 0;
+        const stack = origin !== "bottom" || fx !== 0 || point || video || isVideo(path) || grows.count > 0;
         current = path;
         saved.setText(isVideo(path) || isMono(path) ? path : "");
         switching.restart();
         if (stack) {
             clock = Date.now();
-            stackGrow(isVideo(path) ? path : still(path), fx, old);
+            stackGrow(isVideo(path) ? path : still(path), fx, old, point);
         }
         if (isVideo(path)) {
             prepare();
@@ -146,7 +202,7 @@ Singleton {
             image = still(path);
             if (!stack) {
                 native.restart();
-                Quickshell.execDetached([script, "set", image, "", origin, (growTime / 1000).toFixed(2)]);
+                Quickshell.execDetached([script, "set", image, "", origin, (Settings.durationOf("circle") / 1000).toFixed(2)]);
             }
         }
     }
@@ -154,7 +210,7 @@ Singleton {
     // awww's own grow is running
     Timer {
         id: native
-        interval: root.growTime + 100
+        interval: Settings.durationOf("circle") + 100
     }
 
     // Switches in flight, oldest first: each grows a circle of its image or video over the ones below.
@@ -164,12 +220,11 @@ Singleton {
     property ListModel grows: ListModel {}
     property int growSeq: 0
     property real clock: 0
-    readonly property int growTime: Settings.transitionTime
     property int growDrop: -1
 
-    // Linear 0..1 progress
-    function growT(t0, at, dir, now) {
-        return at ? Math.min(1, Math.max(0, t0 + dir * ((now ?? clock) - at) / growTime)) : 0;
+    // Linear 0..1 progress over ms, the switch's own length
+    function growT(t0, at, dir, now, ms) {
+        return at ? Math.min(1, Math.max(0, t0 + dir * ((now ?? clock) - at) / (ms || Settings.transitionTime))) : 0;
     }
 
     // Eased, for the circle's radius
@@ -185,9 +240,10 @@ Singleton {
     signal growCovered(string path)
 
     // old is the still under it for transitions that move it; for a video, its frame once frozen (wait)
-    function stackGrow(img, fx, old) {
+    function stackGrow(img, fx, old, point) {
         const wait = old === frozen;
-        grows.append({ gid: ++growSeq, path: img, under: image, origin: origin, fx: fx, old: wait ? "" : old, wait: wait, t0: 0, at: 0, dir: 1, pos: 0, dur: 0 });
+        grows.append({ gid: ++growSeq, path: img, under: image, origin: origin, fx: fx, old: wait ? "" : old, wait: wait,
+            px: point ? point.x : -1e6, py: point ? point.y : -1e6, ms: Settings.durationOf(transitions[fx].name), t0: 0, at: 0, dir: 1, pos: 0, dur: 0 });
         if (wait) {
             freeze.gid = growSeq;
             freeze.running = false;
@@ -221,7 +277,7 @@ Singleton {
             let k = -1;
             for (let i = root.grows.count - 1; i >= 0; i--) {
                 const g = root.grows.get(i);
-                const t = root.growT(g.t0, g.at, g.dir, now);
+                const t = root.growT(g.t0, g.at, g.dir, now, g.ms);
                 // Slid all the way back: the image under it is on screen already
                 if (g.at && g.dir < 0 && t <= 0)
                     root.grows.remove(i);
