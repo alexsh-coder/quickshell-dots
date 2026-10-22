@@ -8,6 +8,8 @@
 #   wallpaper.sh play VIDEO           start VIDEO unless one is already playing
 #   wallpaper.sh freeze FRAME         pause the video that's on and save the frame it shows to FRAME
 #   wallpaper.sh start VIDEO POSTER   replace the video that's on, starting from POSTER in awww
+#   wallpaper.sh cue SECONDS          pause the video that's on at SECONDS
+#   wallpaper.sh resume               play it on from there
 #   wallpaper.sh poster VIDEO POSTER  write VIDEO's first frame to POSTER unless it's up to date
 #   wallpaper.sh posters CACHE DIR    posters for every video under DIR, named by md5 of the path
 #   wallpaper.sh mono CACHE DIR       negatives of every image under DIR, named by md5 of the path
@@ -36,6 +38,11 @@ mono() {
     magick "$1" -background black -flatten -alpha off -negate "$out.$$.png" && mv -f "$out.$$.png" "$out"
 }
 
+# A player that's gone can linger as a zombie for a while
+playing() {
+    pgrep -x -r D,R,S,T mpvpaper
+}
+
 grow() {
     if [ "${2:-}" = none ]; then
         awww img "$1" --transition-type none
@@ -46,7 +53,7 @@ grow() {
 }
 
 play() {
-    pgrep -x mpvpaper >/dev/null && return 0
+    playing >/dev/null && return 0
     [ -f "$1" ] || return 1
     printf '%s' "$1" >"$run.video"
     # -p pauses it while nothing of the desktop is visible. mpv's default scaling of 4K videos
@@ -72,7 +79,7 @@ screenshot() {
 # mpv can't screenshot frames that stay on the GPU, so it re-decodes the paused one with copy-back
 # first (playing that way all along costs several times the CPU); ffmpeg is the fallback
 freeze() {
-    pgrep -x mpvpaper >/dev/null || return 1
+    playing >/dev/null || return 1
     mpv '{"command":["set_property","pause",true]}' >/dev/null
     local t video
     t=$(mpv '{"command":["get_property","time-pos"]}' | sed -n 's/.*"data":\([0-9.]*\).*/\1/p')
@@ -86,7 +93,7 @@ kill_player() {
     pkill -x mpvpaper || return 0
     local i
     for i in $(seq 50); do
-        pgrep -x mpvpaper >/dev/null || break
+        playing >/dev/null || break
         sleep 0.02
     done
     rm -f "$sock" "$run.video"
@@ -102,8 +109,22 @@ stop() {
     kill_player
 }
 
-# Prints "poster" once awww holds it with the old player gone, then waits until the new one plays
+# Pauses the video that's on at SECONDS, ready for resume
+cue() {
+    mpv '{"command":["set_property","pause",true]}' >/dev/null
+    mpv '{"command":["seek","'"$1"'","absolute+exact"]}' >/dev/null
+    local i
+    for i in $(seq 50); do
+        mpv '{"command":["get_property","time-pos"]}' |
+            sed -n 's/.*"data":\([0-9.]*\).*/\1/p' | awk -v t="$1" '$1 >= t - 0.05 { ok = 1 } END { exit !ok }' && return 0
+        sleep 0.02
+    done
+    return 1
+}
+
+# Prints "poster" once awww holds it with the old player gone, then "ready" once the new one plays
 start() {
+    poster "$1" "$2" || exit 1
     [ -f "$run.pid" ] && kill "$(cat "$run.pid")" 2>/dev/null
     echo $$ >"$run.pid"
     awww img "$2" --transition-type none
@@ -130,6 +151,10 @@ set_wallpaper() {
         grow "$2" "${3:-bottom}"
         sleep 0.8
         play "$1"
+    elif [ "${3:-}" = none ]; then
+        # Quickshell has grown it over the screen already: nothing to show under it on the way out
+        grow "$1" none
+        kill_player
     else
         stop
         grow "$1" "${3:-bottom}"
@@ -142,6 +167,8 @@ set) set_wallpaper "$2" "${3:-}" "${4:-}" ;;
 play) play "$2" ;;
 freeze) freeze "$2" ;;
 start) start "$2" "$3" ;;
+cue) cue "$2" ;;
+resume) mpv '{"command":["set_property","pause",false]}' >/dev/null ;;
 poster) poster "$2" "$3" ;;
 posters)
     find "$3" -type f | while IFS= read -r f; do
@@ -154,7 +181,7 @@ mono)
     done
     ;;
 *)
-    sed -n '2,13s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,15s/^# \{0,1\}//p' "$0" >&2
     exit 1
     ;;
 esac

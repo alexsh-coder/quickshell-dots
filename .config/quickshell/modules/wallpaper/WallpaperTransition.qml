@@ -1,19 +1,19 @@
 import QtQuick
+import QtMultimedia
 import Quickshell
 import Quickshell.Wayland
 import qs.services
 
-// The still a video wallpaper is revealed from (see Wallpaper.cover). It sits in the bottom layer,
-// since a newly started mpvpaper lands on top of everything in the background one. Stays mapped
+// Switches Quickshell grows itself (see Wallpaper.grows).
+// It sits in the bottom layer, since a newly started mpvpaper lands on top of everything in the background one. Stays mapped
 // at 1x1 between switches: created before the desktop widgets, it keeps below them that way.
 PanelWindow {
     id: root
 
-    readonly property bool active: Wallpaper.cover !== "" || Wallpaper.grows.count > 0
+    readonly property bool active: Wallpaper.grows.count > 0
     readonly property real dpr: screen?.devicePixelRatio || 1
     // Drawn only once at full size: a layer made while still 1x1 stretches one pixel over the screen
     readonly property bool full: active && width >= screen.width && height >= screen.height
-    readonly property bool shown: full && still.status === Image.Ready
 
     WlrLayershell.namespace: "wallpaper-transition"
     WlrLayershell.layer: WlrLayer.Bottom
@@ -30,45 +30,6 @@ PanelWindow {
     color: "transparent"
     mask: Region {}
 
-    // A couple of frames for the still to reach the screen before the player may show up under it
-    onShownChanged: {
-        if (shown)
-            settle.restart();
-    }
-
-    Timer {
-        id: settle
-        interval: 50
-        onTriggered: {
-            if (root.shown)
-                Wallpaper.coverShown();
-        }
-    }
-
-    Image {
-        id: still
-
-        anchors.fill: parent
-        visible: root.full && Wallpaper.cover !== ""
-        // Holds the wallpaper's still between switches, so the usual cover is up at once
-        source: (Wallpaper.cover || Wallpaper.image) ? "file://" + (Wallpaper.cover || Wallpaper.image) : ""
-        sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        cache: false
-        smooth: true
-
-        layer.enabled: root.full
-        layer.effect: ShaderEffect {
-            readonly property bool side: Wallpaper.origin !== "bottom"
-            readonly property real radius: Wallpaper.reveal * (side ? Math.hypot(width, height / 2) : Math.hypot(width / 2, height))
-            readonly property point center: side ? Qt.point(Wallpaper.origin === "left" ? 0 : width, height / 2) : Qt.point(width / 2, height)
-            readonly property size extent: Qt.size(width, height)
-
-            fragmentShader: Qt.resolvedUrl("../../shaders/reveal.frag.qsb")
-        }
-    }
-
     // The bass zoom WallpaperFx puts on the wallpaper under the grows, so they match it
     readonly property real fxZoom: MusicFx.wallpaperFx && MusicFx.zoom && Cava.active && !Wallpaper.video ? Cava.bass * 0.04 * MusicFx.gain("zoom") : 0
 
@@ -78,12 +39,12 @@ PanelWindow {
         onTriggered: Wallpaper.clock = Date.now()
     }
 
-    // Side switches stacking up (see Wallpaper.grows). The shader reads the image directly:
+    // Switches stacking up (see Wallpaper.grows). An image's shader reads it directly:
     // no offscreen layer to allocate on every switch
     Repeater {
         model: Wallpaper.grows
 
-        ShaderEffect {
+        Item {
             id: grow
 
             required property string path
@@ -94,34 +55,79 @@ PanelWindow {
             required property int index
             required property int gid
 
-            readonly property Image source: img
-            readonly property real radius: Wallpaper.grown(t0, at, dir) * Math.hypot(width, height / 2)
-            readonly property point center: Qt.point(origin === "left" ? 0 : width, height / 2)
-            readonly property size extent: Qt.size(width, height)
-            // The shader gets the whole decoded image, not the cropped part the Image would draw
-            readonly property size crop: Qt.size(Math.min(1, width / Math.max(1, img.paintedWidth)), Math.min(1, height / Math.max(1, img.paintedHeight)))
+            readonly property bool video: Wallpaper.isVideo(path)
+            readonly property bool side: origin !== "bottom"
+            readonly property real radius: Wallpaper.grown(t0, at, dir) * (side ? Math.hypot(width, height / 2) : Math.hypot(width / 2, height))
+            readonly property point center: side ? Qt.point(origin === "left" ? 0 : width, height / 2) : Qt.point(width / 2, height)
+
+            function loaded() {
+                if (!at)
+                    Wallpaper.grows.setProperty(index, "at", Date.now());
+            }
 
             // Newer switches on top: the Repeater doesn't keep added items above the earlier ones
             z: gid
             anchors.fill: parent
             scale: 1 + root.fxZoom
-            visible: root.full && img.status === Image.Ready
-            fragmentShader: Qt.resolvedUrl("../../shaders/wallgrow.frag.qsb")
+            visible: root.full
 
-            Image {
-                id: img
+            ShaderEffect {
+                readonly property Image source: img
+                readonly property real radius: grow.radius
+                readonly property point center: grow.center
+                readonly property size extent: Qt.size(width, height)
+                // The shader gets the whole decoded image, not the cropped part the Image would draw
+                readonly property size crop: Qt.size(Math.min(1, width / Math.max(1, img.paintedWidth)), Math.min(1, height / Math.max(1, img.paintedHeight)))
 
                 anchors.fill: parent
-                visible: false
-                source: "file://" + grow.path
-                sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false
-                smooth: true
-                onStatusChanged: {
-                    if (status === Image.Ready && !grow.at)
-                        Wallpaper.grows.setProperty(grow.index, "at", Date.now());
+                visible: !grow.video && img.status === Image.Ready
+                fragmentShader: Qt.resolvedUrl("../../shaders/wallgrow.frag.qsb")
+
+                Image {
+                    id: img
+
+                    anchors.fill: parent
+                    visible: false
+                    source: grow.video ? "" : "file://" + grow.path
+                    sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false
+                    smooth: true
+                    onStatusChanged: {
+                        if (status === Image.Ready)
+                            grow.loaded();
+                    }
+                }
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: grow.video
+
+                sourceComponent: Video {
+                    source: "file://" + grow.path
+                    fillMode: VideoOutput.PreserveAspectCrop
+                    loops: MediaPlayer.Infinite
+                    muted: true
+                    autoPlay: true
+                    onPositionChanged: {
+                        if (position <= 0)
+                            return;
+                        Wallpaper.grows.setProperty(grow.index, "pos", position);
+                        Wallpaper.grows.setProperty(grow.index, "dur", duration);
+                        grow.loaded();
+                    }
+
+                    layer.enabled: true
+                    layer.effect: ShaderEffect {
+                        readonly property real radius: grow.radius
+                        readonly property point center: grow.center
+                        readonly property size extent: Qt.size(width, height)
+                        readonly property size crop: Qt.size(1, 1)
+
+                        fragmentShader: Qt.resolvedUrl("../../shaders/wallgrow.frag.qsb")
+                    }
                 }
             }
         }

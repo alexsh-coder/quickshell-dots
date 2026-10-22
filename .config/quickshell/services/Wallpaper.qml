@@ -5,8 +5,8 @@ import Quickshell
 import Quickshell.Io
 
 // Images are shown by awww, videos by mpvpaper on top of it (see scripts/wallpaper.sh).
-// Switching to a video, a still of the old wallpaper covers the screen (WallpaperTransition)
-// while the new player starts underneath, then a circle cut out of it reveals the video playing.
+// Switching to a video, Quickshell plays it in a circle growing over the old wallpaper, which keeps
+// playing; once it covers the screen the new player starts underneath and takes over (see grows).
 Singleton {
     id: root
 
@@ -33,21 +33,9 @@ Singleton {
     // Bumped when new posters land, so thumbnails that failed to load can retry
     property int posters: 0
 
-    // The still shown over a video that's starting up, and how far the circle has cut through it
-    property string cover: ""
-    property real reveal: 0
-    property int coveredScreens: 0
-    property bool covered: false
-    property bool posterReady: false
-    readonly property string frame: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-wallpaper-cover.jpg"
     // mpvpaper's IPC socket (see scripts/wallpaper.sh)
     readonly property string socket: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-wallpaper.sock"
-    // What the switch in progress started from
-    property string from: ""
-    property bool fromVideo: false
 
-    // A switch to a video has played out
-    signal settled
 
     function isVideo(path) {
         return /\.(mp4|webm|mkv|mov)$/i.test(path);
@@ -105,33 +93,29 @@ Singleton {
             Quickshell.execDetached([script, "play", path]);
             return;
         }
-        // Image to image from the side: grown here, each switch over the one before (see grows)
-        const stack = origin !== "bottom" && !video && !isVideo(path) && !cover;
-        cancel();
-        from = image;
-        fromVideo = video;
+        // Videos, steps from the side and anything over a switch in progress are grown here,
+        // each over the one before (see grows); awww grows the rest itself
+        const stack = origin !== "bottom" || video || isVideo(path) || grows.count > 0;
         current = path;
-        saved.setText(video || isMono(path) ? path : "");
+        saved.setText(isVideo(path) || isMono(path) ? path : "");
         switching.restart();
-        if (!stack)
-            grows.clear();
-        if (video) {
-            prepare();
-            transit();
-        } else if (stack) {
-            const img = still(path);
+        if (stack) {
             clock = Date.now();
-            stackGrow(img);
-            image = img;
+            stackGrow(isVideo(path) ? path : still(path));
+        }
+        if (isVideo(path)) {
+            prepare();
         } else {
             image = still(path);
-            Quickshell.execDetached([script, "set", image, "", origin]);
+            if (!stack)
+                Quickshell.execDetached([script, "set", image, "", origin]);
         }
     }
 
-    // Side switches in flight, oldest first: each grows a circle of its image over the ones below.
-    // Once one covers the screen awww takes it without a transition, and it and those under it go.
-    // Each runs from t0 at time at (0 until its image has loaded) in direction dir
+    // Switches in flight, oldest first: each grows a circle of its image or video over the ones below.
+    // Once one covers the screen awww or a new player takes it, and it and those under it go.
+    // Each runs from t0 at time at (0 until it has loaded) in direction dir; a video's
+    // position and duration are pos and dur (ms)
     property ListModel grows: ListModel {}
     property int growSeq: 0
     property real clock: 0
@@ -149,11 +133,14 @@ Singleton {
         return -(Math.cos(Math.PI * t) - 1) / 2;
     }
 
+    // A switch has played out
+    signal settled
+
     // A grow has covered the screen with path: what's under the grows can take it now
     signal growCovered(string path)
 
     function stackGrow(img) {
-        grows.append({ gid: ++growSeq, path: img, under: image, origin: origin, t0: 0, at: 0, dir: 1 });
+        grows.append({ gid: ++growSeq, path: img, under: image, origin: origin, t0: 0, at: 0, dir: 1, pos: 0, dur: 0 });
     }
 
     Timer {
@@ -173,13 +160,104 @@ Singleton {
                 else if (k < 0 && g.dir > 0 && t >= 1)
                     k = i;
             }
-            const g = k >= 0 ? root.grows.get(k) : null;
-            if (!g || g.gid <= root.growDrop)
+            root.resumeOnCue();
+            if (k < 0)
+                return;
+            // What a grow covers can't be seen any more: no need to keep its video playing
+            for (; k > 0; k--)
+                root.grows.remove(0);
+            const g = root.grows.get(0);
+            // Newer switches still growing over it take over from it once they're done
+            let newer = false;
+            for (let i = 1; i < root.grows.count; i++)
+                newer = newer || root.grows.get(i).dir > 0;
+            if (newer || g.gid <= root.growDrop)
                 return;
             root.growDrop = g.gid;
-            root.growCovered(g.path);
-            Quickshell.execDetached([root.script, "set", g.path, "", "none"]);
-            growHandOff.restart();
+            const vid = root.isVideo(g.path);
+            root.growCovered(vid ? root.poster(g.path) : g.path);
+            root.cueGid = -1;
+            cue.running = false;
+            handOff.gid = g.gid;
+            handOff.command = vid ? [root.script, "start", g.path, root.poster(g.path)] : [root.script, "set", g.path, "", "none"];
+            handOff.running = false;
+            handOff.running = true;
+        }
+    }
+
+    // A video grow hands over to its player at the moment both show the same frame: the player
+    // waits paused a little ahead of the grown copy and resumes when the copy gets there (ms)
+    property int cueGid: -1
+    property real cueAt: 0
+
+    function growIndex(gid) {
+        for (let i = 0; i < grows.count; i++)
+            if (grows.get(i).gid === gid)
+                return i;
+        return -1;
+    }
+
+    function resumeOnCue() {
+        if (cueGid < 0)
+            return;
+        const i = growIndex(cueGid);
+        const pos = i < 0 ? -1 : grows.get(i).pos;
+        if (pos < cueAt || pos > cueAt + 1000)
+            return;
+        cueGid = -1;
+        Quickshell.execDetached([script, "resume"]);
+        growHandOff.interval = 80;
+        growHandOff.restart();
+    }
+
+    // Exits once awww has the image and a video player under the grows is gone,
+    // or prints "ready" once a new player plays
+    Process {
+        id: handOff
+
+        property int gid
+
+        stdout: SplitParser {
+            onRead: line => {
+                const i = root.growIndex(handOff.gid);
+                if (line !== "ready" || i < 0)
+                    return;
+                const g = root.grows.get(i);
+                let at = g.pos + 600;
+                if (g.dur && at > g.dur - 300)
+                    at = 300;
+                cue.gid = handOff.gid;
+                cue.at = at;
+                cue.command = [root.script, "cue", (at / 1000).toFixed(3)];
+                cue.running = true;
+            }
+        }
+        onExited: {
+            if (!root.isVideo(command[2] ?? "")) {
+                growHandOff.interval = 300;
+                growHandOff.restart();
+            }
+        }
+    }
+
+    Process {
+        id: cue
+
+        property int gid
+        property real at
+
+        onExited: code => {
+            if (gid !== root.growDrop)
+                return;
+            if (code === 0) {
+                root.cueAt = at;
+                root.cueGid = gid;
+            } else {
+                // Couldn't line them up: better a skip than the copy staying over the player
+                Quickshell.execDetached([root.script, "resume"]);
+                growHandOff.interval = 80;
+                growHandOff.restart();
+            }
         }
     }
 
@@ -190,6 +268,8 @@ Singleton {
         onTriggered: {
             while (root.grows.count && root.grows.get(0).gid <= root.growDrop)
                 root.grows.remove(0);
+            if (!root.grows.count)
+                root.settled();
         }
     }
 
@@ -200,117 +280,6 @@ Singleton {
         prep.path = current;
         prep.command = [script, "poster", current, poster(current)];
         prep.running = true;
-    }
-
-    // A new pick takes over from the switch still in progress
-    function cancel() {
-        freeze.running = false;
-        starter.running = false;
-        coverTimeout.stop();
-        revealAnim.stop();
-        cover = "";
-        reveal = 0;
-        covered = false;
-        posterReady = false;
-    }
-
-    // The old wallpaper goes up as a still: the image, or the frame its video is paused on
-    function transit() {
-        if (fromVideo) {
-            freeze.path = current;
-            freeze.running = true;
-        } else {
-            showCover(from);
-        }
-    }
-
-    function showCover(still) {
-        coveredScreens = 0;
-        cover = still;
-        if (still)
-            coverTimeout.restart();
-        else
-            covered = true;
-        startPlayer();
-    }
-
-    // Called by each screen's WallpaperTransition once the still is on it
-    function coverShown() {
-        if (++coveredScreens >= Quickshell.screens.length && coverTimeout.running) {
-            coverTimeout.stop();
-            covered = true;
-            startPlayer();
-        }
-    }
-
-    // Under the still: awww takes the poster, then the player starts and takes over from it
-    function startPlayer() {
-        if (!covered || !posterReady || starter.running)
-            return;
-        starter.path = current;
-        starter.command = [script, "start", current, poster(current)];
-        starter.running = true;
-    }
-
-    function startReveal() {
-        if (cover && !revealAnim.running && reveal === 0)
-            revealAnim.start();
-    }
-
-    // Both also exit when a newer switch stops them, which then must not touch it
-    Process {
-        id: freeze
-
-        property string path
-
-        command: [root.script, "freeze", root.frame]
-        onExited: code => {
-            if (path === root.current)
-                root.showCover(code === 0 ? root.frame : root.from);
-        }
-    }
-
-    Timer {
-        id: coverTimeout
-        interval: 500
-        onTriggered: {
-            root.covered = true;
-            root.startPlayer();
-        }
-    }
-
-    Process {
-        id: starter
-
-        property string path
-
-        stdout: SplitParser {
-            onRead: line => {
-                if (line === "poster")
-                    root.startReveal();
-            }
-        }
-        onExited: {
-            if (path === root.current)
-                root.startReveal();
-        }
-    }
-
-    // awww's grow, from the bottom with its default curve
-    NumberAnimation {
-        id: revealAnim
-        target: root
-        property: "reveal"
-        from: 0
-        to: 1
-        duration: 800
-        easing.type: Easing.BezierSpline
-        easing.bezierCurve: [0.54, 0, 0.34, 0.99, 1, 1]
-        onFinished: {
-            root.cover = "";
-            root.reveal = 0;
-            root.settled();
-        }
     }
 
     // awww briefly shows other stills while a switch plays out
@@ -334,8 +303,6 @@ Singleton {
                 return;
             root.image = root.poster(path);
             root.posters++;
-            root.posterReady = true;
-            root.startPlayer();
         }
     }
 
