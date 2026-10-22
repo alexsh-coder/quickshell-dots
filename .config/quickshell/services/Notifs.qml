@@ -109,10 +109,24 @@ Singleton {
         }
 
         function forget() {
+            if (leaving)
+                return;
             popup = false;
-            root.list = root.list.filter(n => n !== entry);
-            // Outlives the card's exit animation
-            reaper.start();
+            leaving = true;
+            // History cards slide out and collapse before leaving the list
+            leave.start();
+        }
+
+        // Closed: still listed while its history card animates out
+        property bool leaving: false
+
+        readonly property Timer leave: Timer {
+            interval: 750
+            onTriggered: {
+                root.list = root.list.filter(n => n !== entry);
+                // Outlives the card's exit animation
+                reaper.start();
+            }
         }
 
         readonly property Timer reaper: Timer {

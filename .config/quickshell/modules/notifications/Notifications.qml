@@ -29,22 +29,9 @@ PanelWindow {
     implicitWidth: root.cardWidth
     implicitHeight: screen ? screen.height * 0.8 : 900
     color: "transparent"
-    visible: Notifs.popups.length > 0 || hideDelay.running
+    // Stays mapped: a surface mapped together with its first card shows it
+    // already in place, skipping the slide-in
     mask: Region { item: list.contentItem }
-
-    // Keeps the window up while the last card animates out
-    Timer {
-        id: hideDelay
-        interval: 600
-    }
-
-    Connections {
-        target: Notifs
-        function onPopupsChanged() {
-            if (Notifs.popups.length === 0)
-                hideDelay.restart();
-        }
-    }
 
     ListView {
         id: list

@@ -263,8 +263,9 @@ Scope {
                     easing.bezierCurve: root.open ? Theme.emphasizedDecel : Theme.emphasizedAccel
                 }
             }
+            // A collapsing card already moves smoothly; easing on top would lag behind it
             Behavior on height {
-                enabled: win.visible
+                enabled: win.visible && !Notifs.list.some(n => n.leaving)
                 NumberAnimation { duration: Theme.animPanel; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasized }
             }
 
@@ -347,9 +348,8 @@ Scope {
                         id: list
 
                         width: parent.width
-                        height: Math.min(contentHeight, panel.maxHeight - Theme.pad * 2 - 32 - parent.spacing)
+                        height: Math.min(Math.max(0, contentHeight - root.gap), panel.maxHeight - Theme.pad * 2 - 32 - parent.spacing)
                         visible: list.count > 0
-                        spacing: root.gap
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
 
@@ -359,6 +359,7 @@ Scope {
 
                         delegate: Toast {
                             history: true
+                            gap: root.gap
                             onActivated: root.hide()
                         }
 
@@ -377,13 +378,6 @@ Scope {
 
                         add: Transition {
                             NumberAnimation { property: "x"; from: root.cardWidth; to: 0; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial }
-                        }
-
-                        remove: Transition {
-                            ParallelAnimation {
-                                NumberAnimation { property: "x"; to: root.cardWidth; duration: 300; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasizedAccel }
-                                NumberAnimation { property: "opacity"; to: 0; duration: 300 }
-                            }
                         }
 
                         displaced: Transition {

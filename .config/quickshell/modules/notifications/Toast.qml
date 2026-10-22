@@ -43,8 +43,20 @@ Item {
         return Quickshell.iconPath(icon, true);
     }
 
+    // Space below the card, kept inside it so a closing card takes it along
+    property int gap: 0
+    property real collapse: 1
+
     width: ListView.view.width
-    height: card.height
+    height: (card.height + gap) * collapse
+    clip: collapse < 1
+
+    // History cards leave on their own: slide out, then close the gap
+    SequentialAnimation {
+        running: root.history && root.entry.leaving
+        NumberAnimation { target: card; property: "x"; to: card.width; duration: 250; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasizedAccel }
+        NumberAnimation { target: root; property: "collapse"; to: 0; duration: 400; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasized }
+    }
 
     property real life: 1
 
