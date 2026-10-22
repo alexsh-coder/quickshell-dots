@@ -53,5 +53,6 @@ ShellRoot {
     Lock {}
     WallpaperPicker {}
     DeskEditor {}
+    DeskEdge {}
     QuickSettingsCard {}
 }
