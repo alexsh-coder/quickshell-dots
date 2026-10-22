@@ -16,7 +16,7 @@ done
 if [ "$found" = true ]; then
     hyprctl dispatch 'hl.dsp.workspace.toggle_special("music")' >/dev/null
 elif command -v spotify-launcher >/dev/null; then
-    setsid -f spotify-launcher >/dev/null 2>&1
+    ACCESSIBILITY_ENABLED=1 setsid -f spotify-launcher >/dev/null 2>&1
 elif [ -x "$HOME/.local/bin/ytermusic" ]; then
     http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 \
         setsid -f kitty --class ytermusic -e "$HOME/.local/bin/ytermusic" >/dev/null 2>&1

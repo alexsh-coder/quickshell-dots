@@ -58,8 +58,11 @@ def find_widget():
     return None
 
 
+# The like button is the last plain button; playing from a playlist adds a checkable
+# "hide in this playlist" switch before it
 def button(widget):
-    return next((c for c in children(widget) if attrs(c).get("tag") == "button"), None)
+    buttons = [c for c in children(widget) if attrs(c).get("tag") == "button" and "checkable" not in attrs(c)]
+    return buttons[-1] if buttons else None
 
 
 def title(widget):
@@ -87,6 +90,9 @@ class Watcher:
     def __init__(self):
         self.widget = None
         self.last = None
+        # State a toggle is waiting for, and until when, so the heart doesn't flick back meanwhile
+        self.expect = None
+        self.until = 0
 
     def read(self):
         try:
@@ -102,6 +108,10 @@ class Watcher:
 
     def report(self):
         state = self.read()
+        if self.expect:
+            if state and state[0] != self.expect[0] and state[1] == self.expect[1] and time.time() < self.until:
+                return state
+            self.expect = None
         line = "\t".join(state) if state else "none"
         if line != self.last:
             self.last = line
@@ -119,6 +129,8 @@ class Watcher:
         if not state:
             return
         btn = button(self.widget)
+        self.expect = ("unliked" if state[0] == "liked" else "liked", state[1])
+        self.until = time.time() + 4
         btn.do_action(0)
         # Liking is one press; once liked the button opens the playlist picker instead,
         # where Liked Songs is the first checkbox and the confirm button is the last one
