@@ -7,7 +7,7 @@ import qs.components
 import qs.services
 import qs.modules.launcher
 
-// Hidden dock that slides up when the pointer touches the bottom edge under it
+// Hidden dock: touching the bottom edge under it peeks a tab, hovering the tab slides the dock up
 PanelWindow {
     id: root
 
@@ -21,6 +21,7 @@ PanelWindow {
     readonly property int edge: 9
 
     property bool shown: false
+    property bool peek: false
     // App the context menu is for, kept while the menu fades out
     property bool menuOpen: false
     property var menuEntry: null
@@ -34,7 +35,7 @@ PanelWindow {
     readonly property int baseWidth: apps.length * size + (apps.length - 1) * gap
     property real px: 0
     // Zoom lets go while dragging, so every slot is one step wide
-    property real zoomIn: hover.hovered && dragFrom < 0 ? 1 : 0
+    property real zoomIn: shown && hover.hovered && dragFrom < 0 ? 1 : 0
     Behavior on zoomIn { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
     // macOS-style wave measured on the resting layout, so growing icons never move the points they are measured from
     function sizeAt(i) {
@@ -58,7 +59,7 @@ PanelWindow {
     // Fixed size: a resizing layer surface gets animated by Hyprland
     implicitHeight: zoom + 2 * edge + 24
     color: "transparent"
-    mask: Region { item: root.shown ? area : trigger }
+    mask: Region { item: root.shown ? area : root.peek ? near : trigger }
 
     // Window classes don't always match the desktop id (Spotify) or StartupWMClass (Telegram)
     function windowsOf(entry) {
@@ -84,8 +85,17 @@ PanelWindow {
         id: trigger
         anchors.bottom: parent.bottom
         anchors.horizontalCenter: parent.horizontalCenter
-        width: root.baseWidth + 2 * root.edge
+        width: root.baseWidth + 2 * root.edge + 2 * 20
         height: 2
+    }
+
+    // Pointer can wander around the tab without it dropping back
+    Item {
+        id: near
+        anchors.bottom: parent.bottom
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: trigger.width
+        height: tab.height + 20
     }
 
     Item {
@@ -102,7 +112,7 @@ PanelWindow {
         onHoveredChanged: {
             if (hovered) {
                 hideDelay.stop();
-                root.shown = true;
+                root.peek = true;
             } else {
                 hideDelay.restart();
             }
@@ -112,7 +122,10 @@ PanelWindow {
     Timer {
         id: hideDelay
         interval: 350
-        onTriggered: root.shown = root.menuOpen || root.dragFrom >= 0
+        onTriggered: {
+            root.shown = root.menuOpen || root.dragFrom >= 0;
+            root.peek = false;
+        }
     }
 
     function release() {
@@ -192,6 +205,46 @@ PanelWindow {
             onTriggered: {
                 DockPins.toggle(root.menuEntry.id);
                 root.closeMenu();
+            }
+        }
+    }
+
+    Rectangle {
+        id: tab
+
+        readonly property bool out: root.peek && !root.shown
+
+        width: 56
+        height: 10 + radius
+        radius: 7
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: -radius
+        color: Qt.alpha(Theme.bg, 0.85)
+        border.width: 1
+        border.color: Qt.alpha(Theme.muted, 0.6)
+        opacity: out ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
+
+        transform: Translate {
+            y: tab.out ? 0 : tab.height - tab.radius
+            Behavior on y { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+        }
+
+        Rectangle {
+            width: 20
+            height: 3
+            radius: 1.5
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: (parent.height - parent.radius - height) / 2 + 1
+            color: Theme.accent
+        }
+
+        // The edge row is left out, or the tab would open the dock right under a pointer resting there
+        HoverHandler {
+            onPointChanged: {
+                if (hovered && root.peek && point.position.y < tab.height - tab.radius - 3)
+                    root.shown = true;
             }
         }
     }
