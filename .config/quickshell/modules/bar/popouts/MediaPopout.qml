@@ -739,6 +739,7 @@ Item {
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
         onBack: root.queue = false
+        onTyping: popouts.pinned = true
     }
 
     onFxChanged: {

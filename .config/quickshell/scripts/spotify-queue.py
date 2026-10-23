@@ -3,6 +3,8 @@
 # (the client is a web app; see spotify_cdp.py).
 #   spotify-queue.py list        -> JSON {"context": ..., "current": N, "tracks": [{"uri", "title", "artists", "art"}]}
 #   spotify-queue.py play N URI  -> plays the N-th track of that list, if it is still URI
+#   spotify-queue.py library     -> JSON [{"uri", "name", "kind", "art"}], Liked Songs first
+#   spotify-queue.py open URI    -> plays that playlist, album or artist
 
 import json
 import sys
@@ -90,11 +92,29 @@ LIST = f"""(async () => {{
 }})()"""
 
 
+LIBRARY = f"""(async () => {{
+    {FIND_REGISTRY};
+    const image = u => u?.startsWith("spotify:image:") ? "https://i.scdn.co/image/" + u.slice(14) : u ?? "";
+    const r = await {API}("LibraryAPI").getContents({{ offset: 0, limit: 200 }});
+    return [{{ uri: "spotify:collection:tracks", name: "Liked Songs", kind: "liked", art: "" }},
+        ...r.items.filter(i => ["playlist", "album", "artist"].includes(i.type)).map(i => ({{
+            uri: i.uri, name: i.name, kind: i.type, art: image((i.images ?? [])[0]?.url)
+        }}))];
+}})()"""
+
+
 def main():
     try:
         page = Page()
         if sys.argv[1:2] == ["list"]:
             json.dump(page.eval(LIST), sys.stdout, ensure_ascii=False)
+        elif sys.argv[1:2] == ["library"]:
+            json.dump(page.eval(LIBRARY), sys.stdout, ensure_ascii=False)
+        elif sys.argv[1:2] == ["open"] and len(sys.argv) == 3:
+            page.eval(f"""(async () => {{
+                await {FIND}.play({{ uri: {json.dumps(sys.argv[2])} }}, {{}}, {{}});
+                return true;
+            }})()""")
         elif sys.argv[1:2] == ["play"] and len(sys.argv) == 4:
             ok = page.eval(f"""(async () => {{
                 const all = await {TRACKS};

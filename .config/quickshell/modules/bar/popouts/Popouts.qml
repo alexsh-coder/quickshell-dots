@@ -130,6 +130,13 @@ Item {
         x: Math.round(Math.max(root.flare + 6, Math.min(root.width - width - root.flare - 6, root.drawnCenter - width / 2)))
         clip: true
 
+        // A click inside a hover-opened panel pins it, which hands it the keyboard.
+        // Passive, so the controls under the pointer still get the press
+        PointHandler {
+            acceptedButtons: Qt.AllButtons
+            onActiveChanged: if (active && root.open) root.pinned = true
+        }
+
         Behavior on width {
             enabled: root.reveal > 0
             NumberAnimation { duration: Theme.animPanel; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasized }

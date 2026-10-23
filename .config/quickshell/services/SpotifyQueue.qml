@@ -22,6 +22,18 @@ Singleton {
     // Set while the queue view is open
     property bool watched: false
     property bool again: false
+    // Playlists, albums and artists saved in the library, Liked Songs first
+    property var library: []
+
+    function loadLibrary() {
+        if (player && !libraryReader.running)
+            libraryReader.exec(["python3", script, "library"]);
+    }
+
+    function open(uri) {
+        if (player === SpotifyLike.player)
+            skipper.exec(["python3", script, "open", uri]);
+    }
 
     function refresh() {
         if (!player)
@@ -95,6 +107,18 @@ Singleton {
             if (root.again) {
                 root.again = false;
                 root.refresh();
+            }
+        }
+    }
+
+    Process {
+        id: libraryReader
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.library = JSON.parse(text);
+                } catch (e) {}
             }
         }
     }
