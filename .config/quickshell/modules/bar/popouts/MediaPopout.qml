@@ -31,10 +31,13 @@ Item {
     // The lyrics editor takes the panel, like the effects
     property bool lyrics: false
     property bool pinnedBefore: false
+    // Spotify's queue takes the panel too
+    property bool queue: false
+    readonly property bool canQueue: !!player && player === SpotifyQueue.player
     readonly property real headHeight: hasTrack ? content.implicitHeight + 4 : empty.implicitHeight + 8
 
     implicitWidth: hasTrack ? 440 : fx ? 360 : 280
-    implicitHeight: Theme.padTop + (fx ? fxView.implicitHeight : lyrics ? lyricsView.implicitHeight : headHeight) + Theme.pad
+    implicitHeight: Theme.padTop + (fx ? fxView.implicitHeight : lyrics ? lyricsView.implicitHeight : queue ? queueView.implicitHeight : headHeight) + Theme.pad
 
     function sync() {
         position = player?.position ?? 0;
@@ -64,13 +67,20 @@ Item {
         if (!here) {
             volume.open = false;
             lyrics = false;
+            queue = false;
         }
     }
     onHasTrackChanged: if (!hasTrack) lyrics = false
+    onCanQueueChanged: if (!canQueue) queue = false
+    onQueueChanged: if (queue) {
+        lyrics = false;
+        popouts.fx = false;
+    }
 
     // Typing and tapping need the keyboard, and the panel must stay while the pointer is away
     onLyricsChanged: {
         if (lyrics) {
+            queue = false;
             pinnedBefore = popouts.pinned;
             popouts.fx = false;
             popouts.pinned = true;
@@ -216,8 +226,8 @@ Item {
         id: playerView
 
         anchors.fill: parent
-        enabled: !root.fx && !root.lyrics
-        opacity: root.fx || root.lyrics ? 0 : 1
+        enabled: !root.fx && !root.lyrics && !root.queue
+        opacity: root.fx || root.lyrics || root.queue ? 0 : 1
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
 
@@ -483,6 +493,19 @@ Item {
                     }
                 }
 
+                // Mirrors the speaker on the right; hidden under the volume slider
+                CtrlButton {
+                    x: parent.width - width + 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: root.canQueue
+                    icon: "queue_music"
+                    active: root.queue
+                    enabled: !volume.open
+                    opacity: volume.open ? 0 : 1
+                    Behavior on opacity { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+                    onClicked: root.queue = !root.queue
+                }
+
                 // Hovering the speaker slides a volume slider out over the transport controls
                 Item {
                     id: volume
@@ -704,11 +727,27 @@ Item {
         onBack: root.lyrics = false
     }
 
+    QueueView {
+        id: queueView
+
+        x: Theme.pad
+        y: Theme.padTop
+        width: parent.width - Theme.pad * 2
+        active: root.queue && root.here
+        enabled: root.queue
+        opacity: root.queue ? 1 : 0
+        visible: opacity > 0
+        Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+        onBack: root.queue = false
+    }
+
     onFxChanged: {
         if (!fx)
             fxControls.editing = "";
-        else
+        else {
             lyrics = false;
+            queue = false;
+        }
     }
 
     component FxButton: CtrlButton {

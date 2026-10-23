@@ -120,6 +120,10 @@ cp ~/.config/hypr/hardware.lua.example ~/.config/hypr/hardware.lua
 
 `hardware.lua` holds per-machine settings (monitor scale, mouse, extra env,
 autostart) and is not tracked. Set `monitor_scale` before the first login.
+
+`spotify-launcher.conf` starts Spotify with a DevTools port on localhost (9227),
+which the queue in the media popout reads. Any local program can drive Spotify
+through it while it runs; remove the `--remote-debugging-*` flags to turn it off.
 The settings window writes its Hyprland choices to `~/.config/hypr/settings.lua`
 (also not tracked), which `hyprland.lua` reads on top of its defaults.
 
