@@ -376,7 +376,7 @@ Column {
                 if (mouse.button === Qt.RightButton)
                     root.edit(tile.key);
                 else
-                    MusicFx[tile.key] = !tile.on;
+                    MusicFx.set(tile.key, !tile.on);
             }
         }
     }

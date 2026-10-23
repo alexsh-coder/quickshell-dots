@@ -128,13 +128,15 @@ Singleton {
 
     // Master switch: off remembers which effects were on, on brings them back (all if none were)
     function setWallpaperFx(on) {
+        const values = {};
         if (on) {
             const restore = adapter.savedFx.length ? adapter.savedFx : wallpaperKeys;
-            wallpaperKeys.forEach(k => Desk.setFx(k, restore.includes(k)));
+            wallpaperKeys.forEach(k => values[k] = restore.includes(k));
         } else {
             adapter.savedFx = wallpaperKeys.filter(k => root[k]);
-            wallpaperKeys.forEach(k => Desk.setFx(k, false));
+            wallpaperKeys.forEach(k => values[k] = false);
         }
+        Desk.setFxMany(values);
     }
 
     function setIntensity(v) {

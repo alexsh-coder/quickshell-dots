@@ -476,6 +476,14 @@ Singleton {
         });
     }
 
+    // Several effects in one edit: back-to-back setFx calls would each start from stale presets
+    function setFxMany(values) {
+        mergeTag = "fx:many";
+        editCurrent(p => {
+            p.fx = Object.assign({}, p.fx, values);
+        });
+    }
+
     // Presets
 
     function assign(path, id) {
