@@ -113,7 +113,8 @@ Item {
         width: parent.width
         height: parent.height
         visible: t > 0 && which >= 0
-        opacity: t
+        // fade: out then in, the two lines never share the screen
+        opacity: anim === "fade" ? Math.max(0, 2 * t - 1) : t
         x: anim === "slide" ? (1 - t) * width * 0.2 * (on ? 1 : -1) : 0
         y: anim === "rise" ? (1 - t) * root.size * 2 * (on ? 1 : -1) : 0
         scale: anim === "zoom" ? (on ? 0.8 + 0.2 * t : 1 + 0.25 * (1 - t)) : 1
@@ -191,7 +192,7 @@ Item {
 
         x: root.align === Text.AlignLeft ? 0 : root.align === Text.AlignRight ? parent.width - width : (parent.width - width) / 2
         y: (parent.height - height) / 2 + (anim === "rise" ? (1 - t) * travel * (on ? 1 : -1) : 0)
-        opacity: t
+        opacity: anim === "fade" ? Math.max(0, 2 * t - 1) : t
         scale: anim === "pop" ? (on ? 0.6 + 0.4 * t : 1 + 0.4 * (1 - t)) : 1
         visible: t > 0
         font.family: Theme.font
