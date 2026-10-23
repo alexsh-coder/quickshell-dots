@@ -186,9 +186,10 @@ Singleton {
         // What's on screen right now, if nothing is moving: what the transition starts from
         const settledOld = grows.count === 0 && !native.running;
         const old = !transitions[fx].old || !settledOld ? "" : video ? frozen : image;
-        // Videos, steps from the side, other styles and anything over a switch in progress are grown
-        // here, each over the one before (see grows); awww grows the rest itself
-        const stack = origin !== "bottom" || fx !== 0 || point || video || isVideo(path) || grows.count > 0;
+        // Videos, steps from the side, other styles and anything over a switch in progress (awww's own
+        // grow included: restarting it mid-way stalls it) are grown here, each over the one before
+        // (see grows); awww grows the rest itself
+        const stack = origin !== "bottom" || fx !== 0 || point || video || isVideo(path) || grows.count > 0 || native.running;
         current = path;
         saved.setText(isVideo(path) || isMono(path) ? path : "");
         switching.restart();
