@@ -1,178 +1,68 @@
 #!/usr/bin/env python3
-# Reads and toggles the like button of Spotify's now playing bar over AT-SPI.
-# Spotify has to start with ACCESSIBILITY_ENABLED=1 to expose its UI.
+# Reads and toggles the liked state of the track playing in Spotify, through the library API
+# of its own page (see spotify_cdp.py).
 # Prints "liked<TAB>title", "unliked<TAB>title" or "none" when the state changes;
-# reads "toggle" lines on stdin. Elements are found by structure, not by label,
-# so it works whatever the client language.
+# reads "toggle" lines on stdin.
 
+import importlib.util
+import os
+import select
 import sys
 import time
 
-import gi
+from spotify_cdp import Page
 
-gi.require_version("Atspi", "2.0")
-from gi.repository import Atspi, GLib  # noqa: E402
+spec = importlib.util.spec_from_file_location("queue", os.path.join(os.path.dirname(__file__), "spotify-queue.py"))
+queue = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(queue)
 
-
-def children(o):
-    for i in range(o.get_child_count()):
-        c = o.get_child_at_index(i)
-        if c:
-            yield c
-
-
-def walk(o):
-    stack = [o]
-    while stack:
-        o = stack.pop()
-        yield o
-        stack.extend(reversed(list(children(o))))
+STATE = f"""(async () => {{
+    {queue.FIND_REGISTRY};
+    const item = {queue.FIND}.getState().item;
+    if (!item?.uri?.startsWith("spotify:track:"))
+        return null;
+    const [liked] = await {queue.API}("LibraryAPI").contains(item.uri);
+    return [liked ? "liked" : "unliked", item.name ?? "", item.uri];
+}})()"""
 
 
-def attrs(o):
-    return o.get_attributes() or {}
-
-
-def spotify():
-    desktop = Atspi.get_desktop(0)
-    for app in children(desktop):
-        try:
-            with open(f"/proc/{app.get_process_id()}/comm") as f:
-                if f.read().strip() == "spotify":
-                    return app
-        except OSError:
-            pass
-    return None
-
-
-# The bar is the <aside> whose first child is the now playing widget: cover, title link, artist links, like button
-def find_widget():
-    app = spotify()
-    if not app:
-        return None
-    for o in walk(app):
-        if o.get_role_name() == "landmark" and attrs(o).get("tag") == "aside":
-            first = next(children(o), None)
-            if first and first.get_role_name() == "landmark" and button(first):
-                return first
-    return None
-
-
-# The like button is the last plain button; playing from a playlist adds a checkable
-# "hide in this playlist" switch before it
-def button(widget):
-    buttons = [c for c in children(widget) if attrs(c).get("tag") == "button" and "checkable" not in attrs(c)]
-    return buttons[-1] if buttons else None
-
-
-def title(widget):
-    for o in walk(widget):
-        if o.get_role_name() == "link":
-            return o.get_name() or ""
-    return ""
-
-
-def is_liked(btn):
-    return "bright-accent" in attrs(btn).get("class", "")
-
-
-def find_in(root, pred, timeout=3):
-    end = time.time() + timeout
-    while time.time() < end:
-        for o in walk(root):
-            if pred(o):
-                return o
-        time.sleep(0.1)
-    return None
-
-
-class Watcher:
-    def __init__(self):
-        self.widget = None
-        self.last = None
-        # State a toggle is waiting for, and until when, so the heart doesn't flick back meanwhile
-        self.expect = None
-        self.until = 0
-
-    def read(self):
-        try:
-            if self.widget is None or button(self.widget) is None:
-                self.widget = find_widget()
-            if self.widget is None:
-                return None
-            btn = button(self.widget)
-            return ("liked" if is_liked(btn) else "unliked"), title(self.widget)
-        except GLib.Error:
-            self.widget = None
-            return None
-
-    def report(self):
-        state = self.read()
-        if self.expect:
-            if state and state[0] != self.expect[0] and state[1] == self.expect[1] and time.time() < self.until:
-                return state
-            self.expect = None
-        line = "\t".join(state) if state else "none"
-        if line != self.last:
-            self.last = line
-            print(line, flush=True)
-        return state
-
-    def poll(self):
-        state = self.report()
-        # Rescanning the whole window is the costly part, so back off while Spotify isn't there
-        GLib.timeout_add(1000 if state else 5000, self.poll)
-        return False
-
-    def toggle(self):
-        state = self.read()
-        if not state:
-            return
-        btn = button(self.widget)
-        self.expect = ("unliked" if state[0] == "liked" else "liked", state[1])
-        self.until = time.time() + 4
-        btn.do_action(0)
-        # Liking is one press; once liked the button opens the playlist picker instead,
-        # where Liked Songs is the first checkbox and the confirm button is the last one
-        if state[0] == "liked":
-            app = spotify()
-            menu = app and find_in(app, lambda o: o.get_role_name() == "menu")
-            item = menu and find_in(menu, lambda o: o.get_role_name() == "check menu item")
-            if not item:
-                return
-            # The confirm button only shows up once something has changed
-            dialog = menu.get_parent().get_parent()
-            buttons = lambda: [o for o in walk(dialog) if attrs(o).get("tag") == "button"]
-            before = len(buttons())
-            item.do_action(0)
-            end = time.time() + 3
-            while time.time() < end:
-                now = buttons()
-                if len(now) > before:
-                    now[-1].do_action(0)
-                    break
-                time.sleep(0.1)
-        # Always answer a toggle, so a press that didn't take puts the heart back
-        self.last = None
-        GLib.timeout_add(800, lambda: self.report() and False)
+def toggle_js(uri, like):
+    return f"""(async () => {{
+        {queue.FIND_REGISTRY};
+        await {queue.API}("LibraryAPI").{"add" if like else "remove"}({{ uris: ["{uri}"] }});
+    }})()"""
 
 
 def main():
-    w = Watcher()
-
-    def on_input(src, cond):
-        line = sys.stdin.readline()
-        if not line:
-            loop.quit()
-            return False
-        if line.strip() == "toggle":
-            w.toggle()
-        return True
-
-    loop = GLib.MainLoop()
-    GLib.io_add_watch(sys.stdin.fileno(), GLib.IO_IN | GLib.IO_HUP, on_input)
-    w.poll()
-    loop.run()
+    page = None
+    last = None
+    state = None
+    while True:
+        try:
+            if page is None:
+                page = Page()
+            state = page.eval(STATE)
+        except Exception:
+            page = None
+            state = None
+        line = "\t".join(state[:2]) if state else "none"
+        if line != last:
+            last = line
+            print(line, flush=True)
+        # Back off while Spotify isn't there
+        ready, _, _ = select.select([sys.stdin], [], [], 1 if page else 5)
+        if ready:
+            cmd = sys.stdin.readline()
+            if not cmd:
+                return
+            if cmd.strip() == "toggle" and page and state:
+                try:
+                    page.eval(toggle_js(state[2], state[0] != "liked"))
+                except Exception:
+                    page = None
+                # Always answer a toggle, so a press that didn't take puts the heart back
+                last = None
+                time.sleep(0.3)
 
 
 if __name__ == "__main__":

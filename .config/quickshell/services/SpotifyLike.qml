@@ -5,9 +5,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 
-// Liked state of the track playing in Spotify, read from and toggled in its window over AT-SPI.
-// MPRIS can't do it, and the Web API needs a developer app. Spotify has to start with
-// ACCESSIBILITY_ENABLED=1, see scripts/spotify-like.py
+// Liked state of the track playing in Spotify, read from and toggled in its page over DevTools.
+// MPRIS can't do it, and the Web API needs a developer app. See scripts/spotify-like.py
 Singleton {
     id: root
 
