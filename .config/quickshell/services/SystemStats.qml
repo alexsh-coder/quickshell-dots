@@ -15,6 +15,10 @@ Singleton {
     property real ram: 0
     property real gpu: -1
     property real ramUsedGb: 0
+    // Degrees Celsius, -1 when no sensor was found
+    property real cpuTemp: -1
+    property real gpuTemp: -1
+    property bool nvidia: false
 
     property var lastCpu: null
 
@@ -28,6 +32,12 @@ Singleton {
             mem.reload();
             if (gpuFile.path)
                 gpuFile.reload();
+            if (cpuTempFile.path)
+                cpuTempFile.reload();
+            if (gpuTempFile.path)
+                gpuTempFile.reload();
+            if (root.nvidia && !smi.running)
+                smi.running = true;
         }
     }
 
@@ -64,11 +74,58 @@ Singleton {
         onLoaded: root.gpu = Number(text().trim()) / 100
     }
 
+    FileView {
+        id: cpuTempFile
+        printErrors: false
+        onLoaded: root.cpuTemp = Number(text().trim()) / 1000
+    }
+
+    FileView {
+        id: gpuTempFile
+        printErrors: false
+        onLoaded: root.gpuTemp = Number(text().trim()) / 1000
+    }
+
+    // NVIDIA has no sysfs load or temperature, ask the driver instead
+    Process {
+        id: smi
+        command: ["nvidia-smi", "--query-gpu=utilization.gpu,temperature.gpu", "--format=csv,noheader,nounits"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const [load, temp] = text.split("\n")[0].split(",").map(Number);
+                if (!isNaN(load))
+                    root.gpu = load / 100;
+                if (!isNaN(temp))
+                    root.gpuTemp = temp;
+            }
+        }
+    }
+
+    // Prints key=value lines for the sensors this machine has
     Process {
         running: true
-        command: ["sh", "-c", "ls /sys/class/drm/card*/device/gpu_busy_percent 2>/dev/null | head -n1"]
+        command: ["sh", "-c", `
+            echo busy=$(ls /sys/class/drm/card*/device/gpu_busy_percent 2>/dev/null | head -n1)
+            for h in /sys/class/hwmon/hwmon*; do
+                case $(cat $h/name) in
+                    coretemp|k10temp|zenpower) echo cpu=$h/temp1_input;;
+                    amdgpu|radeon) echo gpu=$h/temp1_input;;
+                esac
+            done
+            [ -e /dev/nvidiactl ] && command -v nvidia-smi >/dev/null && echo nvidia=1`]
         stdout: StdioCollector {
-            onStreamFinished: gpuFile.path = text.trim()
+            onStreamFinished: {
+                const kv = {};
+                for (const l of text.split("\n")) {
+                    const i = l.indexOf("=");
+                    if (i > 0 && !(l.slice(0, i) in kv))
+                        kv[l.slice(0, i)] = l.slice(i + 1);
+                }
+                gpuFile.path = kv.busy ?? "";
+                cpuTempFile.path = kv.cpu ?? "";
+                gpuTempFile.path = kv.gpu ?? "";
+                root.nvidia = kv.nvidia === "1";
+            }
         }
     }
 }

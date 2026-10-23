@@ -10,16 +10,20 @@ Row {
     readonly property int pct: Math.round((dev?.percentage ?? 0) * 100)
     readonly property bool charging: dev?.state === UPowerDeviceState.Charging
                                   || dev?.state === UPowerDeviceState.FullyCharged
-    readonly property bool low: !charging && pct <= 15
+    readonly property bool hasBattery: dev?.isLaptopBattery ?? false
+    readonly property bool low: hasBattery && !charging && pct <= 15
     property bool lit: false
 
-    visible: dev?.isLaptopBattery ?? false
     anchors.verticalCenter: parent.verticalCenter
     spacing: 7
 
     HoverHandler { cursorShape: Qt.PointingHandCursor }
 
+    // Without a battery the button shows the power profile instead
     readonly property string icon: {
+        if (!hasBattery)
+            return PowerProfiles.profile === PowerProfile.PowerSaver ? "energy_savings_leaf"
+                 : PowerProfiles.profile === PowerProfile.Performance ? "speed" : "balance";
         const p = dev?.percentage ?? 0;
         if (p >= 1)
             return charging ? "battery_charging_full" : "battery_full";

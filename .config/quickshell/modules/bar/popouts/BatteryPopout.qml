@@ -15,7 +15,8 @@ Item {
     readonly property int state: dev?.state ?? UPowerDeviceState.Unknown
     readonly property bool charging: state === UPowerDeviceState.Charging
     readonly property bool full: state === UPowerDeviceState.FullyCharged || (!UPower.onBattery && frac >= 0.99)
-    readonly property bool low: !charging && frac <= 0.15
+    readonly property bool hasBattery: dev?.isLaptopBattery ?? false
+    readonly property bool low: hasBattery && !charging && frac <= 0.15
 
     readonly property var profiles: [
         { value: PowerProfile.PowerSaver, icon: "energy_savings_leaf", label: "Eco" },
@@ -51,7 +52,19 @@ Item {
         width: parent.width - Theme.pad * 2
         spacing: 14
 
+        // Desktop: temperatures take the place of the charge
+        Row {
+            visible: !root.hasBattery && (SystemStats.cpuTemp >= 0 || SystemStats.gpuTemp >= 0)
+            width: parent.width
+            height: 40
+            spacing: 28
+
+            Temp { label: "CPU"; value: SystemStats.cpuTemp }
+            Temp { label: "GPU"; value: SystemStats.gpuTemp }
+        }
+
         Item {
+            visible: root.hasBattery
             width: parent.width
             height: 40
 
@@ -87,6 +100,7 @@ Item {
 
         // Charge level; a soft glint runs along it while charging
         Rectangle {
+            visible: root.hasBattery
             width: parent.width
             height: 10
             radius: 5
@@ -284,6 +298,32 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             checked: sw.checked
             onToggled: sw.toggled()
+        }
+    }
+
+    component Temp: Row {
+        id: temp
+
+        property string label
+        property real value: -1
+
+        visible: value >= 0
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 8
+
+        Label {
+            anchors.baseline: deg.baseline
+            text: temp.label
+            font.pixelSize: 11
+            font.weight: Font.Bold
+            color: Theme.subtext
+        }
+        Label {
+            id: deg
+            text: Math.round(temp.value) + "°"
+            font.pixelSize: 28
+            font.weight: Font.Bold
+            color: temp.value >= 85 ? Theme.urgent : Theme.text
         }
     }
 
