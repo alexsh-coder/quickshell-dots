@@ -234,6 +234,9 @@ Singleton {
         return -(Math.cos(Math.PI * t) - 1) / 2;
     }
 
+    // The empty desktop was clicked to change the wallpaper (DeskClick)
+    signal randomRequested
+
     // A switch has played out
     signal settled
 

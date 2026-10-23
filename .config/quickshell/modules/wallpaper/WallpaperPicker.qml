@@ -131,6 +131,13 @@ Scope {
         Wallpaper.set(files.get(i, "filePath"));
     }
 
+    Connections {
+        target: Wallpaper
+        function onRandomRequested() {
+            root.applyRandom();
+        }
+    }
+
     // Slideshow from the settings window
     Timer {
         interval: Math.max(1, Settings.slideshow) * 60000

@@ -39,6 +39,7 @@ ShellRoot {
             WallpaperTransition { screen: desk.modelData }
             WallpaperFx { screen: desk.modelData }
             VideoGlow { screen: desk.modelData }
+            DeskClick { screen: desk.modelData }
             DeskLayer { screen: desk.modelData }
             Dock { screen: desk.modelData }
         }

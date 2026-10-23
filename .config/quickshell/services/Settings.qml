@@ -16,6 +16,7 @@ Singleton {
     property alias transition: adapter.transition
     property alias transitionTime: adapter.transitionTime
     property alias transitionFrom: adapter.transitionFrom
+    property alias clickToChange: adapter.clickToChange
     // Styles left out of "random" and "random-glitch"
     readonly property var randomSkip: adapter.randomSkip
     readonly property var glitchSkip: adapter.glitchSkip
@@ -197,6 +198,8 @@ Singleton {
             property int transitionTime: 800
             // "edge", or "cursor" to start where the pointer is
             property string transitionFrom: "edge"
+            // With "cursor": a click on the empty desktop switches to a random wallpaper
+            property bool clickToChange: false
             property var randomSkip: []
             property var glitchSkip: []
             property var durations: ({})

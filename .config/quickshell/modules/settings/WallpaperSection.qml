@@ -269,6 +269,17 @@ Column {
     }
 
     SettingRow {
+        visible: Settings.transitionFrom === "cursor"
+        label: "Click to change"
+        hint: "A click on the empty desktop brings a random wallpaper"
+
+        Toggle {
+            checked: Settings.clickToChange
+            onToggled: Settings.clickToChange = !checked
+        }
+    }
+
+    SettingRow {
         label: "Default duration"
         hint: "For every transition without its own"
 
