@@ -42,6 +42,17 @@ Column {
         }
     }
 
+    SettingRow {
+        label: "Restart shell"
+        hint: "Reloads Quickshell from scratch, e.g. after icon theme changes"
+
+        PillButton {
+            text: "Restart"
+            icon: "restart_alt"
+            onClicked: Settings.restartShell()
+        }
+    }
+
     SectionTitle { text: "Windows" }
 
     SettingRow {
