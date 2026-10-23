@@ -53,7 +53,7 @@ Item {
 
     Timer {
         id: closeTimer
-        interval: 280
+        interval: root.current === "media" ? 700 : 280
         onTriggered: root.current = ""
     }
 

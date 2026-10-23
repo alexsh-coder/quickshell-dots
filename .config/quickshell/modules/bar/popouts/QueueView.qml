@@ -5,7 +5,7 @@ import qs.config
 import qs.components
 import qs.services
 
-// Spotify's upcoming tracks; clicking one plays it
+// Spotify's tracks around the playing one; clicking one plays it
 Item {
     id: root
 
@@ -45,7 +45,7 @@ Item {
                 anchors.right: actions.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
-                text: SpotifyQueue.context ? "Next from " + SpotifyQueue.context : ""
+                text: SpotifyQueue.context
                 font.pixelSize: 12
                 color: Theme.subtext
                 elide: Text.ElideRight
@@ -93,7 +93,7 @@ Item {
             Label {
                 anchors.centerIn: parent
                 visible: !SpotifyQueue.tracks.length && !SpotifyQueue.loading
-                text: SpotifyQueue.failed ? "Can't reach Spotify" : "Nothing up next"
+                text: SpotifyQueue.failed ? "Can't reach Spotify" : "Nothing here"
                 font.pixelSize: 13
                 color: Theme.subtext
             }
@@ -105,6 +105,18 @@ Item {
                 model: SpotifyQueue.tracks
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
+
+                // Opens with the playing track in the middle
+                function reveal() {
+                    if (root.active && SpotifyQueue.current >= 0)
+                        positionViewAtIndex(SpotifyQueue.current, ListView.Center);
+                }
+
+                onCountChanged: reveal()
+                Connections {
+                    target: root
+                    function onActiveChanged() { list.reveal(); }
+                }
 
                 HoverHandler {
                     id: listHover
@@ -145,6 +157,8 @@ Item {
 
                     required property int index
                     required property var modelData
+                    readonly property bool playing: index === SpotifyQueue.current
+                    readonly property bool played: index < SpotifyQueue.current
 
                     width: list.width
                     height: root.rowHeight
@@ -155,8 +169,8 @@ Item {
                     Rectangle {
                         anchors.fill: parent
                         radius: 10
-                        color: Qt.alpha(Theme.text, rowMouse.pressed ? 0.12 : 0.07)
-                        opacity: rowMouse.containsMouse ? 1 : 0
+                        color: row.playing ? Qt.alpha(Theme.accent, 0.14) : Qt.alpha(Theme.text, rowMouse.pressed ? 0.12 : 0.07)
+                        opacity: row.playing || rowMouse.containsMouse ? 1 : 0
                         Behavior on opacity { NumberAnimation { duration: Theme.anim } }
                     }
 
@@ -166,7 +180,7 @@ Item {
                         width: 16
                         anchors.verticalCenter: parent.verticalCenter
                         horizontalAlignment: Text.AlignRight
-                        visible: !rowMouse.containsMouse
+                        visible: !row.playing && !rowMouse.containsMouse
                         text: row.index + 1
                         font.pixelSize: 12
                         color: Theme.subtext
@@ -175,8 +189,8 @@ Item {
                     Icon {
                         anchors.centerIn: number
                         anchors.horizontalCenterOffset: 1
-                        visible: rowMouse.containsMouse
-                        text: "play_arrow"
+                        visible: row.playing || rowMouse.containsMouse
+                        text: row.playing ? "graphic_eq" : "play_arrow"
                         font.pixelSize: 18
                         color: Theme.accent
                     }
@@ -209,11 +223,13 @@ Item {
                         anchors.rightMargin: 14
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 1
+                        opacity: row.played ? 0.55 : 1
 
                         Label {
                             width: parent.width
                             text: row.modelData.title
                             font.pixelSize: 14
+                            color: row.playing ? Theme.accent : Theme.text
                             elide: Text.ElideRight
                         }
 
@@ -230,7 +246,7 @@ Item {
                         id: rowMouse
                         anchors.fill: parent
                         hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
+                        cursorShape: row.playing ? Qt.ArrowCursor : Qt.PointingHandCursor
                         onClicked: SpotifyQueue.play(row.index)
                     }
                 }

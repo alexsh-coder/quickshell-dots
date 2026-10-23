@@ -31,7 +31,12 @@ if [[ $- == *i* && $TERM == xterm-kitty && -z $FASTFETCH_SHOWN ]] && command -v 
     __ff_cmds=0 __ff_size=$(tput cols)x$(tput lines)
     PROMPT_COMMAND="((__ff_cmds++)); ${PROMPT_COMMAND}"
     __ff_winch() {
-        (( __ff_cmds <= 1 )) || return
+        # too late to redraw: drop the art so reflowed text does not slide under it
+        if (( __ff_cmds > 1 )); then
+            printf '\e_Ga=d,d=A\e\\'
+            trap - WINCH
+            return
+        fi
         # let an animated resize settle: one redraw at the final size, not one per step
         local size=$(tput cols)x$(tput lines) now
         while sleep 0.06; now=$(tput cols)x$(tput lines); [[ $now != $size ]]; do size=$now; done

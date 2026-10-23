@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
 
-// Spotify's upcoming tracks, read from its page (MPRIS has no tracklist there), see
+// Spotify's played, current and upcoming tracks, read from its page (MPRIS has no tracklist there), see
 // scripts/spotify-queue.py. The last answer is kept on disk and shifted along as tracks
 // change, so the list shows at once and is only re-read while someone looks at it
 Singleton {
@@ -14,6 +14,8 @@ Singleton {
     readonly property MprisPlayer player: SpotifyLike.player
     readonly property string script: Quickshell.shellDir + "/scripts/spotify-queue.py"
     property var tracks: []
+    // Index of the playing track in tracks
+    property int current: -1
     property string context: ""
     property bool loading: false
     property bool failed: false
@@ -32,29 +34,30 @@ Singleton {
         reader.exec(["python3", script, "list"]);
     }
 
-    // Plays the i-th upcoming track; the list is cut right away, then re-read
+    // Plays the i-th track; it is marked right away, then the list is re-read
     function play(i) {
         const t = tracks[i];
-        if (!t || player !== SpotifyLike.player)
+        if (!t || i === current || player !== SpotifyLike.player)
             return;
-        tracks = tracks.slice(i);
+        current = i;
         skipper.exec(["python3", script, "play", String(i), t.uri]);
     }
 
     function save() {
-        cache.setText(JSON.stringify({ context, tracks }));
+        cache.setText(JSON.stringify({ context, current, tracks }));
     }
 
     onWatchedChanged: if (watched) refresh()
 
-    // The next track moving into "now playing" is the cached head, so it is dropped locally
+    // A nearby cached track becoming "now playing" is marked locally
     Connections {
         target: root.player
         function onTrackTitleChanged() {
             const now = root.player.trackTitle;
-            const at = root.tracks.findIndex(t => t.title === now);
-            if (at >= 0 && at < 3) {
-                root.tracks = root.tracks.slice(at + 1);
+            const from = Math.max(0, root.current - 3);
+            const at = root.tracks.findIndex((t, i) => i >= from && i <= root.current + 3 && t.title === now);
+            if (at >= 0) {
+                root.current = at;
                 root.save();
             }
             if (root.watched)
@@ -80,6 +83,7 @@ Singleton {
                 } catch (e) {}
                 if (data) {
                     root.tracks = data.tracks;
+                    root.current = data.current ?? -1;
                     root.context = data.context;
                     root.save();
                 }
@@ -111,6 +115,7 @@ Singleton {
         try {
             const c = JSON.parse(cache.text());
             tracks = c.tracks ?? [];
+            current = c.current ?? -1;
             context = c.context ?? "";
         } catch (e) {}
     }

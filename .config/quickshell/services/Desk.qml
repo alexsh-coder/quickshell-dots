@@ -370,8 +370,9 @@ Singleton {
             if (w.type === "visualizer" && key === "style") {
                 const shape = s => s === "bars" || s === "wave" ? "strip" : s;
                 const group = s => ["ring", "nation"].includes(s) ? "round" : shape(s);
+                // A strip's centre is pinned to the bottom edge, so it isn't carried over
                 if (group(w.style) !== group(value))
-                    Object.assign(w, styleRect(value, w.x, w.y));
+                    Object.assign(w, shape(w.style) === "strip" ? styleRect(value) : styleRect(value, w.x, w.y));
             }
             w[key] = value;
         }, key === "style");

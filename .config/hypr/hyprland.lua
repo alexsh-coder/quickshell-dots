@@ -53,7 +53,7 @@ hl.on("hyprland.start", function ()
     -- Qt drops to its single-threaded render loop on NVIDIA (QTBUG-95817), which stutters the
     -- visualizer; other drivers are threaded already.
     -- QT_SCALE_FACTOR is the settings window's panel scale
-    hl.exec_cmd("env QSG_RENDER_LOOP=threaded QT_SCALE_FACTOR=" .. (ui.panel_scale or 1) .. " qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
+    hl.exec_cmd("~/.config/hypr/scripts/respawn.sh env QSG_RENDER_LOOP=threaded QT_SCALE_FACTOR=" .. (ui.panel_scale or 1) .. " qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh dunst")
     -- OSD pill (volume/brightness/layout...); height above the bottom edge is per machine.
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh ~/.config/hypr/scripts/osd.py daemon --margin "
@@ -332,6 +332,9 @@ hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/hard-
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"))
 hl.bind(mainMod .. " + ALT + bracketright", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
 hl.bind(mainMod .. " + ALT + bracketleft",  hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
+-- One-handed (left hand) alternative
+hl.bind(mainMod .. " + ALT + D", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
+hl.bind(mainMod .. " + ALT + A", hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
 hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("qs ipc call desk toggle"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/kitty-opacity-toggle.sh"))
 hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("qs ipc call theme toggle"))

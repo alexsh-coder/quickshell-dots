@@ -53,6 +53,18 @@ Column {
         }
     }
 
+    SettingRow {
+        label: "Terminal font size"
+        hint: "kitty, applied to open windows too"
+
+        ValueSlider {
+            from: 8; to: 24; step: 0.5
+            value: TerminalFont.size
+            format: v => v + " pt"
+            onMoved: v => TerminalFont.set(v)
+        }
+    }
+
     SectionTitle { text: "Windows" }
 
     SettingRow {

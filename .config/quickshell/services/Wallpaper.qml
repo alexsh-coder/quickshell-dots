@@ -121,10 +121,8 @@ Singleton {
             all[path] = true;
         inverted = all;
         invertedFile.setText(JSON.stringify(all, null, 1));
-        if (path === current) {
-            image = still(path);
-            Quickshell.execDetached([script, "set", image]);
-        }
+        if (path === current)
+            set(path);
     }
 
     function thumb(path) {
