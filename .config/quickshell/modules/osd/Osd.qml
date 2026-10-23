@@ -118,6 +118,13 @@ Scope {
     }
 
     Connections {
+        target: Caffeine
+        function onEnabledChanged() {
+            root.showText("coffee", Caffeine.enabled ? "Caffeine on" : "Caffeine off");
+        }
+    }
+
+    Connections {
         target: Keyboard
         function onLayoutSwitched() { root.showText("keyboard", Keyboard.layout); }
         function onCapsToggled() { root.showText("keyboard_capslock", Keyboard.caps ? "Caps on" : "Caps off"); }
