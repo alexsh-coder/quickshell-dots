@@ -31,7 +31,7 @@ Item {
     readonly property var timed: Lyrics.lines.map((l, i) => {
         if (l.words?.length)
             return l;
-        const parts = l.text.split(/(?<=\s)/).filter(w => w.trim());
+        const parts = l.text.match(/\S+\s*/g) ?? [];
         const next = Lyrics.lines[i + 1]?.time ?? l.time + parts.length * 0.4;
         const step = Math.min(0.6, (next - l.time) / Math.max(1, parts.length));
         return { time: l.time, text: l.text, words: parts.map((w, k) => ({ time: l.time + k * step, dur: step, text: w })) };
