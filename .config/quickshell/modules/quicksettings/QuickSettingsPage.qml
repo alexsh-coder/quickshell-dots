@@ -94,10 +94,14 @@ Item {
 
             Column {
                 anchors.left: parent.left
+                anchors.right: headerButtons.left
+                anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 1
 
                 Label {
+                    width: parent.width
+                    elide: Text.ElideRight
                     text: root.greeting + (Quickshell.env("USER") ? ", " + Quickshell.env("USER") : "")
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
@@ -110,6 +114,7 @@ Item {
             }
 
             Row {
+                id: headerButtons
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 6
