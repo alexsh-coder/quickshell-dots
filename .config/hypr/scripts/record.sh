@@ -3,7 +3,7 @@
 #   record.sh         click a window or drag a region
 #   record.sh screen  the focused monitor
 # Running it again while recording stops and saves.
-pkill -INT -f '^gpu-screen-recorder ' && exit
+pkill -INT -x gpu-screen-reco && exit
 
 dir="$HOME/Videos/Screencasts"
 mkdir -p "$dir"
@@ -17,10 +17,20 @@ else
 fi
 
 # The bar shows a recording indicator between these two calls
-gpu-screen-recorder "${target[@]}" -f 60 -fm cfr -q ultra -tune quality -a default_output -ac aac -ab 256 -o "$out" &
+# Flatpak build bundles an FFmpeg that matches the legacy NVIDIA driver;
+# hevc_10bit + constant QP avoids banding on blur and gradients
+gsr=(gpu-screen-recorder)
+flatpak info com.dec05eba.gpu_screen_recorder &>/dev/null &&
+    gsr=(flatpak run --command=gpu-screen-recorder com.dec05eba.gpu_screen_recorder)
+
+"${gsr[@]}" "${target[@]}" -f 60 -fm cfr -k hevc_10bit -bm qp -q ultra -a default_output -ac aac -ab 256 -o "$out" &
 pid=$!
 qs ipc call recorder started >/dev/null 2>&1
 wait "$pid"
 rc=$?
 qs ipc call recorder stopped >/dev/null 2>&1
-((rc == 0)) && notify-send -a "Screen recorder" "Recording saved" "${out/#$HOME/\~}"
+if [[ -s $out ]]; then
+    notify-send -a "Screen recorder" "Recording saved" "${out/#$HOME/\~}"
+else
+    notify-send -u critical -a "Screen recorder" "Recording failed" "exit code $rc"
+fi
