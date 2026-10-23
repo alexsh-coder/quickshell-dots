@@ -107,6 +107,8 @@ PanelWindow {
 
         GlowOverlay {
             anchors.fill: parent
+            // Drawn over the grows instead while they run (WallpaperTransition)
+            visible: !(Wallpaper.grows.count > 0 && !Wallpaper.video) && MusicFx.glowType !== "halo" && opacity > 0
             strength: MusicFx.glow ? Math.min(1, Cava.bass * 0.9 * MusicFx.gain("glow")) : 0
         }
     }

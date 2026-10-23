@@ -1,8 +1,10 @@
 import QtQuick
+import QtQuick.Effects
 import QtMultimedia
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
+import qs.modules.musicfx
 import qs.services
 
 // Switches Quickshell grows itself (see Wallpaper.grows).
@@ -51,6 +53,9 @@ PanelWindow {
         onTriggered: Wallpaper.clock = Date.now()
     }
 
+    // WallpaperFx's glow, which the grows would cover from below until one has covered the screen
+    readonly property bool glowOver: active && !Wallpaper.video
+
     // Switches stacking up (see Wallpaper.grows). An image's shader reads it directly:
     // no offscreen layer to allocate on every switch
     Repeater {
@@ -90,6 +95,15 @@ PanelWindow {
             scale: 1 + root.fxZoom + root.videoZoom
             transform: Translate { x: root.panX; y: root.panY }
             visible: root.full
+
+            // WallpaperFx's kick blur, which the grows would otherwise hide until one covers the screen
+            layer.enabled: root.glowOver && MusicFx.wallpaperFx && MusicFx.blur && Cava.active
+            layer.effect: MultiEffect {
+                autoPaddingEnabled: false
+                blurEnabled: true
+                blurMax: 48
+                blur: Math.min(1, Cava.kick * 0.8 * MusicFx.gain("blur"))
+            }
 
             TransitionEffect {
                 anchors.fill: parent
@@ -165,6 +179,17 @@ PanelWindow {
                 hideSource: true
                 live: true
             }
+        }
+    }
+
+    Item {
+        anchors.fill: parent
+        z: 1e9
+        visible: root.full && root.glowOver
+
+        GlowOverlay {
+            anchors.fill: parent
+            strength: MusicFx.wallpaperFx && MusicFx.glow && Cava.active ? Math.min(1, Cava.bass * 0.9 * MusicFx.gain("glow")) : 0
         }
     }
 }

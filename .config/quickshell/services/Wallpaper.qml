@@ -188,8 +188,10 @@ Singleton {
         const old = !transitions[fx].old || !settledOld ? "" : video ? frozen : image;
         // Videos, steps from the side, other styles and anything over a switch in progress (awww's own
         // grow included: restarting it mid-way stalls it) are grown here, each over the one before
-        // (see grows); awww grows the rest itself
-        const stack = origin !== "bottom" || fx !== 0 || point || video || isVideo(path) || grows.count > 0 || native.running;
+        // (see grows); so is any switch under live music effects, which would drop out for awww's.
+        // awww grows the rest itself
+        const fxLive = MusicFx.wallpaperFx && Cava.active;
+        const stack = origin !== "bottom" || fx !== 0 || point || video || isVideo(path) || grows.count > 0 || native.running || fxLive;
         current = path;
         saved.setText(isVideo(path) || isMono(path) ? path : "");
         switching.restart();
