@@ -114,12 +114,21 @@ Singleton {
     property string wanted: ""
     property string sources: ""
     property string ranFor: ""
+    readonly property string split: "--- histogram ---"
 
     function pick(path) {
         wanted = path;
         if (path && !matugen.running) {
             ranFor = path;
-            matugen.command = ["matugen", "image", path, "--show-source-colors"];
+            // Both analyses are cached per file and mtime, so a wallpaper seen before applies at once
+            matugen.command = ["sh", "-c", `
+                f="$1/$(printf '%s %s' "$(stat -c %Y "$2")" "$2" | md5sum | cut -c1-32)"
+                if [ -s "$f" ]; then touch "$f"; cat "$f"; exit; fi
+                mkdir -p "$1"
+                { matugen image "$2" --show-source-colors && echo "${root.split}" &&
+                  magick "$2" -resize 128x128 -colors 12 -depth 8 -format %c histogram:info:-; } > "$f.part" &&
+                    mv "$f.part" "$f" && cat "$f" || rm -f "$f.part"
+                find "$1" -type f -mtime +60 -delete`, "sh", Quickshell.cachePath("accent"), path];
             matugen.running = true;
         }
     }
@@ -263,22 +272,18 @@ Singleton {
         id: matugen
         stdout: StdioCollector {
             onStreamFinished: {
-                if (root.ranFor === root.wanted) {
-                    root.sources = text;
-                    histogram.exec(["magick", root.ranFor, "-resize", "128x128", "-colors", "12", "-depth", "8", "-format", "%c", "histogram:info:-"]);
-                } else
+                if (root.ranFor !== root.wanted) {
                     root.pick(root.wanted);
-            }
-        }
-    }
-
-    Process {
-        id: histogram
-        stdout: StdioCollector {
-            // matugen falls back to Google blue on gray images, so the histogram decides
-            onStreamFinished: {
-                root.palette = root.weigh(text);
-                root.wallLight = root.brightness(text) > 0.5;
+                    return;
+                }
+                const at = text.indexOf(root.split);
+                if (at < 0)
+                    return;
+                root.sources = text.slice(0, at);
+                // matugen falls back to Google blue on gray images, so the histogram decides
+                const hist = text.slice(at + root.split.length);
+                root.palette = root.weigh(hist);
+                root.wallLight = root.brightness(hist) > 0.5;
                 root.gray = root.palette.length === 0;
                 root.fade(root.mono ? root.monoDark : root.fromSources(root.sources));
             }

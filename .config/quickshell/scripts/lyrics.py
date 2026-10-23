@@ -7,6 +7,7 @@
 
 import base64
 import glob
+import hashlib
 import json
 import os
 import re
@@ -19,6 +20,10 @@ import zlib
 from concurrent.futures import ThreadPoolExecutor
 
 LOCAL = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "lyrics")
+CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "quickshell", "lyrics")
+# A miss is retried after a day, found lyrics are kept for a month
+MISS_TTL = 86400
+HIT_TTL = 30 * 86400
 KRC_KEY = b"@Gaw^2tGQ61-\xce\xd2ni"
 # Kugou prepends credits ("Lyrics by：...") and copyright notes
 JUNK = re.compile(r"^[^:：]{1,40}[:：]|未经|著作权|TME")
@@ -227,11 +232,44 @@ def fetch(artist, title, album, duration):
     return lines, plain
 
 
-def main():
+def cache_path(artist, title, album, duration):
+    key = "\n".join([artist, title, album, str(round(duration))])
+    return os.path.join(CACHE, hashlib.md5(key.encode()).hexdigest() + ".json")
+
+
+def cached(path):
     try:
-        lines, _ = fetch(sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4]))
-    except Exception:
-        sys.exit(1)
+        age = time.time() - os.path.getmtime(path)
+        with open(path, encoding="utf-8") as f:
+            lines = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return lines if age < (HIT_TTL if lines else MISS_TTL) else None
+
+
+def store(path, lines):
+    try:
+        os.makedirs(CACHE, exist_ok=True)
+        with open(path + ".part", "w", encoding="utf-8") as f:
+            json.dump(lines, f, ensure_ascii=False)
+        os.replace(path + ".part", path)
+    except OSError:
+        pass
+
+
+def main():
+    artist, title, album, duration = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4])
+    # Hand-made files go first, so an edit shows up without touching the cache
+    lines = local(artist, title, duration)
+    if not lines:
+        path = cache_path(artist, title, album, duration)
+        lines = cached(path)
+        if lines is None:
+            try:
+                lines, _ = fetch(artist, title, album, duration)
+            except Exception:
+                sys.exit(1)
+            store(path, lines)
     if lines and lines[0]["time"] > 0:
         lines.insert(0, {"time": 0, "text": "", "words": None})
     json.dump(lines, sys.stdout, ensure_ascii=False)

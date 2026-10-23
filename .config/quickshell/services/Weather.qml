@@ -98,6 +98,7 @@ Singleton {
             };
             const d = data.daily;
             days = d.time.map((t, i) => ({
+                day: t,
                 date: new Date(t + "T12:00"),
                 code: d.weather_code[i],
                 max: Math.round(d.temperature_2m_max[i]),
@@ -106,6 +107,7 @@ Singleton {
             fetchedAt = Date.now();
             loading = false;
             failed = false;
+            last.setText(JSON.stringify({ city, place, lat, lon, current, days, fetchedAt }));
         });
     }
 
@@ -150,8 +152,28 @@ Singleton {
         printErrors: false
     }
 
+    // Last forecast, shown at once on start while a fresh one loads
+    FileView {
+        id: last
+        path: Quickshell.cachePath("weather.json")
+        blockLoading: true
+        printErrors: false
+    }
+
     Component.onCompleted: {
         city = saved.text().trim();
-        locate();
+        let c = null;
+        try {
+            c = JSON.parse(last.text());
+        } catch (e) {}
+        if (c?.city !== city || !c.days)
+            return locate();
+        place = c.place;
+        lat = c.lat;
+        lon = c.lon;
+        current = c.current;
+        days = c.days.map(d => Object.assign({}, d, { date: new Date(d.day + "T12:00") }));
+        fetchedAt = c.fetchedAt;
+        refresh();
     }
 }
