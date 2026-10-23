@@ -22,6 +22,12 @@ Scope {
     readonly property int thumbH: 162
     readonly property int gap: 8
     readonly property int tagRow: 36
+    // On a grayscale wallpaper the text follows the wallpaper's brightness, not the scheme
+    // (same as the visualizers), so dark mode over a white one stays readable
+    readonly property color ink: Accent.mono ? Accent.onWall : Theme.text
+    readonly property color inkSub: Accent.mono ? Qt.alpha(Accent.onWall, 0.65) : Theme.subtext
+    readonly property color inkAccent: Accent.mono ? Accent.onWall : Theme.accent
+    readonly property color halo: Accent.mono ? (Accent.wallLight ? "#ffffff" : "#000000") : Theme.halo
     readonly property string tagPath: tagIndex < tags.length ? tags[tagIndex].path : ""
 
     // The strip loops only when there are enough images to fill it; a short tag just sits centered
@@ -53,6 +59,9 @@ Scope {
         hide(true);
         Desk.editing = true;
     }
+
+    // A reload while the picker was open leaves windows faded out
+    Component.onCompleted: windowsFade("show")
 
     function windowsFade(mode) {
         Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/windows-fade.sh", mode]);
@@ -376,9 +385,11 @@ Scope {
             layer.enabled: true
             layer.effect: MultiEffect {
                 shadowEnabled: true
-                shadowColor: Theme.halo
-                shadowOpacity: 0.85
-                shadowBlur: 0.45
+                shadowColor: root.halo
+                // Tight and solid: a wide one thins into a haze that doesn't cover busy wallpapers
+                blurMax: 16
+                shadowOpacity: 1
+                shadowBlur: 0.4
             }
 
             MouseArea {
@@ -408,7 +419,7 @@ Scope {
                         width: 3
                         height: parent.height * 0.5
                         radius: 2
-                        color: Theme.accent
+                        color: root.inkAccent
                     }
                 }
 
@@ -436,7 +447,7 @@ Scope {
                         width: parent.width - 50
                         elide: Text.ElideRight
                         text: tagItem.modelData.name
-                        color: tagItem.current ? Theme.text : Theme.subtext
+                        color: tagItem.current ? root.ink : root.inkSub
                         Behavior on color { ColorAnimation { duration: Theme.anim } }
                     }
 
@@ -445,7 +456,7 @@ Scope {
                         anchors.verticalCenter: parent.verticalCenter
                         text: tagFiles.count
                         font.pixelSize: 13
-                        color: tagItem.current ? Theme.accent : Theme.subtext
+                        color: tagItem.current ? root.inkAccent : root.inkSub
                         Behavior on color { ColorAnimation { duration: Theme.anim } }
                     }
 
@@ -567,7 +578,7 @@ Scope {
                                 radius: Theme.radius
                                 color: "transparent"
                                 border.width: 2
-                                border.color: tile.selected ? Theme.accent : "transparent"
+                                border.color: tile.selected ? root.inkAccent : "transparent"
                                 Behavior on border.color { ColorAnimation { duration: Theme.anim } }
                             }
 
@@ -679,6 +690,7 @@ Scope {
                     width: Math.min(implicitWidth, root.thumbW * 2)
                     elide: Text.ElideRight
                     font.pixelSize: 14
+                    color: root.ink
                     text: root.n === 0
                           ? (root.tags.length === 0 ? "No folders in " + Wallpaper.dir + " or " + Wallpaper.videoDir : "Nothing here")
                           : root.prettify((root.fileRev, files.get(strip.currentIndex % root.n, "fileBaseName") ?? ""))
@@ -690,7 +702,7 @@ Scope {
                     y: strip.height + 14
                     visible: root.n > 0
                     font.pixelSize: 13
-                    color: Theme.subtext
+                    color: root.inkSub
                     text: (strip.currentIndex % root.n + 1) + " / " + root.n
                 }
             }
