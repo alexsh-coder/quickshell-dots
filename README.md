@@ -201,6 +201,7 @@ real Caps Lock.
 | `Super+Shift+W` | wallpaper picker |
 | `Super+Shift+D` | light/dark scheme |
 | `Super+Shift+N` | night mode |
+| `Super+Shift+C` | caffeine (keep awake) |
 | `Super+S` / `Super+Shift+S` | scratchpad / move window there |
 | `Super+1..0` / `Super+Shift+1..0` | workspace / move window |
 | `Super+[` / `Super+]` | previous / next workspace |
