@@ -111,6 +111,9 @@ ln -s ~/dotfiles/.config/quickshell ~/.config/quickshell
 ln -s ~/dotfiles/.config/fastfetch  ~/.config/fastfetch
 ln -s ~/dotfiles/.config/kitty      ~/.config/kitty
 ln -s ~/dotfiles/.config/starship.toml ~/.config/starship.toml
+ln -s ~/dotfiles/.config/spotify-launcher.conf ~/.config/spotify-launcher.conf
+mkdir -p ~/.local/share/applications
+ln -s ~/dotfiles/.local/share/applications/spotify-launcher.desktop ~/.local/share/applications/spotify-launcher.desktop
 ln -s ~/dotfiles/.local/share/icons/Suru++-Extra ~/.local/share/icons/Suru++-Extra
 cp ~/.config/hypr/hardware.lua.example ~/.config/hypr/hardware.lua
 ```
