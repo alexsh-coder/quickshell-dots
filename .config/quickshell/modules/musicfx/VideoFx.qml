@@ -105,11 +105,19 @@ Scope {
         onTriggered: root.tick()
     }
 
-    // The old player quits as soon as another video is picked
+    // The old player quits as soon as another video is picked; the new one is linked to the
+    // moment it plays, rather than on the next retry
     Connections {
         target: Wallpaper
         function onCurrentChanged() {
             root.drop(root.sock);
+        }
+        function onPlayerReady() {
+            root.sock?.destroy();
+            root.sent = {};
+            root.retry = 30;
+            root.sock = link.createObject(root);
+            root.tick();
         }
     }
 

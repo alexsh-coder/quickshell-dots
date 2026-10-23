@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as QQC
 import qs.config
 import qs.components
 import qs.services
@@ -52,6 +53,10 @@ Rectangle {
     border.width: 1
     border.color: Theme.muted
 
+    HoverHandler {
+        id: panelHover
+    }
+
     // Clicks stay in the panel
     MouseArea {
         anchors.fill: parent
@@ -66,6 +71,34 @@ Rectangle {
         contentHeight: col.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
+
+        // Thin draggable bar in the right margin, shown while the panel is hovered
+        QQC.ScrollBar.vertical: QQC.ScrollBar {
+            id: vbar
+
+            parent: root
+            x: root.width - width - 4
+            y: Theme.pad
+            height: root.height - Theme.pad * 2
+            width: 8
+            padding: 0
+            policy: flick.contentHeight > flick.height ? QQC.ScrollBar.AlwaysOn : QQC.ScrollBar.AlwaysOff
+            opacity: panelHover.hovered || pressed ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation { duration: 150 }
+            }
+            background: null
+            contentItem: Rectangle {
+                implicitWidth: 4
+                radius: width / 2
+                x: (vbar.width - width) / 2
+                width: vbar.hovered || vbar.pressed ? 6 : 4
+                color: vbar.pressed ? Theme.accent : Qt.alpha(Theme.subtext, vbar.hovered ? 0.7 : 0.4)
+                Behavior on width {
+                    NumberAnimation { duration: 120 }
+                }
+            }
+        }
 
         Column {
             id: col

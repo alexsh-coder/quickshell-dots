@@ -239,6 +239,9 @@ Singleton {
     // A grow has covered the screen with path: what's under the grows can take it now
     signal growCovered(string path)
 
+    // A newly started video player is playing and listens on socket
+    signal playerReady
+
     // old is the still under it for transitions that move it; for a video, its frame once frozen (wait)
     function stackGrow(img, fx, old, point) {
         const wait = old === frozen;
@@ -343,6 +346,8 @@ Singleton {
 
         stdout: SplitParser {
             onRead: line => {
+                if (line === "ready")
+                    root.playerReady();
                 const i = root.growIndex(handOff.gid);
                 if (line !== "ready" || i < 0)
                     return;

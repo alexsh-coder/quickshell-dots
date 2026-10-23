@@ -90,9 +90,11 @@ Item {
             popouts.close();
         else if (event.key === Qt.Key_Space && player?.canTogglePlaying)
             player.togglePlaying();
-        else if (event.key === Qt.Key_Left && player?.canGoPrevious)
+        else if ((event.key === Qt.Key_Left || event.key === Qt.Key_Right) && (event.modifiers & Qt.ShiftModifier) && seekable)
+            seekTo(Math.max(0, Math.min(length, position + (event.key === Qt.Key_Left ? -5 : 5))) / length);
+        else if (event.key === Qt.Key_Left && (event.modifiers & Qt.ControlModifier) && player?.canGoPrevious)
             player.previous();
-        else if (event.key === Qt.Key_Right && player?.canGoNext)
+        else if (event.key === Qt.Key_Right && (event.modifiers & Qt.ControlModifier) && player?.canGoNext)
             player.next();
         else
             return;
@@ -164,13 +166,20 @@ Item {
                 color: Qt.alpha(Theme.bg, Theme.light ? 0.5 : 0.58)
             }
 
-            // Melts into the bar above
+            // Melts into the bar above: smoothstep falloff, no visible edge at either end
             Rectangle {
                 width: parent.width
-                height: 64
+                height: 90
                 gradient: Gradient {
-                    GradientStop { position: 0; color: Theme.bg }
-                    GradientStop { position: 1; color: Qt.alpha(Theme.bg, 0) }
+                    GradientStop { position: 0; color: Qt.alpha(Theme.bg, 1.000) }
+                    GradientStop { position: 0.125; color: Qt.alpha(Theme.bg, 0.957) }
+                    GradientStop { position: 0.25; color: Qt.alpha(Theme.bg, 0.844) }
+                    GradientStop { position: 0.375; color: Qt.alpha(Theme.bg, 0.684) }
+                    GradientStop { position: 0.5; color: Qt.alpha(Theme.bg, 0.500) }
+                    GradientStop { position: 0.625; color: Qt.alpha(Theme.bg, 0.316) }
+                    GradientStop { position: 0.75; color: Qt.alpha(Theme.bg, 0.156) }
+                    GradientStop { position: 0.875; color: Qt.alpha(Theme.bg, 0.043) }
+                    GradientStop { position: 1; color: Qt.alpha(Theme.bg, 0.000) }
                 }
             }
 

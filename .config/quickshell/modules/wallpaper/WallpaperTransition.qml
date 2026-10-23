@@ -36,6 +36,14 @@ PanelWindow {
 
     // The bass zoom WallpaperFx puts on the wallpaper under the grows, so they match it
     readonly property real fxZoom: MusicFx.wallpaperFx && MusicFx.zoom && Cava.active && !Wallpaper.video ? Cava.bass * 0.04 * MusicFx.gain("zoom") : 0
+    // Over a video, the zoom and shake VideoFx gives mpv, so the copy moves the same until the player
+    // under it takes over (same curves, in pixels)
+    readonly property bool videoFx: (MusicFx.zoom || MusicFx.shake) && Cava.active && Wallpaper.video
+    readonly property real shakeAmp: videoFx && MusicFx.shake ? Cava.kick * Cava.kick * 14 * MusicFx.gain("shake") : 0
+    readonly property real videoZoom: videoFx ? (MusicFx.zoom ? Cava.bass * 0.04 * MusicFx.gain("zoom") : 0) + shakeAmp * 2 / Math.min(width, height) : 0
+    readonly property real shakeTime: Wallpaper.clock / 1000
+    readonly property real panX: shakeAmp * (Math.sin(shakeTime * 47) * 0.6 + Math.sin(shakeTime * 83 + 1.3) * 0.4)
+    readonly property real panY: shakeAmp * (Math.sin(shakeTime * 53 + 2.1) * 0.6 + Math.sin(shakeTime * 71 + 0.4) * 0.4)
 
     // Grows advance with the frames this screen draws, not on a timer that drifts against them
     FrameAnimation {
@@ -79,7 +87,8 @@ PanelWindow {
             // Newer switches on top: the Repeater doesn't keep added items above the earlier ones
             z: gid
             anchors.fill: parent
-            scale: 1 + root.fxZoom
+            scale: 1 + root.fxZoom + root.videoZoom
+            transform: Translate { x: root.panX; y: root.panY }
             visible: root.full
 
             TransitionEffect {
