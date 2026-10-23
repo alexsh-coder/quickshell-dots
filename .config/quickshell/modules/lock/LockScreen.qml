@@ -247,8 +247,17 @@ Item {
 
     // Keys come in as text, so either layout types into the field
     Item {
+        id: keys
         anchors.fill: parent
         focus: true
+        // Outputs get re-created on resume and the new surface can come up without item focus
+        Connections {
+            target: keys.Window.window
+            function onActiveChanged() {
+                if (keys.Window.active)
+                    keys.forceActiveFocus();
+            }
+        }
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 root.lock.submit();
