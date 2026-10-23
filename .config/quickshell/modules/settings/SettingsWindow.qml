@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as QQC
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
@@ -184,6 +185,40 @@ Scope {
                 contentHeight: pages.height + Theme.pad * 2
                 boundsBehavior: Flickable.StopAtBounds
                 clip: true
+
+                HoverHandler {
+                    id: flickHover
+                }
+
+                // Thin draggable bar, shown only while the pointer is near the right edge
+                QQC.ScrollBar.vertical: QQC.ScrollBar {
+                    id: vbar
+
+                    readonly property bool near: flickHover.hovered && flickHover.point.position.x > flick.width - 56
+
+                    parent: flick.parent
+                    x: flick.x + flick.width - width - 4
+                    y: flick.y + Theme.pad
+                    height: flick.height - Theme.pad * 2
+                    width: 8
+                    padding: 0
+                    policy: flick.contentHeight > flick.height ? QQC.ScrollBar.AlwaysOn : QQC.ScrollBar.AlwaysOff
+                    opacity: near || hovered || pressed ? 1 : 0
+                    Behavior on opacity {
+                        NumberAnimation { duration: 150 }
+                    }
+                    background: null
+                    contentItem: Rectangle {
+                        implicitWidth: 4
+                        radius: width / 2
+                        x: (vbar.width - width) / 2
+                        width: vbar.hovered || vbar.pressed ? 6 : 4
+                        color: vbar.pressed ? Theme.accent : Qt.alpha(Theme.subtext, vbar.hovered ? 0.7 : 0.4)
+                        Behavior on width {
+                            NumberAnimation { duration: 120 }
+                        }
+                    }
+                }
 
                 Item {
                     id: pages

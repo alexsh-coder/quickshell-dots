@@ -72,7 +72,7 @@ Rectangle {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
-        // Thin draggable bar in the right margin, shown while the panel is hovered
+        // Thin draggable bar in the right margin, shown only while the pointer is near the right edge
         QQC.ScrollBar.vertical: QQC.ScrollBar {
             id: vbar
 
@@ -83,7 +83,9 @@ Rectangle {
             width: 8
             padding: 0
             policy: flick.contentHeight > flick.height ? QQC.ScrollBar.AlwaysOn : QQC.ScrollBar.AlwaysOff
-            opacity: panelHover.hovered || pressed ? 1 : 0
+            readonly property bool near: panelHover.hovered && panelHover.point.position.x > root.width - 56
+
+            opacity: near || hovered || pressed ? 1 : 0
             Behavior on opacity {
                 NumberAnimation { duration: 150 }
             }
