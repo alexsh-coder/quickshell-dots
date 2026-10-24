@@ -249,7 +249,9 @@ Singleton {
     Process {
         id: scan
         running: true
-        command: ["sh", "-c", `for d in "$HOME/.local/share/icons" "$HOME/.icons" /usr/share/icons; do
+        // The Rice themes are drawn here, not shipped: built on first run
+        command: ["sh", "-c", `[ -d "$HOME/.local/share/icons/Rice-Fluent" ] || "$0" >/dev/null
+        for d in "$HOME/.local/share/icons" "$HOME/.icons" /usr/share/icons; do
             for t in "$d"/*/; do
                 t=\${t%/}
                 [ -L "$t" ] && continue
@@ -259,7 +261,7 @@ Singleton {
                 if [ -d "$t/cursors" ]; then printf '%s\\t%s\\t1\\n' "$n" "$t"
                 elif [ -d "$t/hyprcursors" ]; then printf '%s\\t%s\\t0\\n' "$n" "$t"; fi
             done
-        done | sort -fu -t "$(printf '\\t')" -k1,1`]
+        done | sort -fu -t "$(printf '\\t')" -k1,1`, Quickshell.shellDir + "/scripts/cursor-dot.py"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const lines = text.trim().split("\n").filter(l => l);

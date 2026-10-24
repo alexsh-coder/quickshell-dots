@@ -234,10 +234,10 @@ Singleton {
             property int nightTemp: 4000
             property bool ecoOnBattery: false
             // Effects drawn around the pointer: trail "off", "comet" or "sparks"; ring visualizer
-            property string cursorTrail: "off"
+            property string cursorTrail: "comet"
             property bool cursorViz: false
             // Cursor theme as picked; cursor_theme in hypr is what runs (a Tinted- copy when recolored)
-            property string cursorBase: ""
+            property string cursorBase: "Rice-Fluent"
             // Recolor: "black", "white", "accent", or "" for the theme's own
             property string cursorColor: ""
             // Seconds without movement before the ring fades, 0 for never

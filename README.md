@@ -65,7 +65,7 @@ Arch Linux is what it runs on; other distros should work with the same programs.
 - grim, slurp, imagemagick, gpu-screen-recorder for screenshots and recordings
 - kitty, starship, fastfetch for the terminal
 - jq, socat, curl, libnotify
-- python with PyGObject and AT-SPI (Spotify like button)
+- python with PyGObject and AT-SPI (Spotify like button), Pillow (cursors)
 - fonts: Maple Mono, CaskaydiaCove Nerd Font, JetBrainsMono Nerd Font,
   Material Symbols Rounded, Noto Color Emoji
 - icon theme: Suru++ Asprómauros
@@ -76,7 +76,7 @@ On Arch, from the official repos and the AUR (with `yay` or `paru`):
 sudo pacman -S --needed hyprland hypridle hyprlock hyprsunset hyprpolkitagent hyprpicker \
     awww ffmpeg matugen kconfig cava playerctl cliphist wl-clipboard brightnessctl \
     grim slurp imagemagick gpu-screen-recorder kitty jq socat curl libnotify \
-    python-gobject at-spi2-core starship fastfetch \
+    python-gobject at-spi2-core python-pillow starship fastfetch \
     ttf-cascadia-code-nerd ttf-jetbrains-mono-nerd ttf-material-symbols-variable noto-fonts-emoji
 yay -S --needed quickshell-git mpvpaper maplemono-ttf
 ```
