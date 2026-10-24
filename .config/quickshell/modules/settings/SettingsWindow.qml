@@ -13,6 +13,17 @@ Scope {
 
     property ShellScreen screen: Quickshell.screens[0]
     property string section: "wallpaper"
+    // Sections are built on first view and dropped a minute after the card closes,
+    // unless a monitor change is still waiting to be kept
+    readonly property bool alive: win.visible || warm.running || (displayPage.item?.countdown ?? 0) > 0
+    property var seen: []
+    onSectionChanged: if (!seen.includes(section)) seen = seen.concat(section)
+    onAliveChanged: if (!alive) seen = []
+
+    Timer {
+        id: warm
+        interval: 60000
+    }
 
     readonly property var sections: [
         { name: "wallpaper", label: "Wallpaper", icon: "wallpaper" },
@@ -37,6 +48,7 @@ Scope {
 
         screen: root.screen
         visible: Settings.open || card.opacity > 0
+        onVisibleChanged: if (!visible) warm.restart()
 
         WlrLayershell.namespace: "settings"
         WlrLayershell.layer: WlrLayer.Overlay
@@ -226,15 +238,15 @@ Scope {
                     x: Theme.pad + 8
                     y: Theme.pad - 6
                     width: flick.width - (Theme.pad + 8) * 2
-                    height: current?.implicitHeight ?? 0
+                    height: current?.item?.implicitHeight ?? 0
 
                     readonly property Item current: ({ wallpaper: wallpaperPage, display: displayPage, look: lookPage, input: inputPage, power: powerPage })[root.section] ?? null
 
-                    WallpaperSection { id: wallpaperPage; width: parent.width; visible: root.section === "wallpaper"; shown: Settings.open && visible }
-                    DisplaySection { id: displayPage; width: parent.width; visible: root.section === "display"; shown: Settings.open && visible }
-                    LookSection { id: lookPage; width: parent.width; visible: root.section === "look"; shown: Settings.open && visible }
-                    InputSection { id: inputPage; width: parent.width; visible: root.section === "input"; shown: Settings.open && visible }
-                    PowerSection { id: powerPage; width: parent.width; visible: root.section === "power"; shown: Settings.open && visible }
+                    Page { id: wallpaperPage; name: "wallpaper"; sourceComponent: WallpaperSection { width: wallpaperPage.width; shown: Settings.open && wallpaperPage.visible } }
+                    Page { id: displayPage; name: "display"; sourceComponent: DisplaySection { width: displayPage.width; shown: Settings.open && displayPage.visible } }
+                    Page { id: lookPage; name: "look"; sourceComponent: LookSection { width: lookPage.width; shown: Settings.open && lookPage.visible } }
+                    Page { id: inputPage; name: "input"; sourceComponent: InputSection { width: inputPage.width; shown: Settings.open && inputPage.visible } }
+                    Page { id: powerPage; name: "power"; sourceComponent: PowerSection { width: powerPage.width; shown: Settings.open && powerPage.visible } }
                 }
 
                 // Each section opens at its top
@@ -246,6 +258,14 @@ Scope {
                 }
             }
         }
+    }
+
+    component Page: Loader {
+        required property string name
+
+        width: parent.width
+        visible: root.section === name
+        active: root.alive && (visible || root.seen.includes(name))
     }
 
     function step(by) {

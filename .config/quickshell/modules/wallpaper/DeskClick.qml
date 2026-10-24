@@ -14,12 +14,15 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Bottom
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
+    // 1x1 while off, like WallpaperTransition: stays in place in the stack without full-screen buffers
     anchors {
         top: true
         left: true
-        bottom: true
-        right: true
+        bottom: root.on
+        right: root.on
     }
+    implicitWidth: 1
+    implicitHeight: 1
     color: "transparent"
     mask: Region { item: root.on ? catcher : null }
 

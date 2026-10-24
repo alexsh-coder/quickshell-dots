@@ -20,12 +20,15 @@ Item {
     readonly property string style: cfg.style ?? "bars"
     readonly property color ink: Theme.paint(cfg.color)
     readonly property real gain: (cfg.gain ?? 1)
-    readonly property list<real> values: Cava.values.map(v => Math.min(1, v * gain))
+    // Plain JS array: per-bar bindings index it, and indexing a list property copies the whole list
+    readonly property var values: Cava.values.map(v => Math.min(1, v * gain))
     readonly property int n: Cava.bars
     // Bars and mirror: the spectrum stretched or squeezed to the chosen count
     readonly property int count: Math.max(2, Math.round(cfg.count ?? n))
     readonly property var resampled: {
-        const v = Array.from(values), out = [];
+        if (style !== "bars" && style !== "mirror")
+            return [];
+        const v = values, out = [];
         for (let i = 0; i < count; i++) {
             const m = i / (count - 1) * (n - 1), j = Math.floor(m), f = m - j;
             out.push((v[j] ?? 0) * (1 - f) + (v[Math.min(j + 1, n - 1)] ?? 0) * f);

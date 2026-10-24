@@ -121,7 +121,8 @@ Scope {
             Behavior on opacity { NumberAnimation { duration: 500 } }
 
             Repeater {
-                model: Cava.bars
+                // Bars exist only while the shade is up: hidden, they'd still animate every cava frame
+                model: drop.visible ? Cava.bars : 0
 
                 Rectangle {
                     required property int index

@@ -70,11 +70,20 @@ PanelWindow {
         readonly property real gap: Cursor.size * (Cursor.base === "Rice-Fluent" ? 0.3 : 0.12) / root.ui
         readonly property real start: reach > 0 ? Math.min(0.5, gap / reach) : 0
 
+        // Woken by pointer motion, asleep once the trail has drained, so a still pointer redraws nothing
+        property bool alive: false
+
         anchors.fill: parent
         visible: Settings.cursorTrail === "comet"
 
+        Connections {
+            target: Cursor
+            function onXChanged() { comet.alive = true; }
+            function onYChanged() { comet.alive = true; }
+        }
+
         FrameAnimation {
-            running: comet.visible && root.visible
+            running: comet.visible && root.visible && comet.alive
             onTriggered: {
                 const now = Date.now();
                 let p = root.here ? comet.points.filter(q => now - q.t < comet.life) : [];
@@ -82,6 +91,13 @@ PanelWindow {
                 // Where Hyprland says, not ahead of it: prediction wobbles the line
                 if (root.here && (!last || Math.hypot(last.x - root.cx, last.y - root.cy) > 0.5))
                     p.unshift({ x: root.cx, y: root.cy, t: now });
+                if (p.length < 2 && comet.points.length < 2) {
+                    comet.points = p;
+                    if (comet.outline.length)
+                        comet.outline = [];
+                    comet.alive = p.length > 0;
+                    return;
+                }
                 comet.points = p;
                 comet.outline = comet.ribbon(p, now);
             }
@@ -211,6 +227,8 @@ PanelWindow {
         readonly property real reach: Settings.vizHeight
         // Cava's bars stretched or squeezed to n, wrapping around
         readonly property var values: {
+            if (!visible)
+                return [];
             const src = Cava.values, m = src.length, out = [];
             for (let i = 0; i < n; i++) {
                 const p = i * m / n, j = Math.floor(p), f = p - j;
@@ -252,7 +270,7 @@ PanelWindow {
         }
 
         Repeater {
-            model: Settings.vizStyle === "bars" || Settings.vizStyle === "dots" ? ring.n : 0
+            model: Settings.cursorViz && (Settings.vizStyle === "bars" || Settings.vizStyle === "dots") ? ring.n : 0
 
             Item {
                 required property int index

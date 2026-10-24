@@ -53,7 +53,7 @@ hl.on("hyprland.start", function ()
     -- Qt drops to its single-threaded render loop on NVIDIA (QTBUG-95817), which stutters the
     -- visualizer; other drivers are threaded already.
     -- QT_SCALE_FACTOR is the settings window's panel scale
-    hl.exec_cmd("~/.config/hypr/scripts/respawn.sh env QSG_RENDER_LOOP=threaded QT_SCALE_FACTOR=" .. (ui.panel_scale or 1) .. " qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
+    hl.exec_cmd("~/.config/hypr/scripts/respawn.sh env QSG_RENDER_LOOP=threaded MALLOC_ARENA_MAX=2 QT_SCALE_FACTOR=" .. (ui.panel_scale or 1) .. " ~/.config/quickshell/scripts/nothp.py qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh dunst")
     -- OSD pill (volume/brightness/layout...); height above the bottom edge is per machine.
     -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh ~/.config/hypr/scripts/osd.py daemon --margin "

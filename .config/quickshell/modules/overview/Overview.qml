@@ -52,6 +52,9 @@ Scope {
     // Textures the cards borrow: what sits behind see-through windows, and the screen as it was
     readonly property Item softWall: softWall
     readonly property Item screenFrame: capLoader.item
+    // The wallpaper copies are decoded only while shown, so they don't sit in memory between uses
+    readonly property bool wallsReady: [wall, softWall, blurWall].every(i => i.status !== Image.Loading)
+    onWallsReadyChanged: maybeBegin()
 
     readonly property int count: entries.length
     readonly property bool wraps: count >= 3
@@ -249,7 +252,7 @@ Scope {
     }
 
     function maybeBegin() {
-        if (phase !== "loading" || !built || !(frameReady || timedOut))
+        if (phase !== "loading" || !built || !((frameReady && wallsReady) || timedOut))
             return;
         if (!count) {
             phase = "closed";
@@ -489,7 +492,7 @@ Scope {
                     id: wall
 
                     anchors.fill: parent
-                    source: Wallpaper.image ? "file://" + Wallpaper.image : ""
+                    source: root.shown && Wallpaper.image ? "file://" + Wallpaper.image : ""
                     sourceSize: Qt.size(width, height)
                     fillMode: Image.PreserveAspectCrop
                     // Decoded off the main thread: a wallpaper switch would freeze the shell for a frame or few
@@ -499,6 +502,8 @@ Scope {
 
                 // Static blur, crossfaded in: animating the blur radius itself steps visibly
                 Image {
+                    id: blurWall
+
                     anchors.fill: parent
                     source: wall.source
                     sourceSize: Qt.size(width / 2, height / 2)
