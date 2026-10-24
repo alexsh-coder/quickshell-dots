@@ -48,8 +48,8 @@ PanelWindow {
         reap.restart();
     }
 
-    // Only mapped while something shows: visualizers alone stay unmapped without music
-    readonly property bool needed: (Desk.widgetsOn || Desk.editing) && Desk.widgets.some(w => w.type !== "visualizer") || Desk.widgets.length > 0 && (Desk.editing || MusicFx.desktop && Cava.active)
+    // Only mapped while something shows: hidden widgets and visualizers without music don't count
+    readonly property bool needed: Desk.editing && Desk.widgets.length > 0 || Desk.widgetsOn && Desk.widgets.some(w => !w.hidden && (w.type !== "visualizer" || MusicFx.desktop && Cava.active))
 
     visible: needed || hold.running
     onNeededChanged: {

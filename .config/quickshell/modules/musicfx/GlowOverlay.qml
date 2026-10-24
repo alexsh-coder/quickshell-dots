@@ -3,7 +3,7 @@ import QtQuick.Shapes
 import qs.config
 import qs.services
 
-// Music glow over the wallpaper: from a screen edge, or radial around the visualizer's centre.
+// Music glow over the wallpaper: from a screen edge or all of them, or radial around the visualizer's centre.
 // Type, edge and size come from MusicFx; "halo" leaves only the visualizer's own shadow
 Item {
     id: root
@@ -11,24 +11,32 @@ Item {
     property real strength: 0
 
     readonly property bool radial: MusicFx.glowType === "radial"
-    readonly property bool horizontal: MusicFx.glowFrom === "left" || MusicFx.glowFrom === "right"
-    // The glowing edge is at the gradient's start
-    readonly property bool fromStart: MusicFx.glowFrom === "top" || MusicFx.glowFrom === "left"
+    // "around" glows from all four edges at once
+    readonly property var sides: MusicFx.glowFrom === "around" ? ["top", "bottom", "left", "right"] : [MusicFx.glowFrom]
+    readonly property real depth: MusicFx.glowFrom === "around" ? Math.min(width, height) * MusicFx.glowSize / 2 : -1
     readonly property color tint: Qt.alpha(Theme.fxColor, 0.35)
 
     visible: MusicFx.glowType !== "halo" && opacity > 0
     opacity: strength * MusicFx.fade
 
-    Rectangle {
-        visible: !root.radial
-        x: MusicFx.glowFrom === "right" ? parent.width - width : 0
-        y: MusicFx.glowFrom === "bottom" ? parent.height - height : 0
-        width: root.horizontal ? parent.width * MusicFx.glowSize : parent.width
-        height: root.horizontal ? parent.height : parent.height * MusicFx.glowSize
-        gradient: Gradient {
-            orientation: root.horizontal ? Gradient.Horizontal : Gradient.Vertical
-            GradientStop { position: 0; color: root.fromStart ? root.tint : "transparent" }
-            GradientStop { position: 1; color: root.fromStart ? "transparent" : root.tint }
+    Repeater {
+        model: root.radial ? [] : root.sides
+
+        Rectangle {
+            required property string modelData
+            readonly property bool horizontal: modelData === "left" || modelData === "right"
+            // The glowing edge is at the gradient's start
+            readonly property bool fromStart: modelData === "top" || modelData === "left"
+
+            x: modelData === "right" ? root.width - width : 0
+            y: modelData === "bottom" ? root.height - height : 0
+            width: !horizontal ? root.width : root.depth >= 0 ? root.depth : root.width * MusicFx.glowSize
+            height: horizontal ? root.height : root.depth >= 0 ? root.depth : root.height * MusicFx.glowSize
+            gradient: Gradient {
+                orientation: horizontal ? Gradient.Horizontal : Gradient.Vertical
+                GradientStop { position: 0; color: fromStart ? root.tint : "transparent" }
+                GradientStop { position: 1; color: fromStart ? "transparent" : root.tint }
+            }
         }
     }
 

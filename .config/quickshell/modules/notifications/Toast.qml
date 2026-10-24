@@ -333,14 +333,22 @@ Item {
         }
 
         // Time left; stops while the card is hovered
-        Rectangle {
+        // Bottom strip of a card-shaped fill, so the ends follow the corners
+        Item {
             visible: !root.history && root.timeout > 0
-            x: card.radius
+            x: 1
             y: card.height - 3
-            width: (card.width - card.radius * 2) * root.life
+            width: (card.width - 2) * root.life
             height: 2
-            radius: 1
-            color: Qt.alpha(root.tint, 0.7)
+            clip: true
+
+            Rectangle {
+                y: -(card.height - 4)
+                width: card.width - 2
+                height: card.height - 2
+                radius: card.radius - 1
+                color: Qt.alpha(root.tint, 0.7)
+            }
         }
     }
 }

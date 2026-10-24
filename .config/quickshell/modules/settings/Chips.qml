@@ -1,6 +1,7 @@
 import QtQuick
 import qs.config
 import qs.components
+import qs.services
 
 // One of a few choices: model is [{ value, label }], current the value picked.
 // Lines up in one row, wrapping once wider than maxWidth
@@ -56,9 +57,24 @@ Flow {
 
             MouseArea {
                 id: area
+
+                // Flipped and back after a cursor theme change, so the new theme shows under the pointer
+                property bool kicked: false
+
                 anchors.fill: parent
                 hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
+                cursorShape: kicked ? Qt.ArrowCursor : Qt.PointingHandCursor
+
+                Connections {
+                    target: Cursor
+                    function onApplied() {
+                        if (area.containsMouse) {
+                            // Both shapes go out in one batch, so Hyprland never draws the arrow
+                            area.kicked = true;
+                            area.kicked = false;
+                        }
+                    }
+                }
                 onClicked: root.picked(chip.modelData.value)
             }
         }

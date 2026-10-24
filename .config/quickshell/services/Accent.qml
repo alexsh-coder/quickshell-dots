@@ -30,7 +30,15 @@ Singleton {
     // Drawn straight on the wallpaper (visualizers): a grayscale one gets the opposite of its own brightness
     property bool wallLight: false
     readonly property color onWall: mono ? (wallLight ? monoLight : monoDark) : color
-    readonly property color color: mono ? Scheme.pick(monoLight, monoDark) : Scheme.dark >= 1 ? shift(tunedBase, 0, 0, tweak.l) : lightAccent(tunedBase, lightL + (tweak.l || 0) + (targetL - lightL) * Scheme.dark)
+    readonly property color color: tone(tunedBase, Scheme.dark)
+    // Where color is fading to: what slow consumers (cursor themes) build for right away
+    readonly property color target: tone(shift(to, tweak.h, tweak.c, 0), Math.round(Scheme.dark))
+    // Cursor accent: on a grayscale wallpaper the opposite of the wallpaper's brightness (so it
+    // flips with an inverted one), otherwise target
+    readonly property color cursorTarget: mono ? (wallLight ? monoLight : monoDark) : target
+    function tone(c, dark) {
+        return mono ? Qt.tint(monoLight, Qt.alpha(monoDark, dark)) : dark >= 1 ? shift(c, 0, 0, tweak.l) : lightAccent(c, lightL + (tweak.l || 0) + (targetL - lightL) * dark);
+    }
     // M3-style roles: secondary is a muted accent, tertiary sits 60° away in hue
     readonly property color secondary: role(0.5 + 0.34 * Scheme.dark, 0.05, 0)
     readonly property color tertiary: role(0.56 + 0.26 * Scheme.dark, 0.1 + 0.07 * (1 - Scheme.dark), -60 + 120 * Scheme.dark)
@@ -121,7 +129,13 @@ Singleton {
         if (path && !matugen.running) {
             ranFor = path;
             // Both analyses are cached per file and mtime, so a wallpaper seen before applies at once
-            matugen.command = ["sh", "-c", `
+            matugen.command = analysis(path);
+            matugen.running = true;
+        }
+    }
+
+    function analysis(path) {
+        return ["sh", "-c", `
                 f="$1/$(printf '%s %s' "$(stat -c %Y "$2")" "$2" | md5sum | cut -c1-32)"
                 if [ -s "$f" ]; then touch "$f"; cat "$f"; exit; fi
                 mkdir -p "$1"
@@ -129,8 +143,21 @@ Singleton {
                   magick "$2" -resize 128x128 -colors 12 -depth 8 -format %c histogram:info:-; } > "$f.part" &&
                     mv "$f.part" "$f" && cat "$f" || rm -f "$f.part"
                 find "$1" -type f -mtime +60 -delete`, "sh", Quickshell.cachePath("accent"), path];
-            matugen.running = true;
-        }
+    }
+
+    // The cursor accent a wallpaper would get (as cursorTarget), from its analysis(), for building ahead
+    function predict(path, text) {
+        const at = text.indexOf(split);
+        if (at < 0)
+            return null;
+        const hist = text.slice(at + split.length);
+        if (Wallpaper.isMono(path) || weigh(hist).length === 0)
+            return brightness(hist) > 0.5 ? monoLight : monoDark;
+        const t = tweaks[path] || {};
+        const a = t.both || {}, b = t[Scheme.light ? "light" : "dark"] || {};
+        const tw = k => (a[k] || 0) + (b[k] || 0);
+        const c = shift(fromSources(text.slice(0, at)), tw("h"), tw("c"), 0);
+        return Scheme.light ? lightAccent(c, lightL + tw("l")) : shift(c, 0, 0, tw("l"));
     }
 
     function fade(next) {

@@ -230,9 +230,32 @@ Item {
 
     NowPlaying {
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 56 - 30 * (1 - root.depth)
+        anchors.bottom: power.top
+        anchors.bottomMargin: 40
         opacity: content.opacity
+    }
+
+    PowerRow {
+        id: power
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: 48 - 30 * (1 - root.depth)
+        opacity: content.opacity
+    }
+
+    Icon {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 28
+        font.pixelSize: 20
+        weight: 400
+        fill: 0
+        opacity: content.opacity
+        color: Qt.rgba(1, 1, 1, 0.6)
+        readonly property var levels: ["signal_wifi_0_bar", "network_wifi_1_bar", "network_wifi_2_bar", "network_wifi_3_bar", "network_wifi"]
+        text: Net.ethernet ? "cable"
+            : !Net.wifiOn || !Net.active ? "wifi_off"
+            : levels[Math.max(0, Math.min(4, Math.floor(Net.active.signalStrength * 5)))]
     }
 
     Connections {

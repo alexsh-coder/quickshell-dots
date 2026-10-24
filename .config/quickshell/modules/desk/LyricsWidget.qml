@@ -558,7 +558,7 @@ Item {
     }
 
     FrameAnimation {
-        running: root.active && (Lyrics.player?.isPlaying ?? false)
+        running: root.active && root.visible && (Lyrics.player?.isPlaying ?? false)
         onTriggered: root.pos = Lyrics.player.position
     }
 

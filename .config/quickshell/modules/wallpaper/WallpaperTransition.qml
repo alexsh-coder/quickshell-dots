@@ -153,6 +153,10 @@ PanelWindow {
 
                 anchors.fill: parent
                 active: grow.video
+                layer.enabled: active && Wallpaper.bw
+                layer.effect: MultiEffect {
+                    saturation: -1
+                }
 
                 sourceComponent: Video {
                     source: "file://" + grow.path

@@ -13,6 +13,12 @@
 #   wallpaper.sh poster VIDEO POSTER  write VIDEO's first frame to POSTER unless it's up to date
 #   wallpaper.sh posters CACHE DIR    posters for every video under DIR, named by md5 of the path
 #   wallpaper.sh mono CACHE DIR       negatives of every image under DIR, named by md5 of the path
+#   wallpaper.sh gray IMAGE CACHE     black-and-white copy of IMAGE, named by md5 of the path
+#   wallpaper.sh bw on|off [POSTER]   black-and-white mode for videos: the player desaturates and
+#                                     awww holds the gray copy of POSTER
+#   wallpaper.sh still VIDEO POSTER   make POSTER (and its gray copy in bw mode), print the one to show
+#   wallpaper.sh grays CACHE DIR      list the images under DIR that are already black and white and
+#                                     make black-and-white copies of the rest, so toggling is instant
 set -u
 
 run=${XDG_RUNTIME_DIR:-/tmp}/qs-wallpaper
@@ -31,11 +37,44 @@ poster() {
     ffmpeg -nostdin -v error -y -i "$1" -frames:v 1 -q:v 2 "$2.tmp.jpg" && mv -f "$2.tmp.jpg" "$2"
 }
 
+# The gray copy of a poster sits next to it
+gray_poster() {
+    local out=${1%.jpg}-gray.jpg
+    [ -s "$out" ] && [ "$out" -nt "$1" ] && return 0
+    magick "$1" -colorspace Gray -colorspace sRGB -type TrueColor -quality 95 "$out.$$.jpg" && mv -f "$out.$$.jpg" "$out"
+}
+
+# The poster awww should hold: its gray copy in bw mode
+shown() {
+    if [ -f "$run.bw" ] && gray_poster "$1"; then
+        printf '%s' "${1%.jpg}-gray.jpg"
+    else
+        printf '%s' "$1"
+    fi
+}
+
 mono() {
     local out=$2/$(printf '%s' "$1" | md5sum | cut -c1-32)-neg.png
     [ -s "$out" ] && [ "$out" -nt "$1" ] && return 0
     mkdir -p "$2"
     magick "$1" -background black -flatten -alpha off -negate "$out.$$.png" && mv -f "$out.$$.png" "$out"
+}
+
+gray() {
+    local out=$2/$(printf '%s' "$1" | md5sum | cut -c1-32)-gray.jpg
+    [ -s "$out" ] && [ "$out" -nt "$1" ] && return 0
+    mkdir -p "$2"
+    magick "$1[0]" -background black -flatten -alpha off -colorspace Gray -colorspace sRGB -type TrueColor -quality 95 "$out.$$.jpg" && mv -f "$out.$$.jpg" "$out"
+}
+
+# Mean chroma of a small copy, cached next to the variants; under 0.04 counts as black and white
+chroma() {
+    local c=$2/$(printf '%s' "$1" | md5sum | cut -c1-32).chroma
+    if ! { [ -s "$c" ] && [ "$c" -nt "$1" ]; }; then
+        mkdir -p "$2"
+        magick "$1[0]" -resize 64x64 -colorspace HCL -channel G -separate +channel -format '%[fx:mean]' info: >"$c" 2>/dev/null || return 1
+    fi
+    awk '{ exit !($1 < 0.04) }' "$c"
 }
 
 # A player that's gone can linger as a zombie for a while
@@ -58,8 +97,10 @@ play() {
     printf '%s' "$1" >"$run.video"
     # -p pauses it while nothing of the desktop is visible. mpv's default scaling of 4K videos
     # keeps an integrated GPU busy enough to drop frames; profile=fast takes a third of that
+    local sat=0
+    [ -f "$run.bw" ] && sat=-100
     setsid -f mpvpaper -p \
-        -o "no-audio loop hwdec=auto-safe profile=fast panscan=1.0 input-ipc-server=$sock" \
+        -o "no-audio loop hwdec=auto-safe profile=fast panscan=1.0 saturation=$sat input-ipc-server=$sock" \
         ALL "$1" </dev/null >/dev/null 2>&1
 }
 
@@ -127,7 +168,7 @@ start() {
     poster "$1" "$2" || exit 1
     [ -f "$run.pid" ] && kill "$(cat "$run.pid")" 2>/dev/null
     echo $$ >"$run.pid"
-    awww img "$2" --transition-type none
+    awww img "$(shown "$2")" --transition-type none
     kill_player
     echo poster
     play "$1" || exit 1
@@ -148,7 +189,7 @@ set_wallpaper() {
     if is_video "$1"; then
         poster "$1" "$2" || exit 1
         stop
-        grow "$2" "${3:-bottom}" "${4:-0.8}"
+        grow "$(shown "$2")" "${3:-bottom}" "${4:-0.8}"
         sleep "${4:-0.8}"
         play "$1"
     elif [ "${3:-}" = none ]; then
@@ -170,9 +211,26 @@ start) start "$2" "$3" ;;
 cue) cue "$2" ;;
 resume) mpv '{"command":["set_property","pause",false]}' >/dev/null ;;
 poster) poster "$2" "$3" ;;
+still) poster "$2" "$3" && shown "$3" ;;
+bw)
+    if [ "$2" = on ]; then
+        mkdir -p "${run%/*}" && : >"$run.bw"
+        sat=-100
+    else
+        rm -f "$run.bw"
+        sat=0
+    fi
+    if playing >/dev/null; then
+        mpv '{"command":["set_property","saturation",'"$sat"']}' >/dev/null
+        [ -n "${3:-}" ] && [ -f "$3" ] && awww img "$(shown "$3")" --transition-type none
+    fi
+    ;;
 posters)
     find "$3" -type f | while IFS= read -r f; do
-        is_video "$f" && poster "$f" "$2/$(printf '%s' "$f" | md5sum | cut -c1-32).jpg"
+        if is_video "$f"; then
+            p=$2/$(printf '%s' "$f" | md5sum | cut -c1-32).jpg
+            poster "$f" "$p" && gray_poster "$p"
+        fi
     done
     ;;
 mono)
@@ -180,8 +238,17 @@ mono)
         is_video "$f" || mono "$f" "$2"
     done
     ;;
+gray) gray "$2" "$3" ;;
+grays)
+    find "$3" -type f | while IFS= read -r f; do
+        is_video "$f" && continue
+        # Copies even for those, so nothing asks for a missing file before this list is read
+        gray "$f" "$2"
+        chroma "$f" "$2" && printf '%s\n' "$f"
+    done
+    ;;
 *)
-    sed -n '2,16s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,21s/^# \{0,1\}//p' "$0" >&2
     exit 1
     ;;
 esac

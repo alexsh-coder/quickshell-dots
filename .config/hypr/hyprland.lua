@@ -82,12 +82,13 @@ end)
 local cursor_size = tostring(ui.cursor_size or 28)
 hl.env("XCURSOR_SIZE", cursor_size)
 hl.env("HYPRCURSOR_SIZE", cursor_size)
--- Theme: accent-colored Bibata built by scripts/cursor_theme.py (which also
--- writes cursor.lua); an empty/missing cursor.lua leaves Hyprland's default.
+-- Theme: picked in Quickshell's settings (ui.cursor_theme), else cursor.lua from
+-- scripts/cursor_theme.py; neither leaves Hyprland's default.
 local cursor_ok, cursor = pcall(dofile, os.getenv("HOME") .. "/.config/hypr/cursor.lua")
-if cursor_ok and type(cursor) == "table" and cursor.theme then
-    hl.env("XCURSOR_THEME", cursor.theme)
-    hl.env("HYPRCURSOR_THEME", cursor.theme)
+local cursor_theme = ui.cursor_theme or (cursor_ok and type(cursor) == "table" and cursor.theme)
+if cursor_theme then
+    hl.env("XCURSOR_THEME", cursor_theme)
+    hl.env("HYPRCURSOR_THEME", cursor_theme)
 end
 
 -- Without this, Qt apps (Dolphin) don't load plasma-integration's KDE
@@ -333,8 +334,11 @@ hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle
 hl.bind(mainMod .. " + ALT + bracketright", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
 hl.bind(mainMod .. " + ALT + bracketleft",  hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
 -- One-handed (left hand) alternative
-hl.bind(mainMod .. " + ALT + D", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
-hl.bind(mainMod .. " + ALT + A", hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
+hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
+hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
+-- Invert (Invertible wallpapers only) and black-and-white mode for all
+hl.bind(mainMod .. " + ALT + I", hl.dsp.exec_cmd("qs ipc call wallpaper invert"))
+hl.bind(mainMod .. " + ALT + B", hl.dsp.exec_cmd("qs ipc call wallpaper gray"))
 hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("qs ipc call desk toggle"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/kitty-opacity-toggle.sh"))
 hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("qs ipc call theme toggle"))
@@ -354,7 +358,7 @@ hl.bind(mainMod .. " + J",      hl.dsp.layout("togglesplit"))
 -- Idle and sleep still lock through hypridle -> scripts/lock.sh.
 hl.bind(mainMod .. " + L",         hl.dsp.global("quickshell:lock"))
 hl.bind(mainMod .. " + SHIFT + Escape", hl.dsp.exit())
-hl.bind("CTRL + ALT + Delete",  hl.dsp.exec_cmd("qs ipc call power toggle"))
+hl.bind("CTRL + ALT + Delete",  hl.dsp.exec_cmd("qs ipc call powermenu toggle"))
 hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd(terminal .. " -e ~/.local/bin/btop"))
 hl.bind(mainMod .. " + F", function()
     hl.dispatch(hl.dsp.window.fullscreen())
@@ -383,7 +387,7 @@ hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:mag
 
 -- Music scratchpad: Super+M toggles special:music, launching a player if none is running
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("~/.config/hypr/scripts/music-toggle.sh"))
-hl.bind(mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("qs ipc call media toggle"))
+hl.bind(mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("qs ipc call mediashade toggle"))
 
 -- Scroll through workspaces
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
@@ -570,6 +574,16 @@ hl.layer_rule({
     ignore_alpha = 0.5,
 })
 
+-- Quickshell drop shades (power menu, media) fall and bounce on their own
+hl.layer_rule({
+    name  = "drop-shades",
+    match = { namespace = "^(powermenu|mediashade)$" },
+
+    no_anim      = true,
+    blur         = true,
+    ignore_alpha = 0.5,
+})
+
 hl.layer_rule({
     name  = "wallpaper-picker",
     match = { namespace = "wallpaper" },
@@ -599,6 +613,14 @@ hl.layer_rule({
 hl.layer_rule({
     name  = "wallpaper-glow",
     match = { namespace = "^wallpaper-glow$" },
+
+    no_anim = true,
+})
+
+-- Quickshell's cursor trail and visualizer follow the pointer on their own
+hl.layer_rule({
+    name  = "cursor-fx",
+    match = { namespace = "^cursor(fx|kick)$" },
 
     no_anim = true,
 })

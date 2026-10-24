@@ -26,6 +26,17 @@ Singleton {
     property alias panelScale: adapter.panelScale
     property alias nightTemp: adapter.nightTemp
     property alias ecoOnBattery: adapter.ecoOnBattery
+    property alias cursorTrail: adapter.cursorTrail
+    property alias cursorViz: adapter.cursorViz
+    property alias cursorBase: adapter.cursorBase
+    property alias cursorColor: adapter.cursorColor
+    property alias cursorIdle: adapter.cursorIdle
+    property alias vizStyle: adapter.vizStyle
+    property alias vizBars: adapter.vizBars
+    property alias vizRadius: adapter.vizRadius
+    property alias vizHeight: adapter.vizHeight
+    property alias vizSpin: adapter.vizSpin
+    property alias vizLead: adapter.vizLead
     readonly property var hypr: adapter.hypr
     readonly property var monitors: adapter.monitors
 
@@ -51,7 +62,8 @@ Singleton {
         mouse_sensitivity: 0,
         natural_scroll: true,
         tap_to_click: true,
-        cursor_size: 28
+        cursor_size: 28,
+        cursor_theme: ""
     })
 
     readonly property string luaPath: Quickshell.env("HOME") + "/.config/hypr/settings.lua"
@@ -68,7 +80,7 @@ Singleton {
             all[key] = value;
         adapter.hypr = all;
         if (key === "cursor_size")
-            Quickshell.execDetached(["hyprctl", "setcursor", Quickshell.env("XCURSOR_THEME") || "default", String(value)]);
+            Cursor.update();
     }
 
     function durationOf(name) {
@@ -154,6 +166,13 @@ Singleton {
         Quickshell.execDetached(["setsid", "-f", Quickshell.shellDir + "/scripts/restart.sh", String(Quickshell.processId), String(adapter.panelScale)]);
     }
 
+    // A reload puts the cursor back to the env's, so it's set again once that's done
+    Process {
+        id: reload
+        command: ["hyprctl", "reload"]
+        onExited: Cursor.apply()
+    }
+
     FileView {
         id: luaFile
 
@@ -169,7 +188,7 @@ Singleton {
             ready = true;
             root.sync();
         }
-        onSaved: Quickshell.execDetached(["hyprctl", "reload"])
+        onSaved: reload.running = true
     }
 
     FileView {
@@ -178,6 +197,12 @@ Singleton {
         property bool loaded: false
 
         path: Quickshell.statePath("settings.json")
+        // A hot reload hands the file back already read, with no onLoaded
+        Component.onCompleted: {
+            waitForJob();
+            if (text().length)
+                loaded = true;
+        }
         onAdapterUpdated: {
             writeAdapter();
             debounce.restart();
@@ -208,6 +233,23 @@ Singleton {
             property real panelScale: 1
             property int nightTemp: 4000
             property bool ecoOnBattery: false
+            // Effects drawn around the pointer: trail "off", "comet" or "sparks"; ring visualizer
+            property string cursorTrail: "off"
+            property bool cursorViz: false
+            // Cursor theme as picked; cursor_theme in hypr is what runs (a Tinted- copy when recolored)
+            property string cursorBase: ""
+            // Recolor: "black", "white", "accent", or "" for the theme's own
+            property string cursorColor: ""
+            // Seconds without movement before the ring fades, 0 for never
+            property int cursorIdle: 3
+            // Ring visualizer: "bars", "dots", "wave" or "blob"; bar count, gap around the pointer, reach
+            property string vizStyle: "bars"
+            property int vizBars: 48
+            property int vizRadius: 28
+            property int vizHeight: 34
+            property bool vizSpin: false
+            // How far ahead (ms) the ring is drawn, making up for the frame it renders behind the pointer
+            property int vizLead: 36
             // Hyprland options by their settings.lua names; only those changed from hyprDefaults
             property var hypr: ({})
             property var monitors: ({})
@@ -232,6 +274,16 @@ Singleton {
         // "edge" or "cursor"
         function from(where: string): void {
             adapter.transitionFrom = where;
+        }
+        // Cursor theme by its dir name, and "black", "white", "accent" or "" for its own color
+        function cursor(theme: string, color: string): void {
+            adapter.cursorBase = theme;
+            adapter.cursorColor = color;
+        }
+        // Pointer effects: trail "off", "comet" or "sparks"; ring visualizer on/off
+        function cursorFx(trail: string, viz: bool): void {
+            adapter.cursorTrail = trail;
+            adapter.cursorViz = viz;
         }
         // A Hyprland option by its settings.lua name; value is JSON ("12", "true", "\"slide\"")
         function hypr(key: string, value: string): void {

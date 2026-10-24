@@ -293,6 +293,18 @@ Scope {
         function prev(): void { root.applyStep(-1); }
         function set(path: string): void { Wallpaper.set(path); }
         function invert(): void { Wallpaper.invert(Wallpaper.current); }
+        function gray(): void { Wallpaper.toggleGray(); }
+    }
+
+    component ThumbPic: Image {
+        property real shown: 0
+
+        anchors.fill: parent
+        sourceSize.width: root.thumbW * 2
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+        opacity: status === Image.Ready ? shown : 0
+        Behavior on opacity { NumberAnimation { duration: 700; easing.type: Easing.InOutQuad } }
     }
 
     PanelWindow {
@@ -329,6 +341,12 @@ Scope {
                 // I inverts an image from the Invertible folder (RU "Ш", same scancode)
                 if (event.key === Qt.Key_I || event.nativeScanCode === 31) {
                     Wallpaper.invert(root.currentPath());
+                    event.accepted = true;
+                    return;
+                }
+                // B toggles black-and-white mode for every wallpaper (RU "И", same scancode)
+                if (event.key === Qt.Key_B || event.nativeScanCode === 56) {
+                    Wallpaper.toggleGray();
                     event.accepted = true;
                     return;
                 }
@@ -554,27 +572,79 @@ Scope {
                                 radius: Theme.radius
                                 color: Qt.alpha(Theme.bg, 0.6)
 
-                                Image {
+                                // Two slots: when the picture changes (bw mode, invert) the new one fades in over the
+                                // old, rippling out from the selected tile, one step per neighbour
+                                Item {
                                     id: thumb
 
                                     readonly property string url: "file://" + Wallpaper.thumb(tile.filePath)
+                                    property Image front: thumbA
+                                    readonly property Image back: front === thumbA ? thumbB : thumbA
+
+                                    function swap() {
+                                        if (back.status !== Image.Ready || back.source.toString() !== url)
+                                            return;
+                                        const old = front;
+                                        back.z = 1;
+                                        old.z = 0;
+                                        front = back;
+                                        if (old.status !== Image.Ready) {
+                                            front.shown = 1;
+                                            old.shown = 0;
+                                            return;
+                                        }
+                                        // Each step away from the selected tile starts a beat later
+                                        wave.interval = 1 + Math.min(4, Math.abs(tile.index - strip.currentIndex)) * 220;
+                                        wave.restart();
+                                    }
 
                                     anchors.fill: parent
-                                    source: url
-                                    sourceSize.width: root.thumbW * 2
-                                    fillMode: Image.PreserveAspectCrop
-                                    asynchronous: true
-                                    opacity: status === Image.Ready ? 1 : 0
-                                    Behavior on opacity { NumberAnimation { duration: Theme.anim } }
+                                    onUrlChanged: {
+                                        if (front.source.toString() === url)
+                                            return;
+                                        wave.stop();
+                                        // Toggled straight back: the other slot still holds it
+                                        if (back.source.toString() === url && back.status === Image.Ready)
+                                            return void swap();
+                                        back.shown = 0;
+                                        back.source = url;
+                                    }
+                                    Component.onCompleted: front.source = url
+
+                                    Timer {
+                                        id: wave
+                                        onTriggered: {
+                                            thumb.front.shown = 1;
+                                            fadeOld.restart();
+                                        }
+                                    }
+
+                                    // The old picture goes once the new one fully covers it
+                                    Timer {
+                                        id: fadeOld
+                                        interval: 750
+                                        onTriggered: thumb.back.shown = 0
+                                    }
+
+                                    ThumbPic {
+                                        id: thumbA
+                                        shown: 1
+                                        onStatusChanged: if (status === Image.Ready) thumb.swap()
+                                    }
+
+                                    ThumbPic {
+                                        id: thumbB
+                                        onStatusChanged: if (status === Image.Ready) thumb.swap()
+                                    }
 
                                     // A video's poster may still be on its way when the tile shows up
                                     Connections {
                                         target: Wallpaper
                                         function onPostersChanged() {
-                                            if (thumb.status !== Image.Error)
+                                            if (thumb.front.status !== Image.Error)
                                                 return;
-                                            thumb.source = "";
-                                            thumb.source = Qt.binding(() => thumb.url);
+                                            thumb.front.source = "";
+                                            thumb.front.source = thumb.url;
                                         }
                                     }
                                 }
@@ -621,6 +691,32 @@ Scope {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     onClicked: Wallpaper.invert(tile.filePath)
+                                }
+                            }
+
+                            // Black-and-white mode for all wallpapers (B), shown where invert isn't offered
+                            Rectangle {
+                                visible: tile.selected && Wallpaper.canGray(tile.filePath)
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.margins: 8
+                                width: 24
+                                height: 24
+                                radius: 12
+                                color: grayArea.containsMouse || Wallpaper.bw ? Theme.accent : Qt.alpha(Theme.bg, 0.8)
+
+                                Icon {
+                                    anchors.centerIn: parent
+                                    text: "filter_b_and_w"
+                                    font.pixelSize: 16
+                                    color: grayArea.containsMouse || Wallpaper.bw ? Theme.bg : Theme.text
+                                }
+
+                                MouseArea {
+                                    id: grayArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: Wallpaper.toggleGray()
                                 }
                             }
 

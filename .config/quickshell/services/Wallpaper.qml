@@ -19,6 +19,9 @@ Singleton {
     readonly property string monoDir: dir + "/Invertible/"
     readonly property string monoCache: Quickshell.cachePath("mono")
     property var inverted: ({})
+    // Images that are already black and white, left alone by bw mode
+    property bool bw: false
+    property var natural: ({})
     readonly property bool mono: isMono(current)
     readonly property string script: Quickshell.shellDir + "/scripts/wallpaper.sh"
 
@@ -111,6 +114,63 @@ Singleton {
         return inverted[path] ? monoCache + "/" + Qt.md5(path) + "-neg.png" : path;
     }
 
+    function canGray(path) {
+        return !!path && !isMono(path) && !natural[path];
+    }
+
+    // The poster awww holds under a video
+    function videoStill(path) {
+        return bw ? poster(path).replace(/\.jpg$/, "-gray.jpg") : poster(path);
+    }
+
+    function grayPath(path) {
+        return monoCache + "/" + Qt.md5(path) + "-gray.jpg";
+    }
+
+    // Black-and-white mode for every image at once. Copies are made ahead by the scan; the one on screen
+    // is made first if missing, so awww never gets a file that isn't there yet
+    function toggleGray() {
+        if (!bw && canGray(current) && !isVideo(current))
+            grayJob.createObject(root, { path: current });
+        else
+            setBw(!bw);
+    }
+
+    function setBw(on) {
+        bw = on;
+        bwFile.setText(on ? "1" : "");
+        if (video) {
+            // The player is recoloured in place; awww's poster swaps underneath
+            bwSync.command = [script, "bw", on ? "on" : "off", poster(current)];
+            bwSync.running = true;
+        } else {
+            Quickshell.execDetached([script, "bw", on ? "on" : "off"]);
+            if (canGray(current))
+                set(current);
+        }
+    }
+
+    Process {
+        id: bwSync
+        onExited: if (root.video) root.image = root.videoStill(root.current)
+    }
+
+    Component {
+        id: grayJob
+
+        Process {
+            required property string path
+
+            running: true
+            command: [root.script, "gray", path, root.monoCache]
+            onExited: code => {
+                if (code === 0)
+                    root.setBw(true);
+                destroy();
+            }
+        }
+    }
+
     function invert(path) {
         if (!isMono(path))
             return;
@@ -126,12 +186,12 @@ Singleton {
     }
 
     function thumb(path) {
-        return isVideo(path) ? poster(path) : isMono(path) ? variant(path) : path;
+        return isVideo(path) ? (bw && canGray(path) ? videoStill(path) : poster(path)) : still(path);
     }
 
     // What awww is given for an image
     function still(path) {
-        return isMono(path) ? variant(path) : path;
+        return isMono(path) ? variant(path) : bw && canGray(path) ? grayPath(path) : path;
     }
 
 
@@ -191,7 +251,7 @@ Singleton {
         const fxLive = MusicFx.wallpaperFx && Cava.active;
         const stack = origin !== "bottom" || fx !== 0 || point || video || isVideo(path) || grows.count > 0 || native.running || fxLive;
         current = path;
-        saved.setText(isVideo(path) || isMono(path) ? path : "");
+        saved.setText(isVideo(path) || isMono(path) || bw && canGray(path) ? path : "");
         switching.restart();
         if (stack) {
             clock = Date.now();
@@ -411,7 +471,7 @@ Singleton {
         if (prep.running)
             return;
         prep.path = current;
-        prep.command = [script, "poster", current, poster(current)];
+        prep.command = [script, "still", current, poster(current)];
         prep.running = true;
     }
 
@@ -434,7 +494,7 @@ Singleton {
             }
             if (code !== 0)
                 return;
-            root.image = root.poster(path);
+            root.image = root.videoStill(path);
             root.posters++;
         }
     }
@@ -447,11 +507,11 @@ Singleton {
                 const m = text.match(/image: (.+)$/m);
                 const still = m ? m[1].trim().replace(/^~/, root.home) : "";
                 const last = saved.text().trim();
-                if (last && still === root.poster(last)) {
+                if (last && root.isVideo(last) && (still === root.poster(last) || still === root.videoStill(last))) {
                     root.current = last;
-                    root.image = still;
+                    root.image = root.videoStill(last);
                     Quickshell.execDetached([root.script, "play", last]);
-                } else if (last && root.isMono(last) && (still === last || still.startsWith(root.monoCache))) {
+                } else if (last && (root.isMono(last) || root.bw && root.canGray(last)) && (still === last || still.startsWith(root.monoCache))) {
                     root.current = last;
                     root.image = root.still(last);
                     if (root.image !== still)
@@ -472,10 +532,27 @@ Singleton {
     Process {
         id: monoScan
         command: [root.script, "mono", root.monoCache, root.monoDir]
-        onExited: root.posters++
+        onExited: {
+            root.posters++;
+            grayScan.running = true;
+        }
     }
 
-    // The video or black-and-white image that's on, so it comes back after a restart
+    Process {
+        id: grayScan
+        command: [root.script, "grays", root.monoCache, root.dir]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const all = {};
+                for (const f of text.split("\n"))
+                    if (f)
+                        all[f] = true;
+                root.natural = all;
+            }
+        }
+    }
+
+    // The video, inverted or black-and-white image that's on, so it comes back after a restart
     FileView {
         id: saved
         path: Quickshell.statePath("wallpaper-video")
@@ -490,10 +567,20 @@ Singleton {
         printErrors: false
     }
 
+    FileView {
+        id: bwFile
+        path: Quickshell.statePath("bw")
+        blockLoading: true
+        printErrors: false
+    }
+
     Component.onCompleted: {
         try {
             inverted = JSON.parse(invertedFile.text() || "{}");
         } catch (e) {}
+        bw = bwFile.text().trim() === "1";
+        // The script keeps its own flag in the runtime dir, gone after a reboot
+        Quickshell.execDetached([script, "bw", bw ? "on" : "off"]);
         refresh();
     }
 }

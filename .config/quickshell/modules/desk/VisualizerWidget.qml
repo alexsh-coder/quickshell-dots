@@ -77,13 +77,13 @@ Item {
         return Math.max(0, Math.min(1, v));
     }
 
-    // Halo on the bass, when the preset's glow is the visualizer's own
-    layer.enabled: active && MusicFx.glow
+    // Halo on the bass: the preset's glow, or the ring's own switch (lights its text and art too)
+    layer.enabled: active && (MusicFx.glow || (style === "ring" && !!cfg.ringGlow))
     layer.effect: MultiEffect {
         shadowEnabled: true
         shadowColor: root.ink
         shadowBlur: 1
-        shadowOpacity: Math.min(1, (0.35 + Cava.bass * 0.65) * MusicFx.gain("glow"))
+        shadowOpacity: Math.min(1, (0.35 + Cava.bass * 0.65) * (MusicFx.glow ? MusicFx.gain("glow") : 1))
         shadowScale: 1.02
     }
 
@@ -234,6 +234,300 @@ Item {
                 color: "transparent"
                 border.width: 2
                 border.color: Qt.alpha(root.ink, 0.35 + Cava.bass * 0.5)
+            }
+
+            // What sits in the hole: art, track info, lyrics, a clock or a bass-driven disc
+            Item {
+                id: center
+
+                readonly property string mode: root.cfg.ringCenter ?? "none"
+                readonly property var player: Lyrics.player
+                readonly property bool hasArt: ["cover", "cover+title", "vinyl"].includes(mode)
+                readonly property bool hasText: ["title", "cover+title"].includes(mode)
+                readonly property real d: ringItem.radius * 2 - ((root.cfg.ringLine ?? true) ? 24 : 12)
+                // Hole size without the bass pulse
+                readonly property real rest: root.sh * 0.14 * (root.cfg.ringSize ?? 1) * root.k * 2 - ((root.cfg.ringLine ?? true) ? 24 : 12)
+                property date now: new Date()
+
+                // Greedy word wrap measured at the resting font size; the last line gets an ellipsis.
+                // FontMetrics methods at a fixed 100 px, scaled: no properties written, so no binding loops
+                function wrap(str, px, maxW, maxLines, bold) {
+                    const fm = bold ? boldMetrics : metrics;
+                    const limit = maxW * 100 / Math.max(7, px);
+                    const lines = [];
+                    let cur = "";
+                    for (const w of str.split(/\s+/).filter(x => x)) {
+                        const next = cur ? cur + " " + w : w;
+                        if (!cur || fm.advanceWidth(next) <= limit)
+                            cur = next;
+                        else {
+                            lines.push(cur);
+                            cur = w;
+                        }
+                    }
+                    if (cur)
+                        lines.push(cur);
+                    const out = lines.slice(0, maxLines);
+                    if (out.length)
+                        out[out.length - 1] = fm.elidedText(lines.slice(out.length - 1).join(" "), Qt.ElideRight, limit);
+                    return out.join("\n");
+                }
+
+                FontMetrics {
+                    id: metrics
+                    font.family: Theme.font
+                    font.pixelSize: 100
+                }
+
+                FontMetrics {
+                    id: boldMetrics
+                    font.family: Theme.font
+                    font.pixelSize: 100
+                    font.bold: true
+                }
+
+                component LyricSlot: Text {
+                    property bool on
+                    property string line
+                    property real t: on ? 1 : 0
+
+                    Behavior on t { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+
+                    anchors.centerIn: parent
+                    visible: t > 0
+                    opacity: Math.max(0, 2 * t - 1)
+                    horizontalAlignment: Text.AlignHCenter
+                    text: center.wrap(line, center.rest * 0.09, center.rest * 0.8, 4, false)
+                    color: root.ink
+                    font.family: Theme.font
+                    font.pixelSize: Math.max(8, center.rest * 0.09)
+                }
+
+                visible: mode !== "none"
+                x: root.cx - d / 2
+                y: root.cy - d / 2
+                width: d
+                height: d
+
+                ClippingRectangle {
+                    visible: center.hasArt
+                    anchors.fill: parent
+                    radius: width / 2
+                    color: Qt.alpha(root.ink, 0.15)
+
+                    Cover {
+                        anchors.fill: parent
+                        player: center.player
+                        rotation: center.mode === "vinyl" ? spin.angle : 0
+                    }
+
+                    // Darkens the art so the text on top stays readable
+                    Rectangle {
+                        visible: center.mode === "cover+title"
+                        anchors.fill: parent
+                        color: Qt.alpha("#000000", 0.45)
+                    }
+                }
+
+                // Vinyl: grooves and a spindle hole over the spinning art
+                Repeater {
+                    model: center.mode === "vinyl" ? 3 : 0
+
+                    Rectangle {
+                        required property int index
+
+                        anchors.centerIn: parent
+                        width: center.d * (0.92 - index * 0.14)
+                        height: width
+                        radius: width / 2
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Qt.alpha("#000000", 0.25)
+                    }
+                }
+
+                Rectangle {
+                    visible: center.mode === "vinyl"
+                    anchors.centerIn: parent
+                    width: center.d * 0.1
+                    height: width
+                    radius: width / 2
+                    color: Theme.bg
+                    border.width: 2
+                    border.color: Qt.alpha(root.ink, 0.6)
+                }
+
+                FrameAnimation {
+                    id: spin
+                    property real angle: 0
+                    running: center.mode === "vinyl" && root.active && (center.player?.isPlaying ?? false)
+                    // 33 rpm, nudged by the bass
+                    onTriggered: angle = (angle + frameTime * 200 * (1 + Cava.bass * 0.6)) % 360
+                }
+
+                // Every text mode lives here: laid out once at the resting size, so the ring's pulse never
+                // reflows or resizes it. The beat shows as a tremble instead: a jitter that spikes on kicks
+                // and hums on the bass, plus an accent ghost split off sideways
+                Item {
+                    id: shaker
+
+                    readonly property real energy: Math.min(1, Cava.kick + Cava.bass * 0.35)
+                    property real jx: 0
+                    property real jy: 0
+                    property real jr: 0
+
+                    visible: center.hasText || ["lyrics", "clock", "progress"].includes(center.mode)
+                    width: center.d
+                    height: center.d
+                    transform: [
+                        Rotation { origin.x: shaker.width / 2; origin.y: shaker.height / 2; angle: shaker.jr },
+                        Translate { x: shaker.jx; y: shaker.jy }
+                    ]
+                    layer.enabled: visible && root.active
+                    layer.smooth: true
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowBlur: 0.15
+                        shadowColor: center.mode === "cover+title" ? root.ink : Theme.secondary
+                        shadowOpacity: Math.min(0.8, Cava.kick * 1.2)
+                        shadowHorizontalOffset: center.rest * 0.018 * Cava.kick
+                        shadowVerticalOffset: 0
+                    }
+
+                    FrameAnimation {
+                        running: root.active && shaker.visible
+                        onTriggered: {
+                            const amp = center.rest * 0.012 * shaker.energy;
+                            // A new random target every frame, eased into, so it trembles rather than teleports
+                            const ease = Math.min(1, frameTime * 30);
+                            shaker.jx += ((Math.random() * 2 - 1) * amp - shaker.jx) * ease;
+                            shaker.jy += ((Math.random() * 2 - 1) * amp - shaker.jy) * ease;
+                            shaker.jr += ((Math.random() * 2 - 1) * 1.5 * shaker.energy - shaker.jr) * ease;
+                        }
+                    }
+                }
+
+                // Lines are broken at the resting size and then drawn unwrapped, so the font can pulse
+                // with the bass without words jumping between lines
+                Column {
+                    parent: shaker
+                    visible: center.hasText
+                    anchors.centerIn: parent
+                    spacing: center.rest * 0.02
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        text: center.wrap(center.player?.trackTitle ?? "", center.rest * 0.1, center.rest * 0.78, 2, true)
+                        color: center.mode === "cover+title" ? "#ffffff" : root.ink
+                        font.family: Theme.font
+                        font.pixelSize: Math.max(8, center.rest * 0.1)
+                        font.weight: Font.Bold
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        horizontalAlignment: Text.AlignHCenter
+                        text: center.wrap(center.player?.trackArtist ?? "", center.rest * 0.07, center.rest * 0.78, 1, false)
+                        color: center.mode === "cover+title" ? "#ffffff" : root.ink
+                        opacity: 0.7
+                        font.family: Theme.font
+                        font.pixelSize: Math.max(7, center.rest * 0.07)
+                    }
+                }
+
+                // Track position as an arc, the time in the middle
+                Shape {
+                    visible: center.mode === "progress"
+                    anchors.fill: parent
+                    preferredRendererType: Shape.CurveRenderer
+
+                    ShapePath {
+                        fillColor: "transparent"
+                        strokeColor: Qt.alpha(root.ink, 0.2)
+                        strokeWidth: 3
+                        PathAngleArc { centerX: center.d / 2; centerY: center.d / 2; radiusX: center.d / 2 - 4; radiusY: radiusX; startAngle: 0; sweepAngle: 360 }
+                    }
+
+                    ShapePath {
+                        fillColor: "transparent"
+                        strokeColor: root.ink
+                        strokeWidth: 3
+                        capStyle: ShapePath.RoundCap
+                        PathAngleArc {
+                            centerX: center.d / 2
+                            centerY: center.d / 2
+                            radiusX: center.d / 2 - 4
+                            radiusY: radiusX
+                            startAngle: -90
+                            sweepAngle: 360 * progressTick.frac
+                        }
+                    }
+                }
+
+                FrameAnimation {
+                    id: progressTick
+                    property real frac: 0
+                    property real pos: 0
+                    running: center.mode === "progress" && root.active
+                    onTriggered: {
+                        const p = center.player;
+                        pos = p?.position ?? 0;
+                        frac = p && p.length > 0 ? Math.min(1, pos / p.length) : 0;
+                    }
+                }
+
+                Text {
+                    parent: shaker
+                    visible: center.mode === "progress" || center.mode === "clock"
+                    anchors.centerIn: parent
+                    text: center.mode === "clock" ? Qt.formatTime(center.now, "hh:mm")
+                        : Math.floor(progressTick.pos / 60) + ":" + String(Math.floor(progressTick.pos % 60)).padStart(2, "0")
+                    color: root.ink
+                    font.family: Theme.font
+                    font.pixelSize: Math.max(8, center.rest * (center.mode === "clock" ? 0.22 : 0.16))
+                    font.weight: Font.Light
+                }
+
+                Timer {
+                    running: center.mode === "clock" && root.active
+                    interval: 1000
+                    repeat: true
+                    triggeredOnStart: true
+                    onTriggered: center.now = new Date()
+                }
+
+                // Lyrics: the old line fades out, then the new one fades in
+                Item {
+                    id: lyricStage
+
+                    parent: shaker
+
+                    readonly property string target: center.mode === "lyrics" ? (Lyrics.lines[Lyrics.index]?.text ?? center.player?.trackTitle ?? "") : ""
+                    property bool flip: false
+
+                    visible: center.mode === "lyrics"
+                    anchors.fill: parent
+
+                    onTargetChanged: {
+                        (flip ? lyricB : lyricA).line = target;
+                        flip = !flip;
+                    }
+
+                    LyricSlot { id: lyricA; on: lyricStage.flip }
+                    LyricSlot { id: lyricB; on: !lyricStage.flip }
+                }
+
+                // Solid disc breathing with the bass, flashing on kicks
+                Rectangle {
+                    visible: center.mode === "pulse"
+                    anchors.centerIn: parent
+                    width: center.d * (0.55 + Cava.bass * 0.35)
+                    height: width
+                    radius: width / 2
+                    color: root.ink
+                    opacity: 0.25 + Cava.kick * 0.6
+                }
             }
 
             Repeater {
@@ -480,94 +774,109 @@ Item {
                     radius: width / 2
                     color: Theme.surface
 
-                    // Two slots: the new cover fades in over the old one, which only drops once covered.
-                    // While the art is still downloading the url is empty, so the old cover is held
-                    Item {
-                        id: cover
-
-                        readonly property string raw: rings.player?.trackArtUrl ?? ""
-                        readonly property string url: Art.local(raw)
-                        property Image front: picA
-                        property Image prev: null
-
-                        function fadeTo(pic, value) {
-                            if (pic === front && fade.running && fade.to === value)
-                                return;
-                            settle();
-                            if (pic !== front) {
-                                pic.opacity = 0;
-                                pic.z = 1;
-                                front.z = 0;
-                                prev = front;
-                                front = pic;
-                            }
-                            fade.target = pic;
-                            fade.to = value;
-                            fade.start();
-                        }
-
-                        // Finish a running fade at once, before its slots get reused
-                        function settle() {
-                            if (!fade.running)
-                                return;
-                            fade.stop();
-                            fade.target.opacity = fade.to;
-                            dropPrev();
-                        }
-
-                        function dropPrev() {
-                            if (prev)
-                                prev.opacity = 0;
-                            prev = null;
-                        }
-
-                        function loaded(pic) {
-                            if (pic.status === Image.Ready && pic !== front && pic.source.toString() === url)
-                                fadeTo(pic, 1);
-                        }
-
-                        function load() {
-                            if (!raw)
-                                return fadeTo(front, 0);
-                            if (!url)
-                                return;
-                            if (front.source.toString() === url && front.status === Image.Ready)
-                                return fadeTo(front, 1);
-                            const back = front === picA ? picB : picA;
-                            if (back.source.toString() === url && back.status === Image.Ready)
-                                fadeTo(back, 1);
-                            else {
-                                if (back === prev)
-                                    settle();
-                                back.source = url;
-                            }
-                        }
-
+                    Cover {
                         anchors.fill: parent
-                        onRawChanged: Qt.callLater(load)
-                        onUrlChanged: Qt.callLater(load)
-                        Component.onCompleted: load()
-
-                        NumberAnimation {
-                            id: fade
-                            property: "opacity"
-                            duration: 500
-                            easing.type: Easing.InOutQuad
-                            onFinished: cover.dropPrev()
-                        }
-
-                        CoverPic {
-                            id: picA
-                            onStatusChanged: cover.loaded(picA)
-                        }
-
-                        CoverPic {
-                            id: picB
-                            onStatusChanged: cover.loaded(picB)
-                        }
+                        player: rings.player
                     }
                 }
             }
+        }
+    }
+
+    // Two slots: the new cover fades in over the old one, which only drops once covered.
+    // While the art is still downloading the url is empty, so the old cover is held
+    component Cover: Item {
+        id: cover
+
+        property var player: null
+
+        // Black and white along with a B&W, Invertible or bw-mode wallpaper
+        property real gray: Accent.mono ? 1 : 0
+        Behavior on gray { NumberAnimation { duration: 600; easing.type: Easing.InOutQuad } }
+
+        layer.enabled: gray > 0
+        layer.effect: MultiEffect {
+            saturation: -cover.gray
+        }
+
+        readonly property string raw: player?.trackArtUrl ?? ""
+        readonly property string url: Art.local(raw)
+        property Image front: picA
+        property Image prev: null
+
+        function fadeTo(pic, value) {
+            if (pic === front && fade.running && fade.to === value)
+                return;
+            settle();
+            if (pic !== front) {
+                pic.opacity = 0;
+                pic.z = 1;
+                front.z = 0;
+                prev = front;
+                front = pic;
+            }
+            fade.target = pic;
+            fade.to = value;
+            fade.start();
+        }
+
+        // Finish a running fade at once, before its slots get reused
+        function settle() {
+            if (!fade.running)
+                return;
+            fade.stop();
+            fade.target.opacity = fade.to;
+            dropPrev();
+        }
+
+        function dropPrev() {
+            if (prev)
+                prev.opacity = 0;
+            prev = null;
+        }
+
+        function loaded(pic) {
+            if (pic.status === Image.Ready && pic !== front && pic.source.toString() === url)
+                fadeTo(pic, 1);
+        }
+
+        function load() {
+            if (!raw)
+                return fadeTo(front, 0);
+            if (!url)
+                return;
+            if (front.source.toString() === url && front.status === Image.Ready)
+                return fadeTo(front, 1);
+            const back = front === picA ? picB : picA;
+            if (back.source.toString() === url && back.status === Image.Ready)
+                fadeTo(back, 1);
+            else {
+                if (back === prev)
+                    settle();
+                back.source = url;
+            }
+        }
+
+        onRawChanged: Qt.callLater(load)
+        onUrlChanged: Qt.callLater(load)
+        Component.onCompleted: load()
+
+        NumberAnimation {
+            id: fade
+            property: "opacity"
+            duration: 500
+            easing.type: Easing.InOutQuad
+            onFinished: cover.dropPrev()
+        }
+
+        CoverPic {
+            id: picA
+            onStatusChanged: cover.loaded(picA)
+        }
+
+        CoverPic {
+            id: picB
+            onStatusChanged: cover.loaded(picB)
         }
     }
 

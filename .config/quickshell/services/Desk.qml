@@ -20,7 +20,7 @@ Singleton {
             visualizer: {
                 name: "Visualizer",
                 icon: "graphic_eq",
-                props: { style: "bars", color: "auto", gain: 1, align: "bottom", count: 48, gap: 6, round: 1, fill: "fade", ease: 50, thickness: 2, fillAlpha: 0.45, smooth: 0.55, ringCount: 96, ringWidth: 4, ringSize: 1, ringLine: true, pDensity: 1, pSpeed: 1, pSize: 1, spread: 1 },
+                props: { style: "bars", color: "auto", gain: 1, align: "bottom", count: 48, gap: 6, round: 1, fill: "fade", ease: 50, thickness: 2, fillAlpha: 0.45, smooth: 0.55, ringCount: 96, ringWidth: 4, ringSize: 1, ringLine: true, ringCenter: "none", ringGlow: false, pDensity: 1, pSpeed: 1, pSize: 1, spread: 1 },
                 schema: [
                     { key: "style", label: "Style", values: styles },
                     { key: "color", label: "Color", values: colors },
@@ -38,6 +38,8 @@ Singleton {
                     { key: "ringWidth", label: "Spike width", min: 1, max: 12, step: 0.5, unit: "px", only: ["ring"] },
                     { key: "ringSize", label: "Hole", min: 0.3, max: 2, step: 0.05, unit: "%", only: ["ring"] },
                     { key: "ringLine", label: "Circle", type: "bool", only: ["ring"] },
+                    { key: "ringGlow", label: "Glow", type: "bool", only: ["ring"] },
+                    { key: "ringCenter", label: "Inside", values: ["none", "cover", "title", "cover+title", "vinyl", "progress", "lyrics", "clock", "pulse"], only: ["ring"] },
                     { key: "spread", label: "Spread", min: 0.3, max: 2.5, step: 0.05, unit: "%", only: ["particles"] },
                     { key: "pDensity", label: "Density", min: 0.25, max: 4, step: 0.05, unit: "%", only: ["particles"] },
                     { key: "pSpeed", label: "Speed", min: 0.25, max: 3, step: 0.05, unit: "%", only: ["particles"] },
@@ -153,7 +155,7 @@ Singleton {
     readonly property var fxSchema: [
         { key: "glow", group: "Glow", label: "On", type: "bool" },
         { key: "glowType", group: "Glow", label: "Type", values: ["edge", "radial", "halo"] },
-        { key: "glowFrom", group: "Glow", label: "From", values: ["bottom", "top", "left", "right"] },
+        { key: "glowFrom", group: "Glow", label: "From", values: ["bottom", "top", "left", "right", "around"] },
         { key: "glowSize", group: "Glow", label: "Size", min: 0.1, max: 1, step: 0.05, unit: "%" },
         { key: "gain.glow", group: "Glow", label: "Strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
         { key: "color", group: "Glow", label: "Color", values: colors },

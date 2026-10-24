@@ -37,6 +37,7 @@ Item {
     }
 
     readonly property int rowHeight: 48
+    property real rows: 6
 
     implicitHeight: column.implicitHeight
 
@@ -173,7 +174,7 @@ Item {
 
         Item {
             width: parent.width
-            height: root.rowHeight * 6
+            height: root.rowHeight * root.rows
 
             Label {
                 anchors.centerIn: parent
