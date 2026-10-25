@@ -71,9 +71,36 @@ Item {
         NumberAnimation { target: root; property: "swap"; to: 1; duration: Desk.morphTime / 2; easing.type: Easing.OutSine }
     }
 
-    Loader {
-        anchors.fill: parent
-        sourceComponent: ({ visualizer: visualizer, clock: clock, calendar: calendar, media: media, weather: weather, stats: stats, lyrics: lyrics })[root.spec.type] ?? null
+    // Whole widget, a ring with its cover included; only layered while there's something to draw.
+    // Bigger than the widget by pad, so glows, the split and torn strips aren't cut at the rect
+    Item {
+        id: content
+
+        readonly property string glitchKey: ({ visualizer: "ring", lyrics: "lyrics" })[root.spec.type] ?? ""
+        readonly property real burst: glitchKey ? Glitch.burstFor(glitchKey) : 0
+        readonly property real pad: Math.round(Math.min(240, 48 + Math.min(root.width, root.height) * 0.5))
+
+        x: -pad
+        y: -pad
+        width: root.width + pad * 2
+        height: root.height + pad * 2
+        layer.enabled: glitchKey !== "" && Glitch.has(glitchKey) && (Glitch.split > 0 || burst > 0)
+        layer.effect: ShaderEffect {
+            property real split: Glitch.split
+            property real burst: content.burst
+            property real seed: Glitch.seed
+            property real tear: Math.max(16, Math.min(root.width, root.height) * 0.08) * Glitch.gain
+            property size px: Qt.size(1 / width, 1 / height)
+            fragmentShader: Qt.resolvedUrl("../../shaders/glitch.frag.qsb")
+        }
+
+        Loader {
+            x: content.pad
+            y: content.pad
+            width: root.width
+            height: root.height
+            sourceComponent: ({ visualizer: visualizer, clock: clock, calendar: calendar, media: media, weather: weather, stats: stats, lyrics: lyrics })[root.spec.type] ?? null
+        }
     }
 
     Component {

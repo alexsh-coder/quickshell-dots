@@ -9,7 +9,7 @@ Column {
 
     // Effect whose own strength slider is shown, opened by right-clicking it
     property string editing: ""
-    readonly property var names: ({ desktop: "Visualizer", glow: "Glow", blur: "Blur", zoom: "Zoom", shake: "Shake" })
+    readonly property var names: ({ desktop: "Visualizer", glow: "Glow", blur: "Blur", zoom: "Zoom", shake: "Shake", glitch: "Glitch", pulse: "Pulse", ripple: "Ripple", bloom: "Bloom", vhs: "VHS", hue: "Hue" })
     readonly property var styleIcons: ({ bars: "graphic_eq", wave: "airwave", mirror: "align_vertical_center", ring: "donut_large", nation: "album", particles: "auto_awesome" })
     // A slider is held
     readonly property bool busy: intensitySlider.pressed || strengthSlider.pressed
@@ -205,6 +205,12 @@ Column {
                 Tile { icon: "blur_on"; label: "Blur"; key: "blur" }
                 Tile { icon: "zoom_out_map"; label: "Zoom"; key: "zoom" }
                 Tile { icon: "earthquake"; label: "Shake"; key: "shake" }
+                Tile { icon: "broken_image"; label: "Glitch"; key: "glitch" }
+                Tile { icon: "bolt"; label: "Pulse"; key: "pulse" }
+                Tile { icon: "waves"; label: "Ripple"; key: "ripple" }
+                Tile { icon: "light_mode"; label: "Bloom"; key: "bloom" }
+                Tile { icon: "live_tv"; label: "VHS"; key: "vhs" }
+                Tile { icon: "palette"; label: "Hue"; key: "hue" }
             }
 
             // Strength of one effect, slides open under the grid
@@ -450,6 +456,8 @@ Column {
             id: drag
             anchors.fill: parent
             anchors.margins: -6
+            // Inside the popout's scrolling list: a drag here moves the slider, not the list
+            preventStealing: true
             cursorShape: Qt.PointingHandCursor
             onPressed: mouse => slider.setFrom(mouse.x - 6)
             onPositionChanged: mouse => { if (pressed) slider.setFrom(mouse.x - 6); }

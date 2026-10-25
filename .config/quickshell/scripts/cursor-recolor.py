@@ -13,7 +13,7 @@ With ONLY_SIZE=n in the environment just that size is built, fast, and the copy 
 Either way every size in SIZES is added, and missing names are linked to ones the theme has.
 
 With contrast the outline is redrawn black or white against the new color (for plain black or
-white cursors); without it the theme's own outline stays.
+white cursors); without it the theme's own outline stays, unless it would blend into the new body.
 
 Colorful themes get their hue swapped for the accent's; black-and-white ones get the body
 (the larger of the dark and light parts) painted in it, keeping the outline.
@@ -155,6 +155,18 @@ def mode(all_images):
     return "dark" if dark >= light else "light"
 
 
+def luminance(rgb):
+    lin = [c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4 for c in rgb]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def blends(accent, how):
+    """True when a black-and-white theme's outline (white around a dark body, black around a
+    light one) has under 3:1 contrast with the accent."""
+    y, edge = luminance(accent), 1.0 if how == "dark" else 0.0
+    return (max(y, edge) + 0.05) / (min(y, edge) + 0.05) < 3
+
+
 def recolor(px, how, accent, contrast):
     rgb, a = straight(px)
     acc = np.array(accent, np.float32)
@@ -283,6 +295,7 @@ def main():
         except (OSError, struct.error, ValueError):
             pass
     how = None if plain else mode(sample)
+    contrast = contrast or how in ("dark", "light") and blends(accent, how)
 
     # Work in slices of a file's images, so the big animated ones don't hold everything up
     step = 16

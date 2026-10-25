@@ -12,10 +12,8 @@ Scope {
     id: root
 
     property bool open: false
-    // Flipped off and on in show() to replay the rows' entrance
-    property bool populated: true
-    // True right after opening: rows pop in like bubbles instead of sliding
-    property bool entering: false
+    // Rows replay their entrance on this instead of being recreated, which stalled the first frames
+    signal entered()
     // Hover only takes over the selection after a real cursor move, not when the list scrolls under it
     property bool mouseActive: false
     property point lastCursor: Qt.point(-1, -1)
@@ -39,6 +37,17 @@ Scope {
     // Id of the app whose name is being edited in its row, and the text typed so far
     property string renaming: ""
     property string renameText: ""
+
+    // Prefix mode (">", "?", ":", "@", "/", "!") and what's typed after the prefix
+    readonly property var parsed: modes.parse(query)
+    readonly property string mode: parsed.mode
+    // Calculator, currency, unit, date, time or translation answer for the query, takes Enter over the app list
+    readonly property var answer: mode ? null : Calc.answer(query) ?? (Lookup.query === query ? Lookup.answer : null)
+    readonly property var view: mode ? modeView : resultsView
+    onQueryChanged: Lookup.request(mode ? "" : query)
+    // Kept while the answer card collapses, so its text doesn't vanish mid-animation
+    property var shownAnswer: null
+    onAnswerChanged: if (answer) shownAnswer = answer
 
     readonly property int rowHeight: 52
     readonly property int maxRows: 7
@@ -108,22 +117,23 @@ Scope {
 
     function show() {
         // Everything here runs before open flips, so geometry snaps instead of animating
-        search.clear();
-        query = "";
         showHidden = false;
         menuOpen = false;
         renaming = "";
         mouseActive = false;
         lastCursor = Qt.point(-1, -1);
         ranks = Usage.ranks();
-        entering = true;
-        enterTimer.restart();
-        populated = false;
-        populated = true;
+        Rates.refresh();
         resultsView.currentIndex = 0;
         resultsView.positionViewAtBeginning();
+        entered();
         open = true;
         Qt.callLater(() => search.forceActiveFocus());
+    }
+
+    function setQuery(text) {
+        search.text = text;
+        query = text;
     }
 
     function cursorMoved(item, x, y) {
@@ -152,6 +162,17 @@ Scope {
             Quickshell.execDetached([Theme.terminal, "-e"].concat(Array.from(entry.command)));
         else
             entry.execute();
+        hide();
+    }
+
+    function activateItem(item, alt) {
+        if (modes.activate(item, alt))
+            hide();
+    }
+
+    function copyAnswer() {
+        if (answer?.copy)
+            Quickshell.execDetached(["wl-copy", "--", answer.copy]);
         hide();
     }
 
@@ -351,8 +372,19 @@ Scope {
 
         if (event.key === Qt.Key_Escape) {
             hide();
+        } else if (mode && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            activateItem(modeView.currentItem?.modelData ?? null, ctrl);
+        } else if (mode && (event.key === Qt.Key_Down || event.key === Qt.Key_Tab)) {
+            modeView.incrementCurrentIndex();
+        } else if (mode && event.key === Qt.Key_Up) {
+            modeView.decrementCurrentIndex();
+        } else if (mode) {
+            return;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            launch(resultsView.currentItem?.modelData ?? null);
+            if (answer)
+                copyAnswer();
+            else
+                launch(resultsView.currentItem?.modelData ?? null);
         } else if (event.key === Qt.Key_Menu || shift && event.key === Qt.Key_F10) {
             openMenu(resultsView.currentItem?.modelData ?? null);
         } else if (event.key === Qt.Key_F2) {
@@ -375,12 +407,6 @@ Scope {
         event.accepted = true;
     }
 
-    Timer {
-        id: enterTimer
-        interval: 900
-        onTriggered: root.entering = false
-    }
-
     // Usage may finish loading after the first open
     Connections {
         target: Usage
@@ -401,11 +427,21 @@ Scope {
         }
 
         function open(): void { root.show(); }
+        // Opens with the query typed in: "search :" is an emoji picker, "search @" a window switcher
+        function search(text: string): void {
+            root.show();
+            root.setQuery(text);
+        }
         function close(): void { root.hide(); }
     }
 
     PanelWindow {
         visible: root.open || card.opacity > 0
+        // Cleared once the card is gone, so the next open finds its rows already built
+        onVisibleChanged: if (!visible) {
+            search.clear();
+            root.query = "";
+        }
         screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
 
         WlrLayershell.namespace: "launcher"
@@ -480,7 +516,7 @@ Scope {
                         id: searchIcon
                         x: 14
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "search"
+                        text: root.mode ? modes.info[root.mode].icon : "search"
                         font.pixelSize: 22
                         color: Theme.accent
                     }
@@ -500,7 +536,6 @@ Scope {
                         clip: true
                         focus: true
                         onTextEdited: {
-                            root.entering = false;
                             root.query = text;
                             resultsView.currentIndex = 0;
                         }
@@ -512,6 +547,30 @@ Scope {
                             font.pixelSize: 17
                             color: Theme.subtext
                             text: "Search apps"
+                        }
+
+                        // What each prefix does, until something is typed
+                        Label {
+                            visible: !search.text
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            font.pixelSize: 12
+                            font.weight: Font.Normal
+                            color: Theme.subtext
+                            text: "=  >  ?  :  @  /  !"
+                        }
+
+                        // The mode's own hint, right after its prefix
+                        Label {
+                            visible: !!root.mode && !root.parsed.text
+                            x: search.positionToRectangle(search.text.length).x + 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: search.width - x
+                            elide: Text.ElideRight
+                            font.pixelSize: 14
+                            font.weight: Font.Normal
+                            color: Theme.subtext
+                            text: root.mode ? modes.info[root.mode].placeholder : ""
                         }
                     }
 
@@ -530,11 +589,85 @@ Scope {
                     }
                 }
 
+                Item {
+                    id: answerCard
+                    width: parent.width
+                    height: root.answer ? Math.max(64, answerText.implicitHeight + answerHint.implicitHeight + 26) : 0
+                    visible: height > 0
+                    clip: true
+                    Behavior on height { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.copyAnswer()
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.radius
+                        color: Qt.alpha(Theme.accent, 0.14)
+                        opacity: root.answer ? 1 : 0
+                        Behavior on opacity { NumberAnimation { duration: Theme.anim } }
+
+                        Icon {
+                            id: answerIcon
+                            x: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: root.shownAnswer?.icon ?? "calculate"
+                            font.pixelSize: 24
+                            color: Theme.accent
+                        }
+
+                        Column {
+                            anchors.left: answerIcon.right
+                            anchors.leftMargin: 14
+                            anchors.right: copyHint.left
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 2
+
+                            Label {
+                                id: answerText
+                                width: parent.width
+                                elide: Text.ElideRight
+                                wrapMode: root.shownAnswer?.wrap ? Text.Wrap : Text.NoWrap
+                                maximumLineCount: 5
+                                font.pixelSize: root.shownAnswer?.wrap ? 17 : 22
+                                font.weight: Font.DemiBold
+                                color: Theme.accent
+                                text: root.shownAnswer?.text ?? ""
+                            }
+
+                            Label {
+                                id: answerHint
+                                width: parent.width
+                                elide: Text.ElideRight
+                                font.pixelSize: 12
+                                font.weight: Font.Normal
+                                color: Theme.subtext
+                                text: root.shownAnswer?.hint ?? ""
+                            }
+                        }
+
+                        Label {
+                            id: copyHint
+                            anchors.right: parent.right
+                            anchors.rightMargin: 16
+                            anchors.verticalCenter: parent.verticalCenter
+                            font.pixelSize: 12
+                            color: Theme.subtext
+                            text: "Enter to copy"
+                        }
+                    }
+                }
+
                 ListView {
                     id: resultsView
 
                     width: parent.width
-                    height: Math.min(count, root.maxRows) * root.rowHeight
+                    // "=" means math only, the app list steps aside
+                    height: root.mode || root.query.trim().startsWith("=") ? 0 : Math.min(count, root.maxRows) * root.rowHeight
+                    visible: height > 0
                     clip: true
                     interactive: !root.dragId
                     boundsBehavior: Flickable.StopAtBounds
@@ -543,7 +676,7 @@ Scope {
                     currentIndex: 0
 
                     model: ScriptModel {
-                        values: root.populated ? root.results : []
+                        values: root.results
                     }
 
                     highlight: Rectangle {
@@ -564,14 +697,10 @@ Scope {
                         id: addTrans
                         SequentialAnimation {
                             PropertyAction { property: "opacity"; value: 0 }
-                            PropertyAction { property: "scale"; value: root.entering ? 1 - 0.14 * Math.pow(0.72, addTrans.ViewTransition.index) : 1 }
-                            PropertyAction { property: "lift"; value: root.entering ? 14 * Math.pow(0.72, addTrans.ViewTransition.index) : 0 }
-                            PauseAnimation { duration: Math.max(0, Math.min(addTrans.ViewTransition.index, 10)) * (root.entering ? 45 : 18) }
+                            PauseAnimation { duration: Math.max(0, Math.min(addTrans.ViewTransition.index, 10)) * 18 }
                             ParallelAnimation {
                                 NumberAnimation { property: "opacity"; to: 1; duration: Theme.anim }
-                                NumberAnimation { property: "x"; from: root.entering ? 0 : 16; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
-                                NumberAnimation { property: "scale"; to: 1; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 0.5 + 2.1 * Math.pow(0.72, addTrans.ViewTransition.index) }
-                                NumberAnimation { property: "lift"; to: 0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 0.5 + 2.1 * Math.pow(0.72, addTrans.ViewTransition.index) }
+                                NumberAnimation { property: "x"; from: 16; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
                             }
                         }
                     }
@@ -587,7 +716,46 @@ Scope {
                         NumberAnimation { property: "lift"; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
                     }
                 }
+
+                ListView {
+                    id: modeView
+
+                    width: parent.width
+                    height: root.mode ? Math.min(count, root.maxRows) * root.rowHeight : 0
+                    visible: height > 0
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    highlightMoveDuration: 160
+                    highlightMoveVelocity: -1
+                    currentIndex: 0
+                    // A new list starts from its top
+                    onCountChanged: currentIndex = 0
+
+                    model: ScriptModel {
+                        values: modes.items
+                        objectProp: "key"
+                    }
+
+                    highlight: Rectangle {
+                        radius: Theme.radius
+                        color: Qt.alpha(Theme.accent, 0.14)
+                    }
+
+                    delegate: ModeRow {
+                        launcher: root
+                        height: root.rowHeight
+                        width: modeView.width
+                        current: ListView.isCurrentItem
+                    }
+                }
             }
+        }
+
+        Modes {
+            id: modes
+            launcher: root
+            mode: root.mode
+            text: root.parsed.text
         }
 
         // Any click outside the open menu just closes it

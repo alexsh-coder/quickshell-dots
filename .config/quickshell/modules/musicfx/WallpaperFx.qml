@@ -6,7 +6,7 @@ import qs.config
 import qs.services
 
 // Music-reactive copy of the wallpaper on top of awww: zoom on the bass, blur and shake on kicks,
-// accent glow (see GlowOverlay). Only mapped while music plays, so awww shows through otherwise.
+// accent glow (see GlowOverlay), and the WallFx shader effects. Only mapped while music plays, so awww shows through otherwise.
 PanelWindow {
     id: root
 
@@ -75,33 +75,39 @@ PanelWindow {
         opacity: root.active ? 1 : 0
         Behavior on opacity { NumberAnimation { duration: root.swapping ? 0 : Theme.anim * 2 } }
 
-        Image {
-            id: image
-
+        // Pulse, ripple, bloom, VHS, hue and the glitch over the blurred, moving image
+        WallFxStage {
             anchors.fill: parent
-            source: root.source ? "file://" + root.source : ""
-            sourceSize: Qt.size(root.width * 1.1, root.height * 1.1)
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            cache: false
-            smooth: true
+            on: !Wallpaper.video
 
-            // No padding: the blur clamps at the edges instead of fading them to transparent
-            layer.enabled: MusicFx.blur
-            layer.effect: MultiEffect {
-                autoPaddingEnabled: false
-                blurEnabled: true
-                blurMax: 48
-                // Kicks, not loudness: a song that stays loud shouldn't keep the wallpaper blurred
-                blur: Math.min(1, Cava.kick * 0.8 * MusicFx.gain("blur"))
-            }
+            Image {
+                id: image
 
-            // Overscan just enough to hide the edges while shaking
-            scale: 1 + root.zoom + root.shakeAmp * 2 / Math.min(root.width, root.height)
-            // Layered sines instead of random(), so the shake is jittery but not flickery
-            transform: Translate {
-                x: root.shakeAmp * (Math.sin(root.time * 47) * 0.6 + Math.sin(root.time * 83 + 1.3) * 0.4)
-                y: root.shakeAmp * (Math.sin(root.time * 53 + 2.1) * 0.6 + Math.sin(root.time * 71 + 0.4) * 0.4)
+                anchors.fill: parent
+                source: root.source ? "file://" + root.source : ""
+                sourceSize: Qt.size(root.width * 1.1, root.height * 1.1)
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: false
+                smooth: true
+
+                // No padding: the blur clamps at the edges instead of fading them to transparent
+                layer.enabled: MusicFx.blur
+                layer.effect: MultiEffect {
+                    autoPaddingEnabled: false
+                    blurEnabled: true
+                    blurMax: 48
+                    // Kicks, not loudness: a song that stays loud shouldn't keep the wallpaper blurred
+                    blur: Math.min(1, Cava.kick * 0.8 * MusicFx.gain("blur"))
+                }
+
+                // Overscan just enough to hide the edges while shaking
+                scale: 1 + root.zoom + root.shakeAmp * 2 / Math.min(root.width, root.height)
+                // Layered sines instead of random(), so the shake is jittery but not flickery
+                transform: Translate {
+                    x: root.shakeAmp * (Math.sin(root.time * 47) * 0.6 + Math.sin(root.time * 83 + 1.3) * 0.4)
+                    y: root.shakeAmp * (Math.sin(root.time * 53 + 2.1) * 0.6 + Math.sin(root.time * 71 + 0.4) * 0.4)
+                }
             }
         }
 

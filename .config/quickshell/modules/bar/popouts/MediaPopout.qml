@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as QQC
 import QtQuick.Effects
 import Quickshell.Services.Mpris
 import Quickshell.Services.Pipewire
@@ -702,12 +703,50 @@ Item {
             }
         }
 
-        FxControls {
-            id: fxControls
+        // Scrolls once it's taller than the screen below the bar
+        Flickable {
+            id: fxFlick
+
             width: parent.width
-            onCustomize: {
-                root.popouts.close();
-                Desk.editing = true;
+            height: Math.min(fxControls.implicitHeight, root.popouts.height - Theme.barHeight - Theme.padTop - Theme.pad - 28 - parent.spacing - 16)
+            contentHeight: fxControls.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+
+            HoverHandler { id: fxHover }
+
+            // Thin draggable bar in the right margin, only while the pointer is over the list
+            QQC.ScrollBar.vertical: QQC.ScrollBar {
+                id: fxBar
+
+                parent: root
+                x: root.width - width - 4
+                y: fxView.y + fxFlick.y
+                height: fxFlick.height
+                width: 8
+                padding: 0
+                policy: fxFlick.contentHeight > fxFlick.height ? QQC.ScrollBar.AlwaysOn : QQC.ScrollBar.AlwaysOff
+                visible: root.fx
+                opacity: fxHover.hovered || hovered || pressed ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 150 } }
+                background: null
+                contentItem: Rectangle {
+                    implicitWidth: 4
+                    radius: width / 2
+                    x: (fxBar.width - width) / 2
+                    width: fxBar.hovered || fxBar.pressed ? 6 : 4
+                    color: fxBar.pressed ? Theme.accent : Qt.alpha(Theme.subtext, fxBar.hovered ? 0.7 : 0.4)
+                    Behavior on width { NumberAnimation { duration: 120 } }
+                }
+            }
+
+            FxControls {
+                id: fxControls
+                width: parent.width
+                onCustomize: {
+                    root.popouts.close();
+                    Desk.editing = true;
+                }
             }
         }
     }

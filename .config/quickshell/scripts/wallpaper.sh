@@ -67,14 +67,15 @@ gray() {
     magick "$1[0]" -background black -flatten -alpha off -colorspace Gray -colorspace sRGB -type TrueColor -quality 95 "$out.$$.jpg" && mv -f "$out.$$.jpg" "$out"
 }
 
-# Mean chroma of a small copy, cached next to the variants; under 0.04 counts as black and white
+# Share of clearly coloured pixels (chroma over 12%) in a small copy, cached next to the variants;
+# none counts as black and white. A mean would miss a small colour accent on a gray image
 chroma() {
-    local c=$2/$(printf '%s' "$1" | md5sum | cut -c1-32).chroma
+    local c=$2/$(printf '%s' "$1" | md5sum | cut -c1-32).colored
     if ! { [ -s "$c" ] && [ "$c" -nt "$1" ]; }; then
         mkdir -p "$2"
-        magick "$1[0]" -resize 64x64 -colorspace HCL -channel G -separate +channel -format '%[fx:mean]' info: >"$c" 2>/dev/null || return 1
+        magick "$1[0]" -resize 64x64 -colorspace HCL -channel G -separate +channel -threshold 12% -format '%[fx:mean]' info: >"$c" 2>/dev/null || return 1
     fi
-    awk '{ exit !($1 < 0.04) }' "$c"
+    awk '{ exit !($1 < 0.001) }' "$c"
 }
 
 # A player that's gone can linger as a zombie for a while

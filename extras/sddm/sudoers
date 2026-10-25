@@ -1,0 +1,2 @@
+# The shell syncs the login screen with the wallpaper through `sudo -n sddm-rice-sync`
+%wheel ALL=(root) NOPASSWD: /usr/local/bin/sddm-rice-sync

@@ -13,9 +13,8 @@ Scope {
 
     property ShellScreen screen: Quickshell.screens[0]
     property string section: "wallpaper"
-    // Sections are built on first view and dropped a minute after the card closes,
-    // unless a monitor change is still waiting to be kept
-    readonly property bool alive: win.visible || warm.running || (displayPage.item?.countdown ?? 0) > 0
+    // Sections are built on first view and dropped a minute after the card closes
+    readonly property bool alive: win.visible || warm.running
     property var seen: []
     onSectionChanged: if (!seen.includes(section)) seen = seen.concat(section)
     onAliveChanged: if (!alive) seen = []

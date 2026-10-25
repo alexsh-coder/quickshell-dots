@@ -20,7 +20,7 @@ Singleton {
             visualizer: {
                 name: "Visualizer",
                 icon: "graphic_eq",
-                props: { style: "bars", color: "auto", gain: 1, align: "bottom", count: 48, gap: 6, round: 1, fill: "fade", ease: 50, thickness: 2, fillAlpha: 0.45, smooth: 0.55, ringCount: 96, ringWidth: 4, ringSize: 1, ringLine: true, ringCenter: "none", ringGlow: false, pDensity: 1, pSpeed: 1, pSize: 1, spread: 1 },
+                props: { style: "bars", color: "auto", gain: 1, align: "bottom", count: 48, gap: 6, round: 1, fill: "fade", ease: 50, thickness: 2, fillAlpha: 0.45, smooth: 0.55, ringCount: 96, ringWidth: 4, ringSize: 1, ringLine: true, ringCenter: "none", nationCenter: "cover", ringGlow: false, pDensity: 1, pSpeed: 1, pSize: 1, spread: 1 },
                 schema: [
                     { key: "style", label: "Style", values: styles },
                     { key: "color", label: "Color", values: colors },
@@ -40,6 +40,7 @@ Singleton {
                     { key: "ringLine", label: "Circle", type: "bool", only: ["ring"] },
                     { key: "ringGlow", label: "Glow", type: "bool", only: ["ring"] },
                     { key: "ringCenter", label: "Inside", values: ["none", "cover", "title", "cover+title", "vinyl", "progress", "lyrics", "clock", "pulse"], only: ["ring"] },
+                    { key: "nationCenter", label: "Inside", values: ["none", "cover", "title", "cover+title", "vinyl", "progress", "lyrics", "clock", "pulse"], only: ["nation"] },
                     { key: "spread", label: "Spread", min: 0.3, max: 2.5, step: 0.05, unit: "%", only: ["particles"] },
                     { key: "pDensity", label: "Density", min: 0.25, max: 4, step: 0.05, unit: "%", only: ["particles"] },
                     { key: "pSpeed", label: "Speed", min: 0.25, max: 3, step: 0.05, unit: "%", only: ["particles"] },
@@ -147,10 +148,26 @@ Singleton {
             blur: false,
             zoom: false,
             shake: false,
+            glitch: false,
+            glitchTargets: ["wall", "ring", "lyrics"],
+            glitchDrift: true,
+            pulse: false,
+            ripple: false,
+            bloom: false,
+            bloomSat: 1,
+            bloomContrast: 1,
+            vhs: false,
+            hue: false,
             "gain.glow": 1,
             "gain.blur": 1,
             "gain.zoom": 1,
-            "gain.shake": 1
+            "gain.shake": 1,
+            "gain.glitch": 1,
+            "gain.pulse": 1,
+            "gain.ripple": 1,
+            "gain.bloom": 1,
+            "gain.vhs": 1,
+            "gain.hue": 1
         })
     readonly property var fxSchema: [
         { key: "glow", group: "Glow", label: "On", type: "bool" },
@@ -164,7 +181,23 @@ Singleton {
         { key: "zoom", group: "Wallpaper", label: "Zoom", type: "bool" },
         { key: "gain.zoom", group: "Wallpaper", label: "Zoom strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
         { key: "shake", group: "Wallpaper", label: "Shake", type: "bool" },
-        { key: "gain.shake", group: "Wallpaper", label: "Shake strength", min: 0.1, max: 2, step: 0.05, unit: "%" }
+        { key: "gain.shake", group: "Wallpaper", label: "Shake strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
+        { key: "glitch", group: "Glitch", label: "On", type: "bool" },
+        { key: "glitchTargets", group: "Glitch", label: "Targets", values: ["wall", "ring", "lyrics"], multi: true },
+        { key: "glitchDrift", group: "Glitch", label: "Drift on bass", type: "bool" },
+        { key: "gain.glitch", group: "Glitch", label: "Strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
+        { key: "pulse", group: "Wallpaper", label: "Pulse", type: "bool" },
+        { key: "gain.pulse", group: "Wallpaper", label: "Pulse strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
+        { key: "ripple", group: "Wallpaper", label: "Ripple", type: "bool" },
+        { key: "gain.ripple", group: "Wallpaper", label: "Ripple strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
+        { key: "bloom", group: "Wallpaper", label: "Bloom", type: "bool" },
+        { key: "gain.bloom", group: "Wallpaper", label: "Bloom strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
+        { key: "bloomSat", group: "Wallpaper", label: "Bloom saturation", min: 0, max: 2, step: 0.05, unit: "%" },
+        { key: "bloomContrast", group: "Wallpaper", label: "Bloom contrast", min: 0, max: 2, step: 0.05, unit: "%" },
+        { key: "vhs", group: "Wallpaper", label: "VHS", type: "bool" },
+        { key: "gain.vhs", group: "Wallpaper", label: "VHS strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
+        { key: "hue", group: "Wallpaper", label: "Hue", type: "bool" },
+        { key: "gain.hue", group: "Wallpaper", label: "Hue strength", min: 0.1, max: 2, step: 0.05, unit: "%" }
     ]
 
     readonly property var presets: adapter.presets
@@ -238,7 +271,7 @@ Singleton {
         const p = presets[idFor(path)];
         const out = Object.assign({}, fxDefaults, p ? p.fx : {});
         if (!p || !fxOn)
-            for (const k of ["glow", "blur", "zoom", "shake"])
+            for (const k of ["glow", "blur", "zoom", "shake", "glitch", "pulse", "ripple", "bloom", "vhs", "hue"])
                 out[k] = false;
         const v = (p?.widgets ?? []).find(w => w.type === "visualizer");
         out.cx = v?.x ?? 0.5;

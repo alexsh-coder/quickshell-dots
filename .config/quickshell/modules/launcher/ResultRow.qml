@@ -40,6 +40,28 @@ MouseArea {
         shiftAnim.restart();
     }
 
+    // Bubble pop when the launcher opens; rows further down start later and bounce less
+    readonly property real popFactor: Math.pow(0.72, Math.max(0, Math.min(index, 10)))
+    SequentialAnimation {
+        id: enterAnim
+        PropertyAction { target: root; property: "opacity"; value: 0 }
+        PropertyAction { target: root; property: "scale"; value: 1 - 0.14 * root.popFactor }
+        PropertyAction { target: root; property: "lift"; value: 14 * root.popFactor }
+        PauseAnimation { duration: Math.max(0, Math.min(root.index, 10)) * 45 }
+        ParallelAnimation {
+            NumberAnimation { target: root; property: "opacity"; to: 1; duration: Theme.anim }
+            NumberAnimation { target: root; property: "scale"; to: 1; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 0.5 + 2.1 * root.popFactor }
+            NumberAnimation { target: root; property: "lift"; to: 0; duration: 420; easing.type: Easing.OutBack; easing.overshoot: 0.5 + 2.1 * root.popFactor }
+        }
+    }
+
+    Connections {
+        target: root.launcher
+        function onEntered() {
+            enterAnim.restart();
+        }
+    }
+
     NumberAnimation {
         id: shiftAnim
         target: root

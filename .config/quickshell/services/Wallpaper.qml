@@ -583,4 +583,19 @@ Singleton {
         Quickshell.execDetached([script, "bw", bw ? "on" : "off"]);
         refresh();
     }
+
+    // The login screen follows the wallpaper and accent once they settle, so flipping through
+    // wallpapers only syncs the last one (extras/sddm)
+    Timer {
+        id: loginSync
+        interval: 5000
+        onTriggered: if (root.image) Quickshell.execDetached(["sudo", "-n", "/usr/local/bin/sddm-rice-sync", root.image, Accent.color.toString()])
+    }
+
+    onImageChanged: loginSync.restart()
+
+    Connections {
+        target: Accent
+        function onColorChanged() { loginSync.restart(); }
+    }
 }

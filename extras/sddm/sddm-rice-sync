@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Copies a wallpaper and accent into the Rice SDDM theme. Run through sudo by the shell;
+# the image is read as the calling user, so root never opens a path it was handed.
+# Usage: sddm-rice-sync IMAGE '#rrggbb'
+set -euo pipefail
+
+theme=/usr/share/sddm/themes/rice
+[ -d "$theme" ] || exit 0
+[[ ${2:-} =~ ^#[0-9a-fA-F]{6}$ ]] || { echo "bad accent" >&2; exit 1; }
+as=${SUDO_USER:-root}
+
+tmp=$(mktemp "$theme/.bg.XXXXXX")
+trap 'rm -f "${tmp:?}"' EXIT
+sudo -u "$as" nice -n 19 ionice -c 3 magick "$1[0]" -resize '2560x2560>' -quality 92 jpg:- > "$tmp"
+chmod 644 "$tmp"
+mv "$tmp" "$theme/background.jpg"
+sed -i "s/^accent=.*/accent=$2/" "$theme/theme.conf"

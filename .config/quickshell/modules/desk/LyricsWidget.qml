@@ -16,7 +16,7 @@ Item {
     readonly property int context: cfg.context ?? 1
     readonly property int align: ({ left: Text.AlignLeft, right: Text.AlignRight })[cfg.align] ?? Text.AlignHCenter
     // Sung line and the rest; "auto" keeps the old look: the wallpaper's accent on light text
-    readonly property color accent: (cfg.color ?? "auto") === "auto" ? Accent.base : Theme.paint(cfg.color)
+    readonly property color accent: Theme.hueShift((cfg.color ?? "auto") === "auto" ? Accent.base : Theme.paint(cfg.color))
     readonly property color textColor: ({ white: "#e6edf3", black: "#1f2328", accent: Accent.color })[cfg.text] ?? "#e6edf3"
     readonly property color halo: textColor.hslLightness > 0.5 ? "#000000" : "#ffffff"
     // Sung-word effects, any mix of them (an old single choice reads as a list of one)

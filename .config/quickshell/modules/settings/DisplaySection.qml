@@ -5,16 +5,12 @@ import qs.config
 import qs.components
 import qs.services
 
-// Resolution, refresh rate, scale and VRR per monitor. A change is tried first and rolls back
-// unless kept within a few seconds, so a mode the screen can't show undoes itself
+// Resolution, refresh rate, scale and VRR per monitor, applied and saved at once
 Column {
     id: root
 
     property bool shown: false
     property var monitors: []
-    // { name, old, next } while waiting to be kept
-    property var trial: null
-    property int countdown: 0
 
     readonly property var scales: [1, 1.2, 1.25, 1 + 1 / 3, 1.5, 1.6, 1 + 2 / 3, 2, 2.4, 2.5, 3]
 
@@ -38,32 +34,10 @@ Column {
         return "hl.monitor({ output = \"" + name + "\", mode = \"" + m.mode + "\", position = \"auto\", scale = " + m.scale + ", vrr = " + m.vrr + " })";
     }
 
-    function tryOut(name, old, next) {
-        trial = { name: name, old: old, next: next };
-        countdown = 15;
+    function apply(name, next) {
         Quickshell.execDetached(["hyprctl", "eval", rule(name, next)]);
+        Settings.setMonitor(name, next);
         refresh.restart();
-    }
-
-    function keep() {
-        Settings.setMonitor(trial.name, trial.next);
-        trial = null;
-    }
-
-    function revert() {
-        Quickshell.execDetached(["hyprctl", "eval", rule(trial.name, trial.old)]);
-        trial = null;
-        refresh.restart();
-    }
-
-    Timer {
-        interval: 1000
-        repeat: true
-        running: root.trial !== null
-        onTriggered: {
-            if (--root.countdown <= 0)
-                root.revert();
-        }
     }
 
     // The monitor takes a moment to switch modes
@@ -71,52 +45,6 @@ Column {
         id: refresh
         interval: 800
         onTriggered: query.running = true
-    }
-
-    // Keep or roll back
-    Rectangle {
-        width: parent.width
-        height: root.trial ? 64 : 0
-        visible: height > 0
-        radius: Theme.radius
-        color: Qt.tint(Theme.surface, Qt.alpha(Theme.accent, 0.14))
-        clip: true
-        Behavior on height { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
-
-        Column {
-            anchors.left: parent.left
-            anchors.leftMargin: 16
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 2
-
-            Label {
-                text: "Keep these display settings?"
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
-            }
-            Label {
-                text: "Going back in " + root.countdown + " s"
-                font.pixelSize: 12
-                color: Theme.subtext
-            }
-        }
-
-        Row {
-            anchors.right: parent.right
-            anchors.rightMargin: 14
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 8
-
-            PillButton {
-                text: "Revert"
-                onClicked: root.revert()
-            }
-            PillButton {
-                text: "Keep"
-                primary: true
-                onClicked: root.keep()
-            }
-        }
     }
 
     Repeater {
@@ -228,14 +156,12 @@ Column {
                     text: "Apply"
                     icon: "check"
                     primary: true
-                    enabled: mon.changed && !root.trial
-                    onClicked: root.tryOut(mon.name,
-                        { mode: mon.curRes + "@" + mon.curRate, scale: mon.curScale, vrr: mon.curVrr },
-                        { mode: mon.res + "@" + mon.rate, scale: mon.factor, vrr: mon.vrr })
+                    enabled: mon.changed
+                    onClicked: root.apply(mon.name, { mode: mon.res + "@" + mon.rate, scale: mon.factor, vrr: mon.vrr })
                 }
                 PillButton {
                     text: "Reset"
-                    visible: mon.changed && !root.trial
+                    visible: mon.changed
                     onClicked: {
                         mon.res = mon.curRes;
                         mon.rate = mon.curRate;

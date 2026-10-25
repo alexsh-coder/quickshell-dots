@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Io
 
 // Music-reactive effects. Intensity, lyrics and the visualizer switch are global; the effects over the
-// wallpaper (glow, blur, zoom, shake) come with the desktop preset (see Desk). Switching wallpapers,
+// wallpaper (glow, blur, zoom, shake and the rest) come with the desktop preset (see Desk). Switching wallpapers,
 // numbers glide to the new values; if a type changes, the effects fade out, swap and fade back in,
 // in step with the wallpaper transition.
 Singleton {
@@ -26,12 +26,20 @@ Singleton {
     readonly property bool blur: value("blur")
     readonly property bool zoom: value("zoom")
     readonly property bool shake: value("shake")
+    readonly property bool glitch: value("glitch")
+    readonly property var glitchTargets: value("glitchTargets") ?? []
+    readonly property bool glitchDrift: value("glitchDrift")
+    readonly property bool pulse: value("pulse")
+    readonly property bool ripple: value("ripple")
+    readonly property bool bloom: value("bloom")
+    readonly property bool vhs: value("vhs")
+    readonly property bool hue: value("hue")
     // Centre of the radial glow: the preset's first visualizer
     readonly property real x: value("cx")
     readonly property real y: value("cy")
 
-    readonly property var wallpaperKeys: ["glow", "blur", "zoom", "shake"]
-    readonly property bool wallpaperFx: zoom || shake || glow || blur
+    readonly property var wallpaperKeys: ["glow", "blur", "zoom", "shake", "glitch", "pulse", "ripple", "bloom", "vhs", "hue"]
+    readonly property bool wallpaperFx: wallpaperKeys.some(k => root[k])
 
     // The transition between two wallpapers' settings
     property var from: Desk.fxFor("")
@@ -126,11 +134,11 @@ Singleton {
         return Desk.widgets.some(w => w.type === "visualizer" && w.style === name && w !== Desk.main);
     }
 
-    // Master switch: off remembers which effects were on, on brings them back (all if none were)
+    // Master switch: off remembers which effects were on, on brings them back (the classic ones if none were)
     function setWallpaperFx(on) {
         const values = {};
         if (on) {
-            const restore = adapter.savedFx.length ? adapter.savedFx : wallpaperKeys;
+            const restore = adapter.savedFx.length ? adapter.savedFx : wallpaperKeys.slice(0, 5);
             wallpaperKeys.forEach(k => values[k] = restore.includes(k));
         } else {
             adapter.savedFx = wallpaperKeys.filter(k => root[k]);
@@ -219,7 +227,7 @@ Singleton {
             } catch (e) {}
         }
         function strength(name: string, value: real): void {
-            if (["desktop", "glow", "zoom", "shake", "blur"].includes(name))
+            if (["desktop", ...root.wallpaperKeys].includes(name))
                 root.setGain(name, value);
         }
     }

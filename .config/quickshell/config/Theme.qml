@@ -22,7 +22,7 @@ Singleton {
     // Accent for the bar, with the wallpaper's own bar tweak on top
     readonly property color wallAccent: Accent.onWall
     // Music effects: the wallpaper's own contrast color unless the preset picks another
-    readonly property color fxColor: paint(MusicFx.color)
+    readonly property color fxColor: hueShift(paint(MusicFx.color))
     readonly property color barAccent: Accent.barColor
     readonly property color tintSubtext: Scheme.pick(Accent.role(0.71, 0.06, 0, 0.06), Accent.role(0.6, 0.045, 0, 0.045))
     readonly property color tintMuted: Scheme.pick(Accent.role(0.875, 0.035, 0, 0.035), Accent.role(0.36, 0.03, 0, 0.03))
@@ -56,6 +56,16 @@ Singleton {
     readonly property int osdMargin: 56
 
     // A widget's color setting: "auto" is the wallpaper's own contrast color
+    // The Hue effect's rotation (WallFx), the same as the wallpaper gets in wallfx.frag, for colors drawn over it
+    function hueShift(c) {
+        const a = WallFx.hue * WallFx.tint;
+        if (!a)
+            return c;
+        const s = Math.sin(a) * 0.57735, co = Math.cos(a), grey = (c.r + c.g + c.b) / 3 * (1 - co);
+        const f = v => Math.max(0, Math.min(1, v));
+        return Qt.rgba(f(c.r * co + (c.b - c.g) * s + grey), f(c.g * co + (c.r - c.b) * s + grey), f(c.b * co + (c.g - c.r) * s + grey), c.a);
+    }
+
     function paint(name) {
         return ({ accent: Accent.color, white: "#ffffff", black: "#000000" })[name] ?? Accent.onWall;
     }

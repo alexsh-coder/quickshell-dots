@@ -56,132 +56,139 @@ PanelWindow {
     // WallpaperFx's glow, which the grows would cover from below until one has covered the screen
     readonly property bool glowOver: active && !Wallpaper.video
 
-    // Switches stacking up (see Wallpaper.grows). An image's shader reads it directly:
-    // no offscreen layer to allocate on every switch
-    Repeater {
-        model: Wallpaper.grows
+    // WallpaperFx's shader effects (bloom, pulse, hue, the glitch...) on the grows too, so a new wallpaper
+    // doesn't come in plain until one has covered the screen
+    WallFxStage {
+        anchors.fill: parent
+        on: root.full && root.glowOver && MusicFx.wallpaperFx
 
-        Item {
-            id: grow
+        // Switches stacking up (see Wallpaper.grows). An image's shader reads it directly:
+        // no offscreen layer to allocate on every switch
+        Repeater {
+            model: Wallpaper.grows
 
-            required property string path
-            required property string origin
-            required property int fx
-            required property string old
-            required property bool wait
-            required property real px
-            required property real py
-            required property int ms
-            required property real t0
-            required property real at
-            required property int dir
-            required property int index
-            required property int gid
+            Item {
+                id: grow
 
-            readonly property bool video: Wallpaper.isVideo(path)
-            readonly property bool toReady: video ? videoLoader.playing : img.status === Image.Ready
-            readonly property bool oldReady: old === "" || oldImg.status === Image.Ready || oldImg.status === Image.Error
-            readonly property bool ready: toReady && oldReady && !wait
+                required property string path
+                required property string origin
+                required property int fx
+                required property string old
+                required property bool wait
+                required property real px
+                required property real py
+                required property int ms
+                required property real t0
+                required property real at
+                required property int dir
+                required property int index
+                required property int gid
 
-            // Starts once both ends are there
-            onReadyChanged: {
-                if (ready && !at)
-                    Wallpaper.grows.setProperty(index, "at", Date.now());
-            }
+                readonly property bool video: Wallpaper.isVideo(path)
+                readonly property bool toReady: video ? videoLoader.playing : img.status === Image.Ready
+                readonly property bool oldReady: old === "" || oldImg.status === Image.Ready || oldImg.status === Image.Error
+                readonly property bool ready: toReady && oldReady && !wait
 
-            // Newer switches on top: the Repeater doesn't keep added items above the earlier ones
-            z: gid
-            anchors.fill: parent
-            scale: 1 + root.fxZoom + root.videoZoom
-            transform: Translate { x: root.panX; y: root.panY }
-            visible: root.full
-
-            // WallpaperFx's kick blur, which the grows would otherwise hide until one covers the screen
-            layer.enabled: root.glowOver && MusicFx.wallpaperFx && MusicFx.blur && Cava.active
-            layer.effect: MultiEffect {
-                autoPaddingEnabled: false
-                blurEnabled: true
-                blurMax: 48
-                blur: Math.min(1, Cava.kick * 0.8 * MusicFx.gain("blur"))
-            }
-
-            TransitionEffect {
-                anchors.fill: parent
-                visible: grow.ready
-                source: grow.video ? videoTexture : img
-                previous: oldImg.status === Image.Ready ? oldImg : img
-                hasPrevious: oldImg.status === Image.Ready
-                cropTo: grow.video ? Qt.size(1, 1) : cropOf(img)
-                cropFrom: cropOf(oldImg)
-                t: Wallpaper.growT(grow.t0, grow.at, grow.dir, undefined, grow.ms)
-                effect: grow.fx
-                origin: grow.origin
-                cursor: grow.px > -1e5 ? Qt.point((grow.px - (root.monitor?.x ?? 0)) / root.ui, (grow.py - (root.monitor?.y ?? 0)) / root.ui) : Qt.point(-1e6, -1e6)
-            }
-
-            Image {
-                id: img
-
-                anchors.fill: parent
-                visible: false
-                source: grow.video ? "" : "file://" + grow.path
-                sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false
-                smooth: true
-            }
-
-            // The wallpaper it replaces, for styles that move it
-            Image {
-                id: oldImg
-
-                anchors.fill: parent
-                visible: false
-                source: grow.old === "" ? "" : "file://" + grow.old
-                sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false
-                smooth: true
-            }
-
-            Loader {
-                id: videoLoader
-
-                property bool playing: false
-
-                anchors.fill: parent
-                active: grow.video
-                layer.enabled: active && Wallpaper.bw
-                layer.effect: MultiEffect {
-                    saturation: -1
+                // Starts once both ends are there
+                onReadyChanged: {
+                    if (ready && !at)
+                        Wallpaper.grows.setProperty(index, "at", Date.now());
                 }
 
-                sourceComponent: Video {
-                    source: "file://" + grow.path
-                    fillMode: VideoOutput.PreserveAspectCrop
-                    loops: MediaPlayer.Infinite
-                    muted: true
-                    autoPlay: true
-                    onPositionChanged: {
-                        if (position <= 0)
-                            return;
-                        Wallpaper.grows.setProperty(grow.index, "pos", position);
-                        Wallpaper.grows.setProperty(grow.index, "dur", duration);
-                        videoLoader.playing = true;
+                // Newer switches on top: the Repeater doesn't keep added items above the earlier ones
+                z: gid
+                anchors.fill: parent
+                scale: 1 + root.fxZoom + root.videoZoom
+                transform: Translate { x: root.panX; y: root.panY }
+                visible: root.full
+
+                // WallpaperFx's kick blur, which the grows would otherwise hide until one covers the screen
+                layer.enabled: root.glowOver && MusicFx.wallpaperFx && MusicFx.blur && Cava.active
+                layer.effect: MultiEffect {
+                    autoPaddingEnabled: false
+                    blurEnabled: true
+                    blurMax: 48
+                    blur: Math.min(1, Cava.kick * 0.8 * MusicFx.gain("blur"))
+                }
+
+                TransitionEffect {
+                    anchors.fill: parent
+                    visible: grow.ready
+                    source: grow.video ? videoTexture : img
+                    previous: oldImg.status === Image.Ready ? oldImg : img
+                    hasPrevious: oldImg.status === Image.Ready
+                    cropTo: grow.video ? Qt.size(1, 1) : cropOf(img)
+                    cropFrom: cropOf(oldImg)
+                    t: Wallpaper.growT(grow.t0, grow.at, grow.dir, undefined, grow.ms)
+                    effect: grow.fx
+                    origin: grow.origin
+                    cursor: grow.px > -1e5 ? Qt.point((grow.px - (root.monitor?.x ?? 0)) / root.ui, (grow.py - (root.monitor?.y ?? 0)) / root.ui) : Qt.point(-1e6, -1e6)
+                }
+
+                Image {
+                    id: img
+
+                    anchors.fill: parent
+                    visible: false
+                    source: grow.video ? "" : "file://" + grow.path
+                    sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false
+                    smooth: true
+                }
+
+                // The wallpaper it replaces, for styles that move it
+                Image {
+                    id: oldImg
+
+                    anchors.fill: parent
+                    visible: false
+                    source: grow.old === "" ? "" : "file://" + grow.old
+                    sourceSize: Qt.size(root.screen.width * root.dpr, root.screen.height * root.dpr)
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache: false
+                    smooth: true
+                }
+
+                Loader {
+                    id: videoLoader
+
+                    property bool playing: false
+
+                    anchors.fill: parent
+                    active: grow.video
+                    layer.enabled: active && Wallpaper.bw
+                    layer.effect: MultiEffect {
+                        saturation: -1
+                    }
+
+                    sourceComponent: Video {
+                        source: "file://" + grow.path
+                        fillMode: VideoOutput.PreserveAspectCrop
+                        loops: MediaPlayer.Infinite
+                        muted: true
+                        autoPlay: true
+                        onPositionChanged: {
+                            if (position <= 0)
+                                return;
+                            Wallpaper.grows.setProperty(grow.index, "pos", position);
+                            Wallpaper.grows.setProperty(grow.index, "dur", duration);
+                            videoLoader.playing = true;
+                        }
                     }
                 }
-            }
 
-            ShaderEffectSource {
-                id: videoTexture
+                ShaderEffectSource {
+                    id: videoTexture
 
-                anchors.fill: parent
-                visible: false
-                sourceItem: videoLoader.item
-                hideSource: true
-                live: true
+                    anchors.fill: parent
+                    visible: false
+                    sourceItem: videoLoader.item
+                    hideSource: true
+                    live: true
+                }
             }
         }
     }
