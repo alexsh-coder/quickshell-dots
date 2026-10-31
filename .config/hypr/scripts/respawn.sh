@@ -3,6 +3,7 @@
 # Hyprland is gone (its IPC socket disappears). Works without uwsm/systemd.
 # Usage: respawn.sh <command> [args...]
 command -v "$1" >/dev/null || exit 0   # not installed on this machine
+ulimit -n "$(ulimit -Hn)" 2>/dev/null  # NVIDIA/EGL leaks sync_file fds, the 1024 soft default runs out
 sock="$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket.sock"
 while [ -S "$sock" ]; do
     "$@"
