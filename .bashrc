@@ -52,5 +52,18 @@ if [[ $- == *i* && $TERM == xterm-kitty && -z $FASTFETCH_SHOWN ]] && command -v 
     PIXFETCH_ART=$__ff_art pixfetch
 fi
 
+# Claude Code on DeepSeek (key in ~/.config/deepseek/api-key)
+ds() {
+    ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic \
+    ANTHROPIC_AUTH_TOKEN=$(cat ~/.config/deepseek/api-key) \
+    ANTHROPIC_MODEL=deepseek-v4-pro \
+    ANTHROPIC_DEFAULT_OPUS_MODEL=deepseek-v4-pro \
+    ANTHROPIC_DEFAULT_SONNET_MODEL=deepseek-v4-pro \
+    ANTHROPIC_DEFAULT_HAIKU_MODEL=deepseek-flash \
+    CLAUDE_CODE_SUBAGENT_MODEL=deepseek-flash \
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+    claude "$@"
+}
+
 # Machine-local, untracked additions
 [ -f ~/.bashrc.local ] && . ~/.bashrc.local
