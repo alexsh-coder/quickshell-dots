@@ -334,6 +334,7 @@ bind("terminal", "Apps|Terminal", mainMod .. " + T",      hl.dsp.exec_cmd(termin
 bind("browser", "Apps|Browser", mainMod .. " + W",      hl.dsp.exec_cmd("zen-browser"))
 -- Claude needs the VPN's HTTP proxy, same as the hproxy alias in .bashrc
 bind("claude", "Apps|Claude Code", mainMod .. " + C",      hl.dsp.exec_cmd(terminal .. " -e env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 /usr/bin/claude --dangerously-skip-permissions"))
+bind("claudecont", "Apps|Claude Code (resume last)", mainMod .. " + SHIFT + C",      hl.dsp.exec_cmd(terminal .. " -e env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 /usr/bin/claude --dangerously-skip-permissions --continue"))
 bind("telegram", "Apps|Telegram", mainMod .. " + U",      hl.dsp.exec_cmd("env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 Telegram"))
 bind("close", "Windows|Close window", mainMod .. " + Q",      hl.dsp.window.close())
 bind("kill", "Windows|Force kill window", mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/hard-kill.sh"))
@@ -351,7 +352,7 @@ bind("desk", "Shell|Desk", mainMod .. " + D",      hl.dsp.exec_cmd("qs ipc call 
 bind("kittyopacity", "Apps|Terminal opacity", mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/kitty-opacity-toggle.sh"))
 bind("theme", "Shell|Light / dark theme", mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("qs ipc call theme toggle"))
 bind("night", "Shell|Night light", mainMod .. " + SHIFT + N", hl.dsp.exec_cmd("qs ipc call night toggle"))
-bind("caffeine", "Shell|Caffeine", mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("qs ipc call caffeine toggle"))
+-- bind("caffeine", "Shell|Caffeine", mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("qs ipc call caffeine toggle"))
 bind("files", "Apps|File manager", mainMod .. " + E",      hl.dsp.exec_cmd(fileManager))
 bind("clipboard", "Shell|Clipboard", mainMod .. " + V",      hl.dsp.exec_cmd("qs ipc call clipboard toggle"))
 bind("notifications", "Shell|Notifications", mainMod .. " + N",      hl.dsp.global("quickshell:notifcenter"))
