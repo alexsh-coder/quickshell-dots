@@ -75,10 +75,22 @@ Singleton {
     function subUse(id) { subRun("use", id); }
     function subRemove(id) { subRun("rm", id); }
 
+    // Off: the list comes from the generated config and latency is a plain TCP connect
     function test() {
-        if (on && !tester.running)
-            tester.running = true;
+        if (on) {
+            if (!tester.running)
+                tester.running = true;
+        } else if (available && !pinger.running) {
+            pinger.running = true;
+        }
     }
+
+    function loadOffline() {
+        if (available && !on && !offlineList.running)
+            offlineList.running = true;
+    }
+
+    onOnChanged: if (!on) loadOffline()
 
     // Oneshot unit: systemctl returns once the refresh is done
     function update() {
@@ -91,7 +103,37 @@ Singleton {
         command: ["systemctl", "start", "vpn-update.service"]
         onExited: {
             refreshSoon.restart();
+            root.loadOffline();
             root.test();
+        }
+    }
+
+    Process {
+        id: offlineList
+        command: ["sudo", "-n", "vpn", "servers"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const all = JSON.parse(text);
+                    if (!root.on && JSON.stringify(all) !== JSON.stringify(root.servers))
+                        root.servers = all;
+                } catch (e) {}
+            }
+        }
+        onExited: if (!root.on) root.test()
+    }
+
+    Process {
+        id: pinger
+        command: ["sudo", "-n", "vpn", "ping"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const res = JSON.parse(text);
+                    if (!root.on)
+                        root.delays = res;
+                } catch (e) {}
+            }
         }
     }
 
@@ -100,8 +142,10 @@ Singleton {
         command: ["sh", "-c", `command -v vpn && systemctl cat ${root.unit}`]
         onExited: code => {
             root.available = code === 0;
-            if (root.available)
+            if (root.available) {
                 root.loadSubs();
+                root.loadOffline();
+            }
         }
     }
 
@@ -130,6 +174,7 @@ Singleton {
             }
             root.loadSubs();
             refreshSoon.restart();
+            loadOffline();
             // The new server list needs a moment to come up
             testSoonTimer.restart();
         }

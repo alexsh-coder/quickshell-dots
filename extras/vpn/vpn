@@ -54,6 +54,8 @@ def parse_vless(uri):
             tls["utls"] = {"enabled": True, "fingerprint": q["fp"]}
         if q.get("alpn"):
             tls["alpn"] = q["alpn"].split(",")
+        if sec == "tls":
+            tls["record_fragment"] = True  # DPI drops whole ClientHello to Cloudflare CDN
         if sec == "reality":
             tls["reality"] = {"enabled": True, "public_key": q.get("pbk", ""), "short_id": q.get("sid", "")}
         ob["tls"] = tls
@@ -359,6 +361,33 @@ def cmd_list():
         print(f"{mark} {i}  {n}{extra}  {'' if n == 'auto' else ms}")
 
 
+def config_servers():
+    with open(CONF) as f:
+        return [o for o in json.load(f)["outbounds"] if o.get("server")]
+
+
+def cmd_servers():
+    need_root()
+    print(json.dumps([o["tag"] for o in config_servers()], ensure_ascii=False))
+
+
+def cmd_ping():
+    need_root()
+    from concurrent.futures import ThreadPoolExecutor
+
+    def tcp(o):
+        t = time.time()
+        try:
+            socket.create_connection((o["server"], o["server_port"]), timeout=3).close()
+        except OSError:
+            return o["tag"], 0
+        return o["tag"], round((time.time() - t) * 1000)
+
+    obs = config_servers()
+    with ThreadPoolExecutor(len(obs) or 1) as ex:
+        print(json.dumps(dict(ex.map(tcp, obs)), ensure_ascii=False))
+
+
 def cmd_use(arg):
     _, names, _ = servers_state()
     name = names[int(arg)] if arg.isdigit() and int(arg) < len(names) else next(
@@ -375,6 +404,7 @@ USAGE = """usage: vpn [command]
   restart         restart sing-box
   list            list servers with latency
   use N|NAME      switch server (number from list or part of name; 'auto' = fastest)
+  servers | ping  server tags / TCP latency as JSON, works while off
   update          refetch subscription and rebuild config
   sub ...         manage subscriptions: list | add URL [NAME] | use REF | rename REF NAME | rm REF
   ui              open web dashboard
@@ -390,6 +420,8 @@ def main():
     elif c == "restart": cmd_restart()
     elif c == "list": cmd_list()
     elif c == "use" and len(a) > 1: cmd_use(" ".join(a[1:]))
+    elif c == "servers": cmd_servers()
+    elif c == "ping": cmd_ping()
     elif c == "update": cmd_update()
     elif c == "sub": cmd_sub(a[1:])
     elif c == "ui": sh("xdg-open", f"{API}/ui/")

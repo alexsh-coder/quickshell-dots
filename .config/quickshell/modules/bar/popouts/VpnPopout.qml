@@ -82,7 +82,7 @@ Item {
                 anchors.right: toggle.left
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
-                visible: Vpn.on && !Vpn.busy
+                visible: !Vpn.busy
 
                 RoundButton {
                     icon: "speed"
@@ -257,7 +257,7 @@ Item {
         Column {
             width: parent.width
             spacing: 2
-            visible: Vpn.on && Vpn.servers.length > 0 && !root.managing
+            visible: Vpn.servers.length > 0 && !root.managing
 
             Repeater {
                 model: Vpn.servers
@@ -383,7 +383,7 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: if (!row.current) Vpn.use(row.modelData)
+            onClicked: if (!row.current && Vpn.on) Vpn.use(row.modelData)
         }
     }
 
