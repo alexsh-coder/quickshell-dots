@@ -13,6 +13,10 @@ Item {
     readonly property var wifi: Net.wifi
     readonly property int rowHeight: 40
     readonly property int maxRows: 5
+    // Adapter whose networks are listed; changes when the picker is used
+    property var shownWifi: null
+    // Guards the adapter switch handler until the panel is built
+    property bool ready: false
 
     // Rows are synced in place, so opening the panel never rebuilds the list
     property var byName: ({})
@@ -74,6 +78,23 @@ Item {
         refresh();
     }
 
+    // Another adapter became the one shown: drop the old rows and scan the new card
+    function switchAdapter() {
+        if (!ready)
+            return;
+        if (asking)
+            stopAsking();
+        // Stop scanning the adapter we're leaving; it may already be gone
+        if (shownWifi && shownWifi !== wifi && Net.wifiDevices.indexOf(shownWifi) !== -1)
+            shownWifi.scannerEnabled = false;
+        shownWifi = wifi;
+        rows.clear();
+        byName = {};
+        refresh();
+        if (here && wifi)
+            wifi.scannerEnabled = true;
+    }
+
     function activate(net) {
         if (net.connected || net.stateChanging)
             return;
@@ -84,7 +105,12 @@ Item {
     }
 
     onHereChanged: if (!here && asking) stopAsking()
-    Component.onCompleted: refresh()
+    onWifiChanged: switchAdapter()
+    Component.onCompleted: {
+        ready = true;
+        shownWifi = wifi;
+        refresh();
+    }
 
     // Scan only once the panel has settled, so the first results don't jolt the opening
     // Unknown networks drop out of the list while the scanner is off, so it keeps
@@ -160,6 +186,73 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 checked: Net.wifiOn
                 onToggled: Networking.wifiEnabled = !Networking.wifiEnabled
+            }
+        }
+
+        // Adapter picker, only when the machine has more than one Wi-Fi card
+        Row {
+            id: adapters
+
+            visible: Net.wifiDevices.length > 1
+            width: parent.width
+            height: 28
+            spacing: 6
+
+            Repeater {
+                model: Net.wifiDevices
+
+                delegate: Rectangle {
+                    id: chip
+
+                    required property var modelData
+                    readonly property bool selected: modelData === root.wifi
+
+                    width: chipContent.implicitWidth + 20
+                    height: 28
+                    radius: Theme.radius - 4
+                    color: selected ? Qt.alpha(Theme.accent, 0.14) : chipMouse.containsMouse ? Theme.surface : Qt.alpha(Theme.surface, 0)
+                    Behavior on color { ColorAnimation { duration: Theme.anim } }
+
+                    Row {
+                        id: chipContent
+
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        Icon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "wifi"
+                            font.pixelSize: 14
+                            color: chip.selected ? Theme.accent : Theme.subtext
+                        }
+
+                        Label {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: chip.modelData.name
+                            font.pixelSize: 12
+                            color: chip.selected ? Theme.text : Theme.subtext
+                        }
+
+                        // Adapter that currently carries the connection
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: chip.modelData.connected
+                            width: 5
+                            height: 5
+                            radius: 2.5
+                            color: Theme.accent
+                        }
+                    }
+
+                    MouseArea {
+                        id: chipMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Net.wifiName = chip.modelData.name
+                    }
+                }
             }
         }
 
