@@ -29,7 +29,9 @@ Scope {
         { name: "display", label: "Display", icon: "monitor" },
         { name: "look", label: "Appearance", icon: "palette" },
         { name: "input", label: "Input", icon: "keyboard" },
-        { name: "power", label: "Power", icon: "battery_horiz_075" }
+        { name: "power", label: "Power", icon: "battery_horiz_075" },
+        { name: "keybinds", label: "Keybinds", icon: "keyboard_command_key" },
+        { name: "remote", label: "Remote", icon: "lan" }
     ]
 
     Connections {
@@ -239,13 +241,15 @@ Scope {
                     width: flick.width - (Theme.pad + 8) * 2
                     height: current?.item?.implicitHeight ?? 0
 
-                    readonly property Item current: ({ wallpaper: wallpaperPage, display: displayPage, look: lookPage, input: inputPage, power: powerPage })[root.section] ?? null
+                    readonly property Item current: ({ wallpaper: wallpaperPage, display: displayPage, look: lookPage, input: inputPage, power: powerPage, keybinds: keybindsPage, remote: remotePage })[root.section] ?? null
 
                     Page { id: wallpaperPage; name: "wallpaper"; sourceComponent: WallpaperSection { width: wallpaperPage.width; shown: Settings.open && wallpaperPage.visible } }
                     Page { id: displayPage; name: "display"; sourceComponent: DisplaySection { width: displayPage.width; shown: Settings.open && displayPage.visible } }
                     Page { id: lookPage; name: "look"; sourceComponent: LookSection { width: lookPage.width; shown: Settings.open && lookPage.visible } }
                     Page { id: inputPage; name: "input"; sourceComponent: InputSection { width: inputPage.width; shown: Settings.open && inputPage.visible } }
                     Page { id: powerPage; name: "power"; sourceComponent: PowerSection { width: powerPage.width; shown: Settings.open && powerPage.visible } }
+                    Page { id: keybindsPage; name: "keybinds"; sourceComponent: KeybindsSection { width: keybindsPage.width; shown: Settings.open && keybindsPage.visible } }
+                    Page { id: remotePage; name: "remote"; sourceComponent: RemoteSection { width: remotePage.width; shown: Settings.open && remotePage.visible } }
                 }
 
                 // Each section opens at its top

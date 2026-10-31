@@ -303,6 +303,14 @@ hl.gesture({
 
 local mainMod = "SUPER"
 
+-- Rebindable from Quickshell's settings (Keybinds): ui.binds[id] replaces the
+-- default keys; the description "id|Group|Label" is how the settings find it.
+local function bind(id, label, keys, action, opts)
+    opts = opts or {}
+    opts.description = id .. "|" .. label
+    hl.bind((ui.binds or {})[id] or keys, action, opts)
+end
+
 -- Switches to the "vnc-passthrough" submap (defined further down) so
 -- mainMod+<digit> etc. reach the remote session instead of switching
 -- workspaces here, but only while vncviewer is actually fullscreen --
@@ -319,48 +327,48 @@ local function sync_vnc_passthrough()
     end
 end
 
-hl.bind(mainMod .. " + R",      hl.dsp.exec_cmd(menu))
+bind("launcher", "Apps|App launcher", mainMod .. " + R",      hl.dsp.exec_cmd(menu))
 -- hl.bind("SUPER + Super_L", hl.dsp.exec_cmd(menu), { release = true })
-hl.bind(mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("~/.local/bin/vnc-linux"))
-hl.bind(mainMod .. " + T",      hl.dsp.exec_cmd(terminal))
-hl.bind(mainMod .. " + W",      hl.dsp.exec_cmd("zen-browser"))
+bind("vnc", "Apps|VNC to remote PC", mainMod .. " + SHIFT + R", hl.dsp.exec_cmd("~/.local/bin/vnc-linux"))
+bind("terminal", "Apps|Terminal", mainMod .. " + T",      hl.dsp.exec_cmd(terminal))
+bind("browser", "Apps|Browser", mainMod .. " + W",      hl.dsp.exec_cmd("zen-browser"))
 -- Claude needs the VPN's HTTP proxy, same as the hproxy alias in .bashrc
-hl.bind(mainMod .. " + C",      hl.dsp.exec_cmd(terminal .. " -e env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 /usr/bin/claude --dangerously-skip-permissions"))
-hl.bind(mainMod .. " + U",      hl.dsp.exec_cmd("env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 Telegram"))
-hl.bind(mainMod .. " + Q",      hl.dsp.window.close())
-hl.bind(mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/hard-kill.sh"))
+bind("claude", "Apps|Claude Code", mainMod .. " + C",      hl.dsp.exec_cmd(terminal .. " -e env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 /usr/bin/claude --dangerously-skip-permissions"))
+bind("telegram", "Apps|Telegram", mainMod .. " + U",      hl.dsp.exec_cmd("env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 Telegram"))
+bind("close", "Windows|Close window", mainMod .. " + Q",      hl.dsp.window.close())
+bind("kill", "Windows|Force kill window", mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/hard-kill.sh"))
 -- [lab-qs] hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("python3 ~/.config/hypr/scripts/wallpaper_carousel.py"))
-hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"))
-hl.bind(mainMod .. " + ALT + bracketright", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
-hl.bind(mainMod .. " + ALT + bracketleft",  hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
+bind("wallpicker", "Wallpaper|Wallpaper picker", mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"))
+bind("wallnext", "Wallpaper|Next wallpaper", mainMod .. " + ALT + bracketright", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
+bind("wallprev", "Wallpaper|Previous wallpaper", mainMod .. " + ALT + bracketleft",  hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
 -- One-handed (left hand) alternative
-hl.bind(mainMod .. " + X", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
-hl.bind(mainMod .. " + Z", hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
+bind("wallnext2", "Wallpaper|Next wallpaper (left hand)", mainMod .. " + X", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
+bind("wallprev2", "Wallpaper|Previous wallpaper (left hand)", mainMod .. " + Z", hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
 -- Invert (Invertible wallpapers only) and black-and-white mode for all
-hl.bind(mainMod .. " + ALT + I", hl.dsp.exec_cmd("qs ipc call wallpaper invert"))
-hl.bind(mainMod .. " + ALT + B", hl.dsp.exec_cmd("qs ipc call wallpaper gray"))
-hl.bind(mainMod .. " + D",      hl.dsp.exec_cmd("qs ipc call desk toggle"))
-hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/kitty-opacity-toggle.sh"))
-hl.bind(mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("qs ipc call theme toggle"))
-hl.bind(mainMod .. " + SHIFT + N", hl.dsp.exec_cmd("qs ipc call night toggle"))
-hl.bind(mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("qs ipc call caffeine toggle"))
-hl.bind(mainMod .. " + E",      hl.dsp.exec_cmd(fileManager))
-hl.bind(mainMod .. " + V",      hl.dsp.exec_cmd("qs ipc call clipboard toggle"))
-hl.bind(mainMod .. " + N",      hl.dsp.global("quickshell:notifcenter"))
-hl.bind(mainMod .. " + I",      hl.dsp.exec_cmd("qs ipc call quicksettings toggle"))
-hl.bind(mainMod .. " + comma",  hl.dsp.exec_cmd("qs ipc call settings toggle"))
-hl.bind(mainMod .. " + TAB",    hl.dsp.global("quickshell:overview"))
-hl.bind(mainMod .. " + SHIFT + TAB", hl.dsp.global("quickshell:overview-back"))
-hl.bind(mainMod .. " + P",      hl.dsp.window.pseudo())
-hl.bind(mainMod .. " + SPACE",  hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mainMod .. " + J",      hl.dsp.layout("togglesplit"))
+bind("wallinvert", "Wallpaper|Invert wallpaper", mainMod .. " + ALT + I", hl.dsp.exec_cmd("qs ipc call wallpaper invert"))
+bind("wallgray", "Wallpaper|Black and white", mainMod .. " + ALT + B", hl.dsp.exec_cmd("qs ipc call wallpaper gray"))
+bind("desk", "Shell|Desk", mainMod .. " + D",      hl.dsp.exec_cmd("qs ipc call desk toggle"))
+bind("kittyopacity", "Apps|Terminal opacity", mainMod .. " + SHIFT + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/kitty-opacity-toggle.sh"))
+bind("theme", "Shell|Light / dark theme", mainMod .. " + SHIFT + D", hl.dsp.exec_cmd("qs ipc call theme toggle"))
+bind("night", "Shell|Night light", mainMod .. " + SHIFT + N", hl.dsp.exec_cmd("qs ipc call night toggle"))
+bind("caffeine", "Shell|Caffeine", mainMod .. " + SHIFT + C", hl.dsp.exec_cmd("qs ipc call caffeine toggle"))
+bind("files", "Apps|File manager", mainMod .. " + E",      hl.dsp.exec_cmd(fileManager))
+bind("clipboard", "Shell|Clipboard", mainMod .. " + V",      hl.dsp.exec_cmd("qs ipc call clipboard toggle"))
+bind("notifications", "Shell|Notifications", mainMod .. " + N",      hl.dsp.global("quickshell:notifcenter"))
+bind("quicksettings", "Shell|Quick settings", mainMod .. " + I",      hl.dsp.exec_cmd("qs ipc call quicksettings toggle"))
+bind("settings", "Shell|Settings", mainMod .. " + comma",  hl.dsp.exec_cmd("qs ipc call settings toggle"))
+bind("overview", "Shell|Overview", mainMod .. " + TAB",    hl.dsp.global("quickshell:overview"))
+bind("overviewback", "Shell|Overview (back)", mainMod .. " + SHIFT + TAB", hl.dsp.global("quickshell:overview-back"))
+bind("pseudo", "Windows|Pseudo-tile", mainMod .. " + P",      hl.dsp.window.pseudo())
+bind("float", "Windows|Toggle floating", mainMod .. " + SPACE",  hl.dsp.window.float({ action = "toggle" }))
+bind("split", "Windows|Toggle split", mainMod .. " + J",      hl.dsp.layout("togglesplit"))
 -- Quickshell's global shortcut: no process to spawn, so the lock starts on the keypress.
 -- Idle and sleep still lock through hypridle -> scripts/lock.sh.
-hl.bind(mainMod .. " + L",         hl.dsp.global("quickshell:lock"))
-hl.bind(mainMod .. " + SHIFT + Escape", hl.dsp.exit())
-hl.bind("CTRL + ALT + Delete",  hl.dsp.exec_cmd("qs ipc call powermenu toggle"))
-hl.bind("CTRL + SHIFT + Escape", hl.dsp.exec_cmd(terminal .. " -e ~/.local/bin/btop"))
-hl.bind(mainMod .. " + F", function()
+bind("lock", "System|Lock screen", mainMod .. " + L",         hl.dsp.global("quickshell:lock"))
+bind("exit", "System|Exit Hyprland", mainMod .. " + SHIFT + Escape", hl.dsp.exit())
+bind("power", "System|Power menu", "CTRL + ALT + Delete",  hl.dsp.exec_cmd("qs ipc call powermenu toggle"))
+bind("btop", "System|Task manager", "CTRL + SHIFT + Escape", hl.dsp.exec_cmd(terminal .. " -e ~/.local/bin/btop"))
+bind("fullscreen", "Windows|Fullscreen", mainMod .. " + F", function()
     hl.dispatch(hl.dsp.window.fullscreen())
     sync_vnc_passthrough()
 end)
@@ -382,12 +390,12 @@ for i = 1, 10 do
 end
 
 -- Scratchpad
-hl.bind(mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"))
-hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
+bind("scratch", "Windows|Scratchpad", mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"))
+bind("toscratch", "Windows|Move to scratchpad", mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
 
 -- Music scratchpad: Super+M toggles special:music, launching a player if none is running
-hl.bind(mainMod .. " + M", hl.dsp.exec_cmd("~/.config/hypr/scripts/music-toggle.sh"))
-hl.bind(mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("qs ipc call mediashade toggle"))
+bind("music", "Apps|Music", mainMod .. " + M", hl.dsp.exec_cmd("~/.config/hypr/scripts/music-toggle.sh"))
+bind("mediashade", "Shell|Media panel", mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("qs ipc call mediashade toggle"))
 
 -- Scroll through workspaces
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
@@ -423,7 +431,7 @@ hl.bind("ALT + TAB",         function() cycle_window(true) end)
 hl.bind("ALT + SHIFT + TAB", function() cycle_window(false) end)
 
 -- Groups (tabbed windows)
-hl.bind(mainMod .. " + G",             hl.dsp.group.toggle())
+bind("group", "Windows|Toggle group", mainMod .. " + G",             hl.dsp.group.toggle())
 hl.bind(mainMod .. " + ALT + G",       hl.dsp.window.move({ out_of_group = true }))
 hl.bind(mainMod .. " + SHIFT + left",  hl.dsp.window.move({ into_or_create_group = "left" }))
 hl.bind(mainMod .. " + SHIFT + right", hl.dsp.window.move({ into_or_create_group = "right" }))
@@ -694,6 +702,12 @@ hl.window_rule({
 -- is genuinely fullscreen; mainMod+Escape is a manual escape hatch back
 -- to normal binds in case fullscreen-state detection ever misfires.
 hl.define_submap("vnc-passthrough", function()
+    hl.bind(mainMod .. " + Escape", hl.dsp.submap(""))
+end)
+
+-- Quickshell's keybind editor switches here while it records a shortcut, so
+-- Hyprland lets the keys through; mainMod+Escape is the way out if qs dies.
+hl.define_submap("rebind", function()
     hl.bind(mainMod .. " + Escape", hl.dsp.submap(""))
 end)
 

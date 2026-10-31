@@ -26,6 +26,8 @@ Singleton {
     property alias panelScale: adapter.panelScale
     property alias nightTemp: adapter.nightTemp
     property alias ecoOnBattery: adapter.ecoOnBattery
+    property alias remoteHost: adapter.remoteHost
+    property alias remoteUser: adapter.remoteUser
     property alias cursorTrail: adapter.cursorTrail
     property alias cursorViz: adapter.cursorViz
     property alias cursorBase: adapter.cursorBase
@@ -39,6 +41,7 @@ Singleton {
     property alias vizLead: adapter.vizLead
     readonly property var hypr: adapter.hypr
     readonly property var monitors: adapter.monitors
+    readonly property var binds: adapter.binds
 
     // Battery saver: blur and shadows off while unplugged
     readonly property bool eco: ecoOnBattery && UPower.onBattery
@@ -112,6 +115,16 @@ Singleton {
     }
 
     // A monitor's mode ("3840x2160@60.00"), scale and VRR, kept once a change is confirmed
+    // keys "" puts the bind back to its default
+    function setBind(id, keys) {
+        const b = Object.assign({}, adapter.binds);
+        if (keys)
+            b[id] = keys;
+        else
+            delete b[id];
+        adapter.binds = b;
+    }
+
     function setMonitor(name, m) {
         const all = Object.assign({}, adapter.monitors);
         all[name] = m;
@@ -133,6 +146,8 @@ Singleton {
         const all = Object.assign({}, adapter.hypr);
         if (Object.keys(adapter.monitors).length)
             all.monitors = adapter.monitors;
+        if (Object.keys(adapter.binds).length)
+            all.binds = adapter.binds;
         if (adapter.panelScale !== 1)
             all.panel_scale = adapter.panelScale;
         if (eco)
@@ -233,6 +248,10 @@ Singleton {
             property real panelScale: 1
             property int nightTemp: 4000
             property bool ecoOnBattery: false
+            // LAN address of the other machine, read by scripts like vnc-linux
+            property string remoteHost: ""
+            // ssh users on it, space separated, tried in order; empty = the local user name
+            property string remoteUser: ""
             // Effects drawn around the pointer: trail "off", "comet" or "sparks"; ring visualizer
             property string cursorTrail: "comet"
             property bool cursorViz: false
@@ -253,6 +272,8 @@ Singleton {
             // Hyprland options by their settings.lua names; only those changed from hyprDefaults
             property var hypr: ({})
             property var monitors: ({})
+            // keybind id -> "SUPER + SHIFT + X", only the ones moved off their default
+            property var binds: ({})
         }
     }
 
@@ -286,6 +307,13 @@ Singleton {
             adapter.cursorViz = viz;
         }
         // A Hyprland option by its settings.lua name; value is JSON ("12", "true", "\"slide\"")
+        function bind(id: string, keys: string): void {
+            root.setBind(id, keys);
+        }
+        function remote(host: string, user: string): void {
+            root.remoteHost = host;
+            root.remoteUser = user;
+        }
         function hypr(key: string, value: string): void {
             if (key in root.hyprDefaults)
                 root.set(key, JSON.parse(value));
