@@ -34,6 +34,10 @@ sudo install -m 755 "$here/sddm-rice-sync" /usr/local/bin/sddm-rice-sync
 sudo install -m 440 "$here/sudoers" /etc/sudoers.d/sddm-rice
 sudo visudo -cf /etc/sudoers.d/sddm-rice >/dev/null
 
+# The greeter runs on Xorg at the panel's real pixels; scale it like the Wayland session so the text matches the lockscreen
+scale=$(sed -n 's/.*\["scale"\] = \([0-9.]*\).*/\1/p' "$HOME/.config/hypr/settings.lua" 2>/dev/null | head -1)
+printf '[General]\nGreeterEnvironment=QT_SCALE_FACTOR=%s\n' "${scale:-1}" | sudo tee /etc/sddm.conf.d/greeter.conf >/dev/null
+
 if [ "${1:-}" = --enable ]; then
     printf '[Theme]\nCurrent=rice\n' | sudo tee /etc/sddm.conf.d/theme.conf >/dev/null
 fi
