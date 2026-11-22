@@ -59,7 +59,8 @@ Singleton {
             last = target;
         burstId = (burstId + 1) % 1000;
         seed = burstId + Math.random();
-        duration = 0.15 + Math.random() * 0.15;
+        // The wallpaper is big enough that a short burst reads as a couple of frames
+        duration = (0.15 + Math.random() * 0.15) * (target === "wall" ? 1.3 : 1);
         level = 0.5 + strength * 0.5;
         life = 1;
         burst = level;
@@ -115,7 +116,7 @@ Singleton {
             root.burst = root.level * Math.ceil(root.life * 3) / 3;
             // New strips every few frames, so a burst flickers instead of freezing
             root.reseed += frameTime;
-            if (root.reseed > 0.05) {
+            if (root.reseed > (root.target === "wall" ? 0.03 : 0.05)) {
                 root.reseed = 0;
                 root.seed = root.burstId + Math.random();
             }

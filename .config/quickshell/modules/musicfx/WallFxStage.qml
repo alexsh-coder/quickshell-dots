@@ -19,13 +19,14 @@ Item {
 
         readonly property real burst: Glitch.burstFor("wall")
 
-        layer.enabled: root.on && Glitch.has("wall") && (Glitch.split > 0 || burst > 0)
+        // Kept on while the glitch is: a fullscreen layer made on the kick eats the first frames of the burst
+        layer.enabled: root.on && Glitch.has("wall")
         layer.effect: ShaderEffect {
             property real split: Glitch.split
             property real burst: glitchHost.burst
             property real seed: Glitch.seed
             property real tear: 60 * Glitch.gain
-            property real styles: 1
+            property real styles: 0
             property size px: Qt.size(1 / width, 1 / height)
             fragmentShader: Qt.resolvedUrl("../../shaders/glitch.frag.qsb")
         }
