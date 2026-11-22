@@ -308,6 +308,8 @@ Scope {
     }
 
     PanelWindow {
+        id: win
+
         visible: root.open || panel.opacity > 0
         screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
 
@@ -393,7 +395,10 @@ Scope {
 
             width: parent.width
             height: root.thumbH + 56
-            y: root.open ? parent.height - height - margin : parent.height - height * 0.5
+            // From the screen, not the window: on the first open the window is still unsized,
+            // and the panel would slide in from the top
+            readonly property real screenBottom: win.screen?.height ?? parent.height
+            y: root.open ? screenBottom - height - margin : screenBottom - height * 0.5
 
             opacity: root.open ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }

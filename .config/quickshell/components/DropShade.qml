@@ -3,9 +3,11 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.config
+import qs.services
 
 // Full-screen shade on the focused monitor: drops from the top in free fall,
-// bounces off the bottom edge and rises back without a bounce.
+// bounces off the bottom edge and rises back without a bounce. With followMotion
+// it comes the way the shell motion preset says instead (Theme.motions).
 // Children go onto the shade; a click on the shade itself closes it
 PanelWindow {
     id: win
@@ -17,21 +19,56 @@ PanelWindow {
     property color shadeColor: Qt.alpha(Theme.bg, 0.88)
     default property alias content: shade.data
     readonly property Item shade: shade
+    property bool followMotion: false
+    // "fall" (free fall with bounces), "slide" (eased drop) or one of the in-place styles
+    readonly property string style: !followMotion ? "fall"
+        : Theme.motionStyle !== "slide" ? Theme.motionStyle
+        : Settings.motion === "m3" || Settings.motion === "bouncy" ? "fall" : "slide"
+    readonly property bool inPlace: style !== "fall" && style !== "slide"
 
     function show() {
         landed = false;
-        rise.stop();
+        stopAll();
         open = true;
-        shade.y = -shade.height;
         shade.vy = 0;
-        fall.running = true;
+        if (style === "fall") {
+            shade.reveal = 1;
+            shade.y = -shade.height;
+            fall.running = true;
+        } else if (style === "slide") {
+            shade.reveal = 1;
+            shade.y = -shade.height;
+            run(slideAnim, "y", 0, Theme.animPanel * 1.2, Theme.emphasizedDecel);
+        } else {
+            shade.y = 0;
+            shade.reveal = 0;
+            landed = true;
+            run(revealAnim, "reveal", 1, Theme.animPanel, style === "fade" ? Theme.emphasizedDecel : Theme.spatial);
+        }
     }
 
     function hide() {
-        // Rise first: the window stays up only while open or rising
-        fall.running = false;
-        rise.restart();
+        // Leave first: the window stays up only while open or leaving
+        stopAll();
+        if (inPlace)
+            run(revealAnim, "reveal", 0, 300 * Theme.speed, Theme.emphasizedAccel);
+        else
+            run(slideAnim, "y", -shade.height, 420 * (followMotion ? Theme.speed : 1), Theme.emphasizedAccel);
         open = false;
+    }
+
+    function stopAll() {
+        fall.running = false;
+        slideAnim.stop();
+        revealAnim.stop();
+    }
+
+    function run(anim, prop, to, duration, curve) {
+        anim.property = prop;
+        anim.to = to;
+        anim.duration = duration;
+        anim.easing.bezierCurve = curve;
+        anim.start();
     }
 
     function toggle() {
@@ -41,7 +78,7 @@ PanelWindow {
             show();
     }
 
-    visible: open || rise.running
+    visible: open || slideAnim.running || revealAnim.running
     screen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0]
 
     WlrLayershell.namespace: namespace
@@ -65,6 +102,10 @@ PanelWindow {
         y: -height
         color: win.shadeColor
         clip: true
+        // In-place styles: 0 gone, 1 shown
+        property real reveal: 1
+        opacity: win.inPlace ? Math.max(0, Math.min(1, reveal * 1.4)) : 1
+        scale: !win.inPlace ? 1 : win.style === "pop" ? 0.85 + 0.15 * reveal : win.style === "zoom" ? 1.06 - 0.06 * Math.min(1, reveal) : 1
 
         // Free fall in px/s, bouncing off the bottom edge with some energy lost each hit
         property real vy: 0
@@ -92,14 +133,16 @@ PanelWindow {
         }
 
         NumberAnimation {
-            id: rise
-
+            id: slideAnim
             target: shade
-            property: "y"
-            to: -shade.height
-            duration: 420
             easing.type: Easing.BezierSpline
-            easing.bezierCurve: Theme.emphasizedAccel
+            // An eased drop lands once it's in place
+            onFinished: if (win.open) win.landed = true
+        }
+        NumberAnimation {
+            id: revealAnim
+            target: shade
+            easing.type: Easing.BezierSpline
         }
 
         MouseArea {

@@ -16,6 +16,8 @@ Scope {
     // Sections are built on first view and dropped a minute after the card closes
     readonly property bool alive: win.visible || warm.running
     property var seen: []
+    // Where each section was scrolled to, so the card reopens where it was left
+    property var scrolls: ({})
     onSectionChanged: if (!seen.includes(section)) seen = seen.concat(section)
     onAliveChanged: if (!alive) seen = []
 
@@ -111,6 +113,9 @@ Scope {
 
                 width: 210
                 height: parent.height
+                // The card's clip is square, so the rail rounds its own outer corners
+                topLeftRadius: card.radius
+                bottomLeftRadius: card.radius
                 color: Qt.alpha(Theme.surface, 0.7)
 
                 Column {
@@ -252,11 +257,40 @@ Scope {
                     Page { id: remotePage; name: "remote"; sourceComponent: RemoteSection { width: remotePage.width; shown: Settings.open && remotePage.visible } }
                 }
 
-                // Each section opens at its top
+                // Each section reopens where it was left. The page may still be loading, so the
+                // position is held until it's tall enough
+                property string shownSection: root.section
+                property real wanted: -1
+
+                function restore() {
+                    wanted = root.scrolls[root.section] ?? 0;
+                    hold();
+                }
+                function hold() {
+                    if (wanted < 0)
+                        return;
+                    const top = Math.max(0, contentHeight - height);
+                    contentY = Math.min(wanted, top);
+                    if (top >= wanted)
+                        wanted = -1;
+                }
+
+                onContentHeightChanged: hold()
+                onContentYChanged: if (wanted < 0 && Settings.open) root.scrolls[shownSection] = contentY
+                onMovementStarted: wanted = -1
+
                 Connections {
                     target: root
                     function onSectionChanged() {
-                        flick.contentY = 0;
+                        flick.shownSection = root.section;
+                        flick.restore();
+                    }
+                }
+                Connections {
+                    target: Settings
+                    function onOpenChanged() {
+                        if (Settings.open)
+                            flick.restore();
                     }
                 }
             }

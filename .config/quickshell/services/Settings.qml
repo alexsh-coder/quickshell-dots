@@ -24,6 +24,7 @@ Singleton {
     readonly property var durations: adapter.durations
     property alias slideshow: adapter.slideshow
     property alias panelScale: adapter.panelScale
+    property alias motion: adapter.motion
     property alias nightTemp: adapter.nightTemp
     property alias ecoOnBattery: adapter.ecoOnBattery
     property alias remoteHost: adapter.remoteHost
@@ -248,6 +249,8 @@ Singleton {
             // Minutes between random wallpapers, 0 for off
             property int slideshow: 0
             property real panelScale: 1
+            // Shell motion preset, one of Theme.motions
+            property string motion: "m3"
             property int nightTemp: 4000
             property bool ecoOnBattery: false
             // LAN address of the other machine, read by scripts like vnc-linux
@@ -290,6 +293,10 @@ Singleton {
         }
         function close(): void {
             root.open = false;
+        }
+        // A Theme.motions preset
+        function motion(name: string): void {
+            adapter.motion = name;
         }
         function transition(name: string): void {
             adapter.transition = name;

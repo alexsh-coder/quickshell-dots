@@ -78,6 +78,7 @@ Scope {
         id: drop
 
         namespace: "mediashade"
+        followMotion: true
         onOpenChanged: if (!open) root.queue = false
 
         // Blurred cover over the whole shade; bigger than it, so the blur doesn't darken the edges

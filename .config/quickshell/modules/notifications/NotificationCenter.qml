@@ -145,7 +145,26 @@ Scope {
 
                 readonly property bool hot: tabArea.containsMouse
                 property int visibleWidth: hot ? 46 : 40
-                property real reveal: edge.out ? 1 : 0
+                property real reveal: 0
+                Component.onCompleted: reveal = edge.out ? 1 : 0
+
+                // Started by hand, so the curve matches the direction (see Popouts)
+                Connections {
+                    target: edge
+                    function onOutChanged() {
+                        tabAnim.stop();
+                        tabAnim.to = edge.out ? 1 : 0;
+                        tabAnim.duration = edge.out ? Theme.animSpatial : 260 * Theme.speed;
+                        tabAnim.easing.bezierCurve = edge.out ? Theme.spatial : Theme.emphasizedAccel;
+                        tabAnim.start();
+                    }
+                }
+                NumberAnimation {
+                    id: tabAnim
+                    target: tab
+                    property: "reveal"
+                    easing.type: Easing.BezierSpline
+                }
 
                 x: edge.width - visibleWidth * reveal
                 anchors.verticalCenter: parent.verticalCenter
@@ -157,13 +176,6 @@ Scope {
                 border.color: Qt.alpha(Theme.accent, hot ? 0.45 : 0.25)
                 opacity: reveal
 
-                Behavior on reveal {
-                    NumberAnimation {
-                        duration: edge.out ? Theme.animSpatial : 260
-                        easing.type: Easing.BezierSpline
-                        easing.bezierCurve: edge.out ? Theme.spatial : Theme.emphasizedAccel
-                    }
-                }
                 Behavior on visibleWidth { NumberAnimation { duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
                 Behavior on height { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
                 Behavior on border.color { ColorAnimation { duration: Theme.anim } }
@@ -219,7 +231,8 @@ Scope {
         id: win
 
         screen: root.screen
-        visible: root.open || panel.shift < 1
+        // Stays mapped: remapping a layer surface on every open costs the first frames
+        visible: true
         WlrLayershell.namespace: "notifcenter"
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: root.open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
@@ -229,13 +242,15 @@ Scope {
             bottom: true
             right: true
         }
-        implicitWidth: root.cardWidth + Theme.pad * 2 + root.gap
+        // Spare room on the left, so a panel springing past its spot isn't cut by the window edge
+        readonly property int room: 100
+        implicitWidth: room + root.cardWidth + Theme.pad * 2 + root.gap
         color: "transparent"
         mask: Region { item: panel }
 
         HyprlandFocusGrab {
             windows: [win]
-            active: win.visible && root.open
+            active: root.open
             onCleared: root.hide()
         }
 
@@ -244,10 +259,15 @@ Scope {
 
             readonly property real maxHeight: win.height - root.gap * 2
             // 0 shown, 1 tucked away past the screen edge
-            property real shift: root.open ? 0 : 1
+            // Slides only once the cards are built, so creation never stalls the animation
+            property real shift: root.open && panelLoader.status === Loader.Ready ? 0 : 1
 
-            x: shift * win.width
+            // Springing past its spot (shift < 0) is damped: the panel is wide, so a full overshoot flies far
+            x: win.room + (Theme.motionStyle === "slide" ? (shift < 0 ? shift * 0.35 : shift) * win.width : 0)
             y: root.gap
+            opacity: Theme.revealOpacity(1 - shift)
+            scale: Theme.revealScale(1 - shift)
+            transformOrigin: Item.TopRight
             width: root.cardWidth + Theme.pad * 2
             height: Math.min(maxHeight, (panelLoader.item?.implicitHeight ?? 0) + Theme.pad * 2)
             radius: Theme.radius + 6
@@ -255,17 +275,18 @@ Scope {
             border.width: 1
             border.color: Qt.alpha(Theme.accent, 0.25)
             clip: true
+            visible: root.open || shift < 1
 
             Behavior on shift {
                 NumberAnimation {
-                    duration: root.open ? Theme.animPanel : 300
+                    duration: root.open ? Theme.animPanel : 300 * Theme.speed
                     easing.type: Easing.BezierSpline
                     easing.bezierCurve: root.open ? Theme.emphasizedDecel : Theme.emphasizedAccel
                 }
             }
             // A collapsing card already moves smoothly; easing on top would lag behind it
             Behavior on height {
-                enabled: win.visible && !Notifs.list.some(n => n.leaving)
+                enabled: panel.shift === 0 && !Notifs.list.some(n => n.leaving)
                 NumberAnimation { duration: Theme.animPanel; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.emphasized }
             }
 
@@ -282,7 +303,8 @@ Scope {
                 x: Theme.pad
                 y: Theme.pad
                 width: parent.width - Theme.pad * 2
-                active: win.visible
+                active: root.open || panel.shift < 1
+                asynchronous: true
 
                 sourceComponent: Column {
                     readonly property alias list: list
@@ -370,14 +392,14 @@ Scope {
                                 PropertyAction { property: "x"; value: 56 }
                                 PauseAnimation { duration: 90 + Math.min(intro.ViewTransition.index, 8) * 40 }
                                 ParallelAnimation {
-                                    NumberAnimation { property: "x"; to: 0; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial }
+                                    NumberAnimation { property: "x"; to: 0; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.standard }
                                     NumberAnimation { property: "opacity"; to: 1; duration: 220 }
                                 }
                             }
                         }
 
                         add: Transition {
-                            NumberAnimation { property: "x"; from: root.cardWidth; to: 0; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial }
+                            NumberAnimation { property: "x"; from: root.cardWidth; to: 0; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.standard }
                         }
 
                         displaced: Transition {

@@ -65,7 +65,26 @@ Variants {
 
             readonly property bool hot: tabArea.containsMouse
             property int visibleWidth: hot ? 46 : 40
-            property real reveal: edge.out ? 1 : 0
+            property real reveal: 0
+            Component.onCompleted: reveal = edge.out ? 1 : 0
+
+            // Started by hand, so the curve matches the direction (see Popouts)
+            Connections {
+                target: edge
+                function onOutChanged() {
+                    tabAnim.stop();
+                    tabAnim.to = edge.out ? 1 : 0;
+                    tabAnim.duration = edge.out ? Theme.animSpatial : 260;
+                    tabAnim.easing.bezierCurve = edge.out ? Theme.spatial : Theme.emphasizedAccel;
+                    tabAnim.start();
+                }
+            }
+            NumberAnimation {
+                id: tabAnim
+                target: tab
+                property: "reveal"
+                easing.type: Easing.BezierSpline
+            }
 
             x: visibleWidth * reveal - width
             anchors.verticalCenter: parent.verticalCenter
@@ -77,13 +96,6 @@ Variants {
             border.color: Qt.alpha(Theme.accent, hot ? 0.45 : 0.25)
             opacity: reveal
 
-            Behavior on reveal {
-                NumberAnimation {
-                    duration: edge.out ? Theme.animSpatial : 260
-                    easing.type: Easing.BezierSpline
-                    easing.bezierCurve: edge.out ? Theme.spatial : Theme.emphasizedAccel
-                }
-            }
             Behavior on visibleWidth { NumberAnimation { duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
             Behavior on border.color { ColorAnimation { duration: Theme.anim } }
 

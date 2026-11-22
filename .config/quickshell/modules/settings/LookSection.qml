@@ -138,6 +138,24 @@ Column {
     SectionTitle { text: "Animations" }
 
     SettingRow {
+        label: "Shell motion"
+        Chips {
+            current: Settings.motion
+            model: [
+                { value: "m3", label: "Material" },
+                { value: "snappy", label: "Snappy" },
+                { value: "fluid", label: "Fluid" },
+                { value: "bouncy", label: "Bouncy" },
+                { value: "smooth", label: "Smooth" },
+                { value: "fade", label: "Fade" },
+                { value: "pop", label: "Pop" },
+                { value: "zoom", label: "Zoom" }
+            ]
+            onPicked: v => Settings.motion = v
+        }
+    }
+
+    SettingRow {
         label: "Animations"
         Toggle {
             checked: Settings.get("animations")

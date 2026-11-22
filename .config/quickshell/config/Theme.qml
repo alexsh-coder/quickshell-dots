@@ -41,18 +41,56 @@ Singleton {
     // Popout padding; the top is tighter since the panel continues the bar
     readonly property int pad: 18
     readonly property int padTop: 14
-    readonly property int anim: 220
+    // Shell motion preset, picked in settings (Settings.motion)
+    readonly property var motions: ({
+        // Material 3: soft landing, slight overshoot on spatial moves
+        m3: { speed: 1, decel: [0.05, 0.7, 0.1, 1, 1, 1], accel: [0.3, 0, 0.8, 0.15, 1, 1], spatial: [0.38, 1.21, 0.22, 1, 1, 1],
+              emphasized: [0.05, 0, 0.133, 0.06, 0.167, 0.4, 0.208, 0.82, 0.25, 1, 1, 1] },
+        // Short and crisp, no overshoot
+        snappy: { speed: 0.65, decel: [0.2, 0.9, 0.3, 1, 1, 1], accel: [0.4, 0, 1, 1, 1, 1], spatial: [0.2, 0.9, 0.3, 1, 1, 1],
+                  emphasized: [0.2, 0.9, 0.3, 1, 1, 1] },
+        // iOS-like sheet: fast start, very long tail
+        fluid: { speed: 1.1, decel: [0.32, 0.72, 0, 1, 1, 1], accel: [0.55, 0, 0.75, 0.3, 1, 1], spatial: [0.32, 0.72, 0, 1, 1, 1],
+                 emphasized: [0.32, 0.72, 0, 1, 1, 1] },
+        // Springy, overshoots on opening too
+        bouncy: { speed: 1.3, decel: [0.3, 1.55, 0.55, 1, 1, 1], accel: [0.36, 0, 0.66, -0.3, 1, 1], spatial: [0.3, 1.6, 0.5, 1, 1, 1],
+                  emphasized: [0.3, 1.45, 0.55, 1, 1, 1] },
+        // Slow, symmetric ease
+        smooth: { speed: 1.4, decel: [0.45, 0, 0.2, 1, 1, 1], accel: [0.6, 0, 0.6, 1, 1, 1], spatial: [0.45, 0, 0.2, 1, 1, 1],
+                  emphasized: [0.6, 0, 0.3, 1, 1, 1] },
+        // Panels fade in place instead of sliding
+        fade: { style: "fade", speed: 0.9, decel: [0.2, 0, 0, 1, 1, 1], accel: [0.4, 0, 1, 1, 1, 1], spatial: [0.2, 0, 0, 1, 1, 1],
+                emphasized: [0.2, 0, 0, 1, 1, 1] },
+        // Panels pop out from small, springing past full size
+        pop: { style: "pop", speed: 1, decel: [0.34, 1.56, 0.64, 1, 1, 1], accel: [0.4, 0, 1, 1, 1, 1], spatial: [0.34, 1.56, 0.64, 1, 1, 1],
+               emphasized: [0.34, 1.3, 0.64, 1, 1, 1] },
+        // Panels settle down from slightly larger while fading in
+        zoom: { style: "zoom", speed: 1, decel: [0.05, 0.7, 0.1, 1, 1, 1], accel: [0.4, 0, 1, 1, 1, 1], spatial: [0.05, 0.7, 0.1, 1, 1, 1],
+                emphasized: [0.05, 0.7, 0.1, 1, 1, 1] }
+    })
+    readonly property var motion: motions[Settings.motion] ?? motions.m3
+    readonly property real speed: motion.speed
+    // How panels come out: "slide", "fade", "pop" or "zoom"
+    readonly property string motionStyle: motion.style ?? "slide"
 
-    // Material 3 motion curves, for Easing.BezierSpline
-    readonly property list<real> emphasizedDecel: [0.05, 0.7, 0.1, 1, 1, 1]
-    readonly property list<real> emphasizedAccel: [0.3, 0, 0.8, 0.15, 1, 1]
+    // A panel's look at reveal p (0 hidden, 1 out) for the in-place styles
+    function revealOpacity(p) {
+        return motionStyle === "slide" ? 1 : Math.max(0, Math.min(1, p * 1.4));
+    }
+    function revealScale(p) {
+        return motionStyle === "pop" ? 0.6 + 0.4 * p : motionStyle === "zoom" ? 1.1 - 0.1 * Math.min(1, p) : 1;
+    }
+
+    readonly property int anim: 220 * speed
+
+    // Motion curves, for Easing.BezierSpline
+    readonly property list<real> emphasizedDecel: motion.decel
+    readonly property list<real> emphasizedAccel: motion.accel
     readonly property list<real> standard: [0.2, 0, 0, 1, 1, 1]
-    // M3 emphasized: quick lift-off, long soft landing, no overshoot
-    readonly property list<real> emphasized: [0.05, 0, 0.133, 0.06, 0.167, 0.4, 0.208, 0.82, 0.25, 1, 1, 1]
-    readonly property int animPanel: 450
-    // M3 Expressive spatial: settles with a slight overshoot
-    readonly property list<real> spatial: [0.38, 1.21, 0.22, 1, 1, 1]
-    readonly property int animSpatial: 500
+    readonly property list<real> emphasized: motion.emphasized
+    readonly property int animPanel: 450 * speed
+    readonly property list<real> spatial: motion.spatial
+    readonly property int animSpatial: 500 * speed
     readonly property int osdMargin: 56
 
     // A widget's color setting: "auto" is the wallpaper's own contrast color
