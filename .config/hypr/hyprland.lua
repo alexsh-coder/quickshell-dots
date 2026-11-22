@@ -41,6 +41,9 @@ end
 local terminal    = "kitty"
 local fileManager = "dolphin"
 local menu        = "qs ipc call launcher toggle"
+-- hardware.lua: env prefix for apps that need a proxy, extra Claude Code flags
+local appEnv      = hardware.app_env and (hardware.app_env .. " ") or ""
+local claudeArgs  = hardware.claude_args and (" " .. hardware.claude_args) or ""
 
 
 -------------------
@@ -327,9 +330,9 @@ bind("vnc", "Apps|VNC to remote PC", mainMod .. " + SHIFT + R", hl.dsp.exec_cmd(
 bind("terminal", "Apps|Terminal", mainMod .. " + T",      hl.dsp.exec_cmd(terminal))
 bind("browser", "Apps|Browser", mainMod .. " + W",      hl.dsp.exec_cmd("zen-browser"))
 -- Claude needs the VPN's HTTP proxy, same as the hproxy alias in .bashrc
-bind("claude", "Apps|Claude Code", mainMod .. " + C",      hl.dsp.exec_cmd(terminal .. " -e env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 /usr/bin/claude --dangerously-skip-permissions"))
-bind("claudecont", "Apps|Claude Code (resume last)", mainMod .. " + SHIFT + C",      hl.dsp.exec_cmd(terminal .. " -e env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 /usr/bin/claude --dangerously-skip-permissions --continue"))
-bind("telegram", "Apps|Telegram", mainMod .. " + U",      hl.dsp.exec_cmd("env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 Telegram"))
+bind("claude", "Apps|Claude Code", mainMod .. " + C",      hl.dsp.exec_cmd(terminal .. " -e " .. appEnv .. "claude" .. claudeArgs))
+bind("claudecont", "Apps|Claude Code (resume last)", mainMod .. " + SHIFT + C",      hl.dsp.exec_cmd(terminal .. " -e " .. appEnv .. "claude" .. claudeArgs .. " --continue"))
+bind("telegram", "Apps|Telegram", mainMod .. " + U",      hl.dsp.exec_cmd(appEnv .. "Telegram"))
 bind("close", "Windows|Close window", mainMod .. " + Q",      hl.dsp.window.close())
 bind("kill", "Windows|Force kill window", mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/hard-kill.sh"))
 bind("wallpicker", "Wallpaper|Wallpaper picker", mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"))

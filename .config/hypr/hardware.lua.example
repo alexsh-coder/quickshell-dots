@@ -17,6 +17,11 @@ return {
     --     __GLX_VENDOR_LIBRARY_NAME = "nvidia",
     -- },
 
+    -- Prefix for Telegram and Claude Code (Super+U, Super+C), e.g. a proxy:
+    -- app_env = "env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809",
+    -- Extra Claude Code flags:
+    -- claude_args = "--model opus",
+
     -- Extra commands run once at Hyprland start.
     -- autostart = { "systemctl --user start wayvnc" },
 }
