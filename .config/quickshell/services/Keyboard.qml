@@ -77,7 +77,7 @@ Singleton {
     Connections {
         target: Hyprland
         function onRawEvent(event) {
-            if (event.name === "activelayout")
+            if (event.name === "activelayout" || event.name === "configreloaded")
                 query.running = true;
         }
     }

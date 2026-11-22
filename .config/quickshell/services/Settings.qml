@@ -66,7 +66,9 @@ Singleton {
         natural_scroll: true,
         tap_to_click: true,
         cursor_size: 28,
-        cursor_theme: ""
+        cursor_theme: "",
+        // xkb layouts, comma separated; the first is the default
+        kb_layout: "us"
     })
 
     readonly property string luaPath: Quickshell.env("HOME") + "/.config/hypr/settings.lua"
@@ -258,7 +260,7 @@ Singleton {
             // Cursor theme as picked; cursor_theme in hypr is what runs (a Tinted- copy when recolored)
             property string cursorBase: "Rice-Fluent"
             // Recolor: "black", "white", "accent", or "" for the theme's own
-            property string cursorColor: ""
+            property string cursorColor: "accent"
             // Seconds without movement before the ring fades, 0 for never
             property int cursorIdle: 3
             // Ring visualizer: "bars", "dots", "wave" or "blob"; bar count, gap around the pointer, reach

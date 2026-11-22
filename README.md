@@ -215,8 +215,9 @@ Hyprland starts `qs` on login. Quickshell reloads itself when a file changes.
 
 ## Keys
 
-Caps Lock switches between the English and Russian layouts, Shift+Caps Lock is the
-real Caps Lock.
+Only English is on by default; a second layout is added in Settings → Input, and
+the layout pill shows up in the bar once there is one. Caps Lock switches between
+them, Shift+Caps Lock is the real Caps Lock.
 
 | Keys | Action |
 | --- | --- |

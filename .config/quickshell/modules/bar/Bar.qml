@@ -300,7 +300,7 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 16
 
-                    KbLayout { id: kb; lit: popouts.current === "keyboard" }
+                    KbLayout { id: kb; visible: Keyboard.layouts.length > 1; lit: popouts.current === "keyboard" }
                     NetworkIcon { id: network; lit: popouts.current === "network" }
                     VpnIcon { id: vpn; lit: popouts.current === "vpn" }
                     Bluetooth { id: bluetooth; lit: popouts.current === "bluetooth" }

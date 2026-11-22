@@ -13,6 +13,17 @@ Column {
 
     SectionTitle { text: "Keyboard" }
 
+    // English stays first; a second layout shows the switcher in the bar (Caps Lock switches)
+    SettingRow {
+        label: "Second layout"
+        hint: "Caps Lock switches between English and it"
+        Chips {
+            current: Settings.get("kb_layout").split(",")[1] ?? ""
+            model: [["", "None"], ["ru", "Russian"], ["ua", "Ukrainian"], ["by", "Belarusian"], ["kz", "Kazakh"], ["de", "German"], ["fr", "French"], ["es", "Spanish"], ["it", "Italian"], ["pl", "Polish"], ["pt", "Portuguese"], ["tr", "Turkish"]].map(l => ({ value: l[0], label: l[1] }))
+            onPicked: v => Settings.set("kb_layout", v ? "us," + v : "us")
+        }
+    }
+
     SettingRow {
         label: "Repeat rate"
         hint: "Characters per second while a key is held"

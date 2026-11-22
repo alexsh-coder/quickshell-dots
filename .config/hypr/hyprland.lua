@@ -264,7 +264,7 @@ hl.config({
 
 hl.config({
     input = {
-        kb_layout  = "us,ru",
+        kb_layout  = ui.kb_layout or "us",
         kb_variant = "",
         kb_model   = "",
         -- custom:nonumlock lives in ~/.config/xkb: Num Lock key does nothing,
