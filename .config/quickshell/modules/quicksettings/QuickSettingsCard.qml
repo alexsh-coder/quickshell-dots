@@ -34,6 +34,8 @@ Scope {
     Item {
         id: host
 
+        // MediaPopout caps its effects list by the panel height
+        height: root.screen?.height ?? 0
         property bool pinned: true
         property bool busy: false
         property bool fx: false

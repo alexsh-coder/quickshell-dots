@@ -90,9 +90,10 @@ Item {
 
         Item {
             width: parent.width
-            height: 36
+            height: Math.max(36, headerText.implicitHeight)
 
             Column {
+                id: headerText
                 anchors.left: parent.left
                 anchors.right: headerButtons.left
                 anchors.rightMargin: 8
@@ -101,7 +102,14 @@ Item {
 
                 Label {
                     width: parent.width
-                    elide: Text.ElideRight
+                    wrapMode: Text.Wrap
+                    text: root.greeting + (Quickshell.env("USER") ? ", " + Quickshell.env("USER") : "")
+                    font.pixelSize: greetingFull.width > width ? 14 : 16
+                    font.weight: Font.DemiBold
+                }
+                TextMetrics {
+                    id: greetingFull
+                    font.family: Theme.font
                     text: root.greeting + (Quickshell.env("USER") ? ", " + Quickshell.env("USER") : "")
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
@@ -230,7 +238,7 @@ Item {
 
             Tile {
                 icon: on ? "do_not_disturb_on" : "notifications"
-                title: "Do not disturb"
+                title: "Focus"
                 detail: on ? "Silenced" : "Off"
                 on: Notifs.dnd
                 onClicked: Notifs.setDnd(!on)
@@ -253,10 +261,10 @@ Item {
             }
 
             Tile {
-                icon: on ? "dark_mode" : "light_mode"
-                title: "Dark mode"
+                icon: "light_mode"
+                title: "Light mode"
                 detail: on ? "On" : "Off"
-                on: !Scheme.light
+                on: Scheme.light
                 onClicked: Scheme.toggle()
             }
 
