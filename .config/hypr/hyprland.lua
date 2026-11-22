@@ -40,7 +40,6 @@ end
 
 local terminal    = "kitty"
 local fileManager = "dolphin"
--- [lab-qs] local menu        = "~/.config/hypr/scripts/wofi-toggle.sh"
 local menu        = "qs ipc call launcher toggle"
 
 
@@ -49,15 +48,10 @@ local menu        = "qs ipc call launcher toggle"
 -------------------
 
 hl.on("hyprland.start", function ()
-    -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh waybar")  -- has segfaulted inside GTK
     -- Qt drops to its single-threaded render loop on NVIDIA (QTBUG-95817), which stutters the
     -- visualizer; other drivers are threaded already.
     -- QT_SCALE_FACTOR is the settings window's panel scale
-    hl.exec_cmd("~/.config/hypr/scripts/respawn.sh env QSG_RENDER_LOOP=threaded MALLOC_ARENA_MAX=2 QT_SCALE_FACTOR=" .. (ui.panel_scale or 1) .. " ~/.config/quickshell/scripts/nothp.py qs")  -- [lab-qs] Quickshell rice: ~/.config/quickshell/shell.qml
-    -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh dunst")
-    -- OSD pill (volume/brightness/layout...); height above the bottom edge is per machine.
-    -- [lab-qs] hl.exec_cmd("~/.config/hypr/scripts/respawn.sh ~/.config/hypr/scripts/osd.py daemon --margin "
-                -- [lab-qs] .. (hardware.osd_margin or 56))
+    hl.exec_cmd("~/.config/hypr/scripts/respawn.sh env QSG_RENDER_LOOP=threaded MALLOC_ARENA_MAX=2 QT_SCALE_FACTOR=" .. (ui.panel_scale or 1) .. " ~/.config/quickshell/scripts/nothp.py qs")
     -- awww-daemon restores the last wallpaper from its own cache (~/.cache/awww).
     hl.exec_cmd("awww-daemon")
     -- hypridle handles auto-lock and lock-before-sleep; it and
@@ -338,7 +332,6 @@ bind("claudecont", "Apps|Claude Code (resume last)", mainMod .. " + SHIFT + C", 
 bind("telegram", "Apps|Telegram", mainMod .. " + U",      hl.dsp.exec_cmd("env http_proxy=http://127.0.0.1:10809 https_proxy=http://127.0.0.1:10809 Telegram"))
 bind("close", "Windows|Close window", mainMod .. " + Q",      hl.dsp.window.close())
 bind("kill", "Windows|Force kill window", mainMod .. " + SHIFT + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/hard-kill.sh"))
--- [lab-qs] hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("python3 ~/.config/hypr/scripts/wallpaper_carousel.py"))
 bind("wallpicker", "Wallpaper|Wallpaper picker", mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpaper toggle"))
 bind("wallnext", "Wallpaper|Next wallpaper", mainMod .. " + ALT + bracketright", hl.dsp.exec_cmd("qs ipc call wallpaper next"))
 bind("wallprev", "Wallpaper|Previous wallpaper", mainMod .. " + ALT + bracketleft",  hl.dsp.exec_cmd("qs ipc call wallpaper prev"))
@@ -445,7 +438,7 @@ hl.bind(mainMod .. " + CTRL + up",    hl.dsp.window.swap({ direction = "up" }))
 hl.bind(mainMod .. " + CTRL + down",  hl.dsp.window.swap({ direction = "down" }))
 
 -- Volume / brightness / media / lock keys: Quickshell runs the action and shows
--- its OSD (~/.config/quickshell/modules/osd). [lab-qs] was osd.py
+-- its OSD (~/.config/quickshell/modules/osd).
 local osd = "qs ipc call osd "
 hl.bind("XF86AudioRaiseVolume", hl.dsp.exec_cmd(osd .. "volume raise"), { locked = true, repeating = true })
 hl.bind("XF86AudioLowerVolume", hl.dsp.exec_cmd(osd .. "volume lower"), { locked = true, repeating = true })

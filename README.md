@@ -5,6 +5,15 @@ notifications, OSD, lockscreen and music effects are all one QML shell. The acce
 colour follows the wallpaper and is pushed out to Hyprland borders, kitty, GTK and
 Qt/KDE apps.
 
+![wallpaper transitions](screenshots/transitions.gif)
+
+| | |
+| --- | --- |
+| ![desktop](screenshots/desktop.webp) | ![fastfetch](screenshots/fastfetch.webp) |
+| ![launcher](screenshots/launcher.webp) | ![quick settings](screenshots/quicksettings.webp) |
+| ![lockscreen](screenshots/lockscreen.webp) | ![power menu](screenshots/powermenu.webp) |
+| ![settings](screenshots/settings.webp) | ![notifications](screenshots/notifications.webp) |
+
 ## What's inside
 
 - **Bar** in pill groups: workspaces, audio visualizer, tray, clock, network,
@@ -144,11 +153,10 @@ to fastfetch, scaled crisply through the kitty graphics protocol. With the folde
 empty it shows the plain Arch logo.
 
 The pixel art from the screenshots is by
-[classic boy](https://www.pixiv.net/users/93692142), packed
-[here](https://drive.google.com/file/d/1jJ3tUKEdIqBdURpdIl1UZG3pO3yLckwi/view) (118 MB):
+[classic boy](https://www.pixiv.net/users/93692142) (118 MB):
 
 ```sh
-curl -fL -o /tmp/pixel-art.zip 'https://drive.usercontent.google.com/download?id=1jJ3tUKEdIqBdURpdIl1UZG3pO3yLckwi&export=download&confirm=t'
+curl -fLo /tmp/pixel-art.zip https://github.com/alexsh-coder/quickshell-dots/releases/latest/download/pixel-art.zip
 unzip /tmp/pixel-art.zip -d ~/Pictures && rm /tmp/pixel-art.zip
 ```
 
@@ -164,6 +172,23 @@ Each folder inside `~/Pictures/Wallpapers` (images) and `~/Videos/Wallpapers`
 ```
 ~/Pictures/Wallpapers/anime/sakura.png
 ~/Videos/Wallpapers/loops/rain.mp4
+```
+
+The wallpapers from the screenshots are in the
+[latest release](https://github.com/alexsh-coder/quickshell-dots/releases/latest),
+at about 1200p and in 4K. They are fan art found on wallpaper sites, all rights stay
+with their artists.
+
+| File | What | Size |
+| --- | --- | --- |
+| `wallpapers.tar` | images | 24 MB |
+| `wallpapers-4k.tar` | images, 4K | 47 MB |
+| `video-wallpapers.tar` | looping videos | 167 MB |
+| `video-wallpapers-4k.tar` | looping videos, 4K | 305 MB |
+
+```sh
+curl -fL https://github.com/alexsh-coder/quickshell-dots/releases/latest/download/wallpapers.tar | tar x -C ~/Pictures
+curl -fL https://github.com/alexsh-coder/quickshell-dots/releases/latest/download/video-wallpapers.tar | tar x -C ~/Videos
 ```
 
 ### VPN

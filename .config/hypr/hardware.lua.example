@@ -11,10 +11,6 @@ return {
     -- mouse_sensitivity   = 0,
     -- mouse_accel_profile = "flat",
 
-    -- OSD pill height above the bottom screen edge, px (default 56).
-    -- Try values live with: ~/.config/hypr/scripts/osd.py margin 80
-    -- osd_margin = 56,
-
     -- Extra environment variables, e.g. for an NVIDIA GPU:
     -- env = {
     --     LIBVA_DRIVER_NAME         = "nvidia",
