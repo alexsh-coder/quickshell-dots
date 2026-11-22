@@ -119,7 +119,7 @@ Scope {
 
     Connections {
         target: Caffeine
-        function onEnabledChanged() {
+        function onSwitched() {
             root.showText("coffee", Caffeine.enabled ? "Caffeine on" : "Caffeine off");
         }
     }

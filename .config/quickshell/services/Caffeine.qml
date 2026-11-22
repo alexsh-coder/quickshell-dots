@@ -10,6 +10,9 @@ Singleton {
 
     property bool enabled: false
 
+    // Only for user switches, not the state restored after a restart
+    signal switched
+
     onEnabledChanged: if (saved.restored) saved.setText(enabled ? "on" : "off")
 
     // Survives a shell restart within the session, like night mode
@@ -31,6 +34,7 @@ Singleton {
 
     function toggle(): void {
         enabled = !enabled;
+        switched();
     }
 
     IpcHandler {
@@ -40,7 +44,8 @@ Singleton {
             root.toggle();
         }
         function set(state: string): void {
-            root.enabled = state === "on";
+            if ((state === "on") !== root.enabled)
+                root.toggle();
         }
         function get(): string {
             return root.enabled ? "on" : "off";
