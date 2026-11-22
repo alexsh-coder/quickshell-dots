@@ -2,3 +2,4 @@
 __pycache__/
 .config/kitty/theme-colors.conf
 .config/kitty/machine.conf
+*.so

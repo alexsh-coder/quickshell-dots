@@ -218,6 +218,158 @@ PanelWindow {
         }
     }
 
+    // Fluent's shapes grow out of the dot inside the theme; the way back is drawn here, as the
+    // theme can't know what came before. Sizes as in scripts/cursor-dot.py
+    Item {
+        id: unmorph
+
+        // [width, height, fill alpha, outlined, rotation] as fractions of the cursor size
+        readonly property var shapes: ({
+            hand: [0.56, 0.56, 70, true, 0], text: [0.08, 0.6, 255, false, 0], grab: [0.34, 0.34, 70, true, 0],
+            grabbing: [0.14, 0.14, 255, false, 0], ew: [0.4, 0.12, 255, false, 0], ns: [0.12, 0.4, 255, false, 0],
+            nwse: [0.4, 0.12, 255, false, 45], nesw: [0.4, 0.12, 255, false, -45], no: [0.44, 0.44, 40, true, 0],
+            cross: [0.08, 0.08, 255, false, 0], help: [0.44, 0.44, 40, true, 0]
+        })
+        readonly property var names: ({
+            hand: ["pointer", "hand", "hand1", "hand2", "pointing_hand", "link"],
+            text: ["text", "xterm", "ibeam"],
+            grab: ["grab", "openhand"],
+            grabbing: ["grabbing", "closedhand", "move", "fleur", "all-scroll", "size_all", "dnd-move"],
+            ew: ["ew-resize", "e-resize", "w-resize", "col-resize", "size_hor", "sb_h_double_arrow", "h_double_arrow", "left_side", "right_side", "split_h"],
+            ns: ["ns-resize", "n-resize", "s-resize", "row-resize", "size_ver", "sb_v_double_arrow", "v_double_arrow", "top_side", "bottom_side", "split_v"],
+            nwse: ["nwse-resize", "nw-resize", "se-resize", "size_fdiag", "top_left_corner", "bottom_right_corner"],
+            nesw: ["nesw-resize", "ne-resize", "sw-resize", "size_bdiag", "top_right_corner", "bottom_left_corner"],
+            no: ["not-allowed", "no-drop", "dnd-no-drop", "crossed_circle", "X_cursor"],
+            cross: ["crosshair", "cross", "tcross", "cell", "plus"],
+            help: ["help", "question_arrow", "whats_this"]
+        })
+        readonly property var waits: ["wait", "watch", "progress", "left_ptr_watch", "half-busy"]
+        readonly property real px: Cursor.size / root.ui
+        property var from: null
+        property string last: ""
+        property real t: 0
+
+        function group(name) {
+            for (const k in names)
+                if (names[k].includes(name))
+                    return k;
+            return "";
+        }
+
+        anchors.fill: parent
+        visible: Cursor.base === "Rice-Fluent" && root.here && t > 0
+
+        Connections {
+            target: Cursor
+            function onShapeChanged() {
+                const was = unmorph.group(unmorph.last);
+                unmorph.last = Cursor.shape;
+                if (!Cursor.shape || unmorph.waits.includes(Cursor.shape) || unmorph.group(Cursor.shape) || !was)
+                    return;
+                unmorph.from = unmorph.shapes[was];
+                back.restart();
+            }
+        }
+
+        NumberAnimation {
+            id: back
+            target: unmorph
+            property: "t"
+            from: 1
+            to: 0
+            duration: 130
+            easing.type: Easing.InCubic
+        }
+
+        Rectangle {
+            readonly property var a: unmorph.from ?? [0.2, 0.2, 255, false, 0]
+            readonly property real k: unmorph.t
+            readonly property real w: (0.2 + (a[0] - 0.2) * k) * unmorph.px
+            readonly property real h: (0.2 + (a[1] - 0.2) * k) * unmorph.px
+
+            x: root.cx - width / 2
+            y: root.cy - height / 2
+            width: w
+            height: h
+            radius: Math.min(w, h) / 2
+            rotation: a[4] * k
+            color: Qt.alpha(root.tint, (a[2] + (255 - a[2]) * (1 - k)) / 255)
+            border.color: root.tint
+            border.width: a[3] && k > 0.5 ? Math.max(1, unmorph.px * 0.03) : 0
+            antialiasing: true
+        }
+    }
+
+    // On each press, as Settings.cursorClick picks: a thin ring out of the pointer or a few bits
+    // flung out ("pop" is the Fluent theme's own, see Cursor.pop)
+    Item {
+        id: press
+
+        readonly property string mode: Settings.cursorClick
+        readonly property real px: Cursor.size / root.ui
+        property real t: 1
+        // Where the press was: the effect stays there as the pointer moves on
+        property real ox: 0
+        property real oy: 0
+
+        anchors.fill: parent
+        visible: (mode === "ripple" || mode === "burst") && t < 1
+
+        Connections {
+            target: Cursor
+            function onClicked() {
+                press.ox = root.cx;
+                press.oy = root.cy;
+                play.restart();
+            }
+        }
+        NumberAnimation {
+            id: play
+            target: press
+            property: "t"
+            from: 0
+            to: 1
+            duration: press.mode === "burst" ? 420 : 320
+            easing.type: Easing.OutCubic
+        }
+
+        Rectangle {
+            readonly property real r: press.px * (0.14 + 0.3 * press.t)
+
+            visible: press.mode === "ripple"
+            x: press.ox - r
+            y: press.oy - r
+            width: r * 2
+            height: r * 2
+            radius: r
+            color: "transparent"
+            border.color: root.tint
+            border.width: 1.5
+            opacity: 0.7 * (1 - press.t)
+            antialiasing: true
+        }
+
+        Repeater {
+            model: press.mode === "burst" ? 6 : 0
+
+            Rectangle {
+                required property int index
+                readonly property real a: index / 6 * 2 * Math.PI + Math.PI / 6
+                readonly property real d: press.px * (0.16 + 0.32 * press.t)
+                readonly property real r: press.px * 0.045 * (1 - press.t * 0.6)
+
+                x: press.ox + Math.cos(a) * d - r
+                y: press.oy + Math.sin(a) * d - r
+                width: r * 2
+                height: r * 2
+                radius: r
+                color: root.tint
+                opacity: 1 - press.t
+                antialiasing: true
+            }
+        }
+    }
+
     // Spectrum all the way around the pointer, lows at the top going clockwise
     Item {
         id: ring

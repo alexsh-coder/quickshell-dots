@@ -156,6 +156,16 @@ Column {
     }
 
     SettingRow {
+        label: "Click"
+        hint: "What the pointer does on a press"
+        Chips {
+            current: Settings.cursorClick
+            model: [{ value: "off", label: "Off" }, { value: "ripple", label: "Ripple" }, { value: "pop", label: "Pop" }, { value: "burst", label: "Burst" }]
+            onPicked: v => Settings.cursorClick = v
+        }
+    }
+
+    SettingRow {
         label: "Music ring"
         hint: "Spectrum around the pointer while something plays"
         Toggle {

@@ -55,6 +55,8 @@ hl.on("hyprland.start", function ()
     -- visualizer; other drivers are threaded already.
     -- QT_SCALE_FACTOR is the settings window's panel scale
     hl.exec_cmd("~/.config/hypr/scripts/respawn.sh env QSG_RENDER_LOOP=threaded MALLOC_ARENA_MAX=2 QT_SCALE_FACTOR=" .. (ui.panel_scale or 1) .. " ~/.config/quickshell/scripts/nothp.py qs")
+    -- Cursor shape events for Quickshell's Fluent cursor; rebuilt when Hyprland updates
+    hl.exec_cmd("make -s -C ~/.config/hypr/plugins/cursorshape && hyprctl plugin load ~/.config/hypr/plugins/cursorshape/cursorshape.so")
     -- awww-daemon restores the last wallpaper from its own cache (~/.cache/awww).
     hl.exec_cmd("awww-daemon")
     -- hypridle handles auto-lock and lock-before-sleep; it and

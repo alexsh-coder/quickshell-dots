@@ -30,6 +30,7 @@ Singleton {
     property alias remoteHost: adapter.remoteHost
     property alias remoteUser: adapter.remoteUser
     property alias cursorTrail: adapter.cursorTrail
+    property alias cursorClick: adapter.cursorClick
     property alias cursorViz: adapter.cursorViz
     property alias cursorBase: adapter.cursorBase
     property alias cursorColor: adapter.cursorColor
@@ -259,6 +260,8 @@ Singleton {
             property string remoteUser: ""
             // Effects drawn around the pointer: trail "off", "comet" or "sparks"; ring visualizer
             property string cursorTrail: "comet"
+            // On a press: "off", "ripple", "pop" (the dot swells) or "burst"
+            property string cursorClick: "pop"
             property bool cursorViz: false
             // Cursor theme as picked; cursor_theme in hypr is what runs (a Tinted- copy when recolored)
             property string cursorBase: "Rice-Fluent"

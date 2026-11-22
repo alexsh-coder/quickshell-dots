@@ -34,6 +34,18 @@ POINTER = ["default", "left_ptr", "arrow", "top_left_arrow", "right_ptr", "conte
            "split_h", "split_v", "grab", "openhand", "grabbing", "closedhand", "pencil", "X_cursor"]
 HAND = ["pointer", "hand", "hand1", "hand2", "pointing_hand", "link"]
 TEXT = ["text", "xterm", "ibeam"]
+# Fluent's own shapes for names that are otherwise the plain dot
+FLUENT = {"grab": ["grab", "openhand"],
+          "grabbing": ["grabbing", "closedhand", "move", "fleur", "all-scroll", "size_all", "dnd-move"],
+          "ew": ["ew-resize", "e-resize", "w-resize", "col-resize", "size_hor", "sb_h_double_arrow",
+                 "h_double_arrow", "left_side", "right_side", "split_h"],
+          "ns": ["ns-resize", "n-resize", "s-resize", "row-resize", "size_ver", "sb_v_double_arrow",
+                 "v_double_arrow", "top_side", "bottom_side", "split_v"],
+          "nwse": ["nwse-resize", "nw-resize", "se-resize", "size_fdiag", "top_left_corner", "bottom_right_corner"],
+          "nesw": ["nesw-resize", "ne-resize", "sw-resize", "size_bdiag", "top_right_corner", "bottom_left_corner"],
+          "no": ["not-allowed", "no-drop", "dnd-no-drop", "crossed_circle", "X_cursor"],
+          "cross": ["crosshair", "cross", "tcross", "cell", "plus"],
+          "help": ["help", "question_arrow", "whats_this"]}
 WAIT = ["wait", "watch", "progress", "left_ptr_watch", "half-busy"]
 
 
@@ -93,27 +105,95 @@ def spinner(size, accent, frame):
     return done(im, size)
 
 
-def blob(size, accent, w, h, fill, edge):
+def blob(size, accent, w, h, fill, edge, extra=None, t=1, rot=0):
     im, s = canvas(size)
     d = ImageDraw.Draw(im)
     c, w, h, p = s / 2, w * s / 2, h * s / 2, SS * 2
     d.rounded_rectangle((c - w - p, c - h - p, c + w + p, c + h + p), min(w, h) + p, fill=(10, 12, 16, 110))
     d.rounded_rectangle((c - w, c - h, c + w, c + h), min(w, h), fill=accent + (fill,),
                         outline=accent + (255,) if edge else None, width=max(SS, round(s * 0.03)))
+    if extra:
+        extra(d, s, c, accent, t)
+    if rot:
+        im = im.rotate(rot, Image.BICUBIC)
     return done(im, size)
+
+
+def tri(d, s, x, y, ang, r, col):
+    import math
+    pts = [(x + r * math.cos(math.radians(ang + k)), y - r * math.sin(math.radians(ang + k))) for k in (0, 140, -140)]
+    d.polygon(pts, fill=col)
+
+
+def arrows(dirs, dist):
+    # small triangles sliding out from the centre along the given angles
+    def f(d, s, c, accent, t):
+        if t <= 0:
+            return
+        import math
+        for a in dirs:
+            r = s * dist * t
+            x, y = c + r * math.cos(math.radians(a)), c - r * math.sin(math.radians(a))
+            tri(d, s, x, y, a, s * 0.085, (10, 12, 16, round(110 * t)))
+            tri(d, s, x, y, a, s * 0.06, accent + (round(255 * t),))
+    return f
+
+
+def slash(d, s, c, accent, t):
+    if t <= 0:
+        return
+    k, w = s * 0.17 * t, max(SS, round(s * 0.045))
+    d.line((c - k, c + k, c + k, c - k), fill=accent + (round(255 * t),), width=w)
+
+
+def cross(d, s, c, accent, t):
+    if t <= 0:
+        return
+    k, g, w = s * 0.3 * t, s * 0.08, max(SS, round(s * 0.035))
+    col = accent + (round(255 * t),)
+    for a, b in ((1, 0), (0, 1)):
+        d.line((c - k * a, c - k * b, c - g * a, c - g * b), fill=col, width=w)
+        d.line((c + g * a, c + g * b, c + k * a, c + k * b), fill=col, width=w)
 
 
 MORPH = 8
 HOLD = 3600000
 # (width, height, fill alpha, outlined) as fractions of the cursor size
-SHAPES = {"dot": (0.2, 0.2, 255, False), "hand": (0.56, 0.56, 70, True), "text": (0.08, 0.6, 255, False)}
+# plus an optional decoration fading in and a rotation in degrees
+SHAPES = {"dot": (0.2, 0.2, 255, False),
+          "hand": (0.56, 0.56, 70, True),
+          "text": (0.08, 0.6, 255, False),
+          "grab": (0.34, 0.34, 70, True),
+          "grabbing": (0.14, 0.14, 255, False, arrows((0, 90, 180, 270), 0.3)),
+          "ew": (0.4, 0.12, 255, False, arrows((0, 180), 0.3)),
+          "ns": (0.12, 0.4, 255, False, arrows((90, 270), 0.3)),
+          "nwse": (0.4, 0.12, 255, False, arrows((0, 180), 0.3), -45),
+          "nesw": (0.4, 0.12, 255, False, arrows((0, 180), 0.3), 45),
+          "no": (0.44, 0.44, 40, True, slash),
+          "cross": (0.08, 0.08, 255, False, cross),
+          "help": (0.44, 0.44, 40, True, lambda d, s, c, a, t: d.text((c, c), "?", fill=a + (round(255 * t),),
+                   anchor="mm", font_size=s * 0.34) if t > 0 else None)}
 
 
 def morph(size, accent, frm, to, f):
     t = 1 - (1 - f / (MORPH - 1)) ** 3
     a, b = SHAPES[frm], SHAPES[to]
     lerp = lambda i: a[i] + (b[i] - a[i]) * t
-    return blob(size, accent, lerp(0), lerp(1), round(lerp(2)), b[3] if t > 0.5 else a[3])
+    extra = b[4] if len(b) > 4 else None
+    return blob(size, accent, lerp(0), lerp(1), round(lerp(2)), b[3] if t > 0.5 else a[3],
+                extra, t, (b[5] if len(b) > 5 else 0))
+
+
+POP = 10
+
+
+def pop(size, accent, shape, f):
+    # Swells fast and settles back; the last frame is the shape itself
+    x = f / (POP - 1)
+    k = 1 + 0.45 * (x / 0.3 if x < 0.3 else 1 - ((x - 0.3) / 0.7) ** 0.7) if x < 1 else 1
+    b = SHAPES[shape]
+    return blob(size, accent, b[0] * k, b[1] * k, b[2], b[3], b[4] if len(b) > 4 else None, 1,
+                b[5] if len(b) > 5 else 0)
 
 
 def xcursor(draw, nframes=1, delay=50, last=None):
@@ -141,14 +221,21 @@ def build(name, style, accent):
     if style == "fluent":
         # The plain dot holds still: Hyprland restarts an animation whenever the shape is set
         # again (theme switches, windows re-setting it), and a shrink-in would jump each time
-        groups = [(POINTER, xcursor(lambda s, f: morph(s, accent, "dot", "dot", 0))),
-                  (HAND, xcursor(lambda s, f: morph(s, accent, "dot", "hand", f), MORPH, 16, HOLD)),
-                  (TEXT, xcursor(lambda s, f: morph(s, accent, "dot", "text", f), MORPH, 16, HOLD))]
+        rest = [n for n in POINTER if not any(n in v for v in FLUENT.values())]
+        anim = lambda to: xcursor(lambda s, f: morph(s, accent, "dot", to, f), MORPH, 16, HOLD)
+        groups = [(rest, xcursor(lambda s, f: morph(s, accent, "dot", "dot", 0))),
+                  (HAND, anim("hand")), (TEXT, anim("text"))]
+        groups += [(names, anim(shape)) for shape, names in FLUENT.items()]
+        # pop_<name>: the press bounce, set by the cursorshape Hyprland plugin
+        bounce = lambda to: xcursor(lambda s, f: pop(s, accent, to, f), POP, 16, HOLD)
+        groups += [(["pop_" + n for n in names], bounce(shape))
+                   for shape, names in [("dot", rest), ("hand", HAND), ("text", TEXT)] + list(FLUENT.items())]
     else:
         groups = [(POINTER, xcursor(lambda s, f: dot(s, accent, style))),
                   (HAND, xcursor(lambda s, f: dot(s, accent, style, big=True))),
                   (TEXT, xcursor(lambda s, f: bar(s, accent)))]
-    groups += [(WAIT, xcursor(lambda s, f: spinner(s, accent, f), FRAMES, 60))]
+    groups += [(WAIT + (["pop_" + n for n in WAIT] if style == "fluent" else []),
+                xcursor(lambda s, f: spinner(s, accent, f), FRAMES, 60))]
     for names, data in groups:
         (cur / names[0]).write_bytes(data)
         for n in names[1:]:

@@ -2,6 +2,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 
 // Cursor theme (installed ones grouped into families, optionally recolored to the accent, applied
@@ -34,7 +35,33 @@ Singleton {
     readonly property int size: Settings.get("cursor_size")
 
     // Pointer in Hyprland layout coords, while some effect wants it
-    readonly property bool tracking: Settings.cursorTrail !== "off" || Settings.cursorViz && Cava.active
+    readonly property bool tracking: Settings.cursorTrail !== "off" || Settings.cursorViz && Cava.active || Settings.cursorClick !== "off" || base === "Rice-Fluent"
+    // Shape on screen, from the cursorshape Hyprland plugin ("" while a client draws its own)
+    property string shape: ""
+    signal clicked
+    // Fluent's press bounce lives in the theme (pop_<shape>); the plugin plays it when told to.
+    // Told again on its first event, as it loads after Quickshell starts
+    readonly property bool pop: Settings.cursorClick === "pop" && base === "Rice-Fluent"
+    property bool popSent: false
+    onPopChanged: popSent = false
+    onPopSentChanged: if (!popSent) sendPop()
+    function sendPop() {
+        Quickshell.execDetached(["hyprctl", "cursorpop", pop ? "1" : "0"]);
+        popSent = true;
+    }
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (event.name === "cursorshape") {
+                root.shape = event.data;
+                if (!root.popSent)
+                    root.sendPop();
+            }
+            else if (event.name === "cursorclick" && event.data === "1")
+                root.clicked();
+        }
+    }
     property real x: 0
     property real y: 0
     // Where the pointer will be a frame from now: effects render a frame behind Hyprland
