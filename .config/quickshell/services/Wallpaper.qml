@@ -516,8 +516,11 @@ Singleton {
                     root.image = root.still(last);
                     if (root.image !== still)
                         Quickshell.execDetached([root.script, "set", root.image]);
-                } else {
+                } else if (still) {
                     root.current = root.image = still;
+                } else {
+                    // Fresh setup: nothing on screen yet
+                    root.set(Quickshell.shellDir + "/data/wallpaper.jpg");
                 }
             }
         }

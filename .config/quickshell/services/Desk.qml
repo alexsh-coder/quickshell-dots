@@ -591,7 +591,11 @@ Singleton {
     function seeds() {
         const vis = (style, extra) => makeWidget("visualizer", Object.assign({ style: style }, extra ?? {}));
         return {
-            default: { name: "Default", widgets: [vis("bars")], fx: {} },
+            default: {
+                name: "Ring",
+                widgets: [vis("ring", { ringCenter: "title" }), makeWidget("lyrics", { y: 0.8235, effect: ["glow", "spot"], lineAnim: "fade" })],
+                fx: { glow: true, blur: true }
+            },
             minimal: {
                 name: "Minimal",
                 widgets: [makeWidget("clock", { x: 0.16, y: 0.2, w: 0.26, h: 0.16, align: "left", style: "date" }), vis("wave", { color: "accent" })],
@@ -709,6 +713,7 @@ Singleton {
                 root.migrate(old);
             else
                 adapter.presets = root.seeds();
+            adapter.lyricsWidget = true;
             writeAdapter();
             root.changed(false);
         }
