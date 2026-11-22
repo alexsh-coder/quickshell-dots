@@ -129,6 +129,7 @@ Scope {
         entered();
         open = true;
         Qt.callLater(() => search.forceActiveFocus());
+        Qt.callLater(resultsSettle.nudge);
     }
 
     function setQuery(text) {
@@ -717,6 +718,7 @@ Scope {
                     }
 
                     ListSettle {
+                        id: resultsSettle
                         view: resultsView
                         paused: !!root.dragId || root.dropping
                     }
