@@ -715,6 +715,11 @@ Scope {
                         NumberAnimation { property: "scale"; to: 1; duration: Theme.anim; easing.type: Easing.OutCubic }
                         NumberAnimation { property: "lift"; to: 0; duration: Theme.anim; easing.type: Easing.OutCubic }
                     }
+
+                    ListSettle {
+                        view: resultsView
+                        paused: !!root.dragId || root.dropping
+                    }
                 }
 
                 ListView {

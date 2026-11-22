@@ -318,6 +318,8 @@ Item {
             moveDisplaced: Transition { NumberAnimation { property: "y"; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
             displaced: Transition { NumberAnimation { property: "y"; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
             add: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.anim } }
+
+            ListSettle { view: list }
         }
     }
 
@@ -325,6 +327,7 @@ Item {
         id: row
 
         required property string name
+        required property int index
         readonly property var net: root.byName[name] ?? root.ghost
         readonly property bool asked: root.asking === net
         readonly property bool busy: net.stateChanging || net.state === ConnectionState.Connecting

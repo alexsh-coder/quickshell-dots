@@ -150,6 +150,8 @@ Item {
             moveDisplaced: Transition { NumberAnimation { property: "y"; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
             displaced: Transition { NumberAnimation { property: "y"; duration: Theme.animSpatial; easing.type: Easing.BezierSpline; easing.bezierCurve: Theme.spatial } }
             add: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.anim } }
+
+            ListSettle { view: list }
         }
     }
 
@@ -157,6 +159,7 @@ Item {
         id: row
 
         required property BluetoothDevice modelData
+        required property int index
         readonly property BluetoothDevice dev: modelData
         readonly property bool busy: dev.pairing || dev.state === BluetoothDeviceState.Connecting
                                   || dev.state === BluetoothDeviceState.Disconnecting
