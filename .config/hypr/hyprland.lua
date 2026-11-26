@@ -598,6 +598,14 @@ hl.layer_rule({
     ignore_alpha = 0.5,
 })
 
+-- Screenshot picker fades its dim itself, and must be gone at once before grim shoots
+hl.layer_rule({
+    name  = "screenshot-picker",
+    match = { namespace = "screenshot" },
+
+    no_anim = true,
+})
+
 hl.layer_rule({
     name  = "wallpaper-picker",
     match = { namespace = "wallpaper" },

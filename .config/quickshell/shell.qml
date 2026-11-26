@@ -16,6 +16,7 @@ import qs.modules.osd
 import qs.modules.overview
 import qs.modules.power
 import qs.modules.quicksettings
+import qs.modules.screenshot
 import qs.modules.settings
 import qs.modules.wallpaper
 
@@ -66,4 +67,5 @@ ShellRoot {
     DeskEdge {}
     QuickSettingsCard {}
     SettingsWindow {}
+    ScreenshotPicker {}
 }
