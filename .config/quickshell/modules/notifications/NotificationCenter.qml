@@ -69,9 +69,17 @@ Scope {
             const n = root.sweepQueue.pop();
             if (n)
                 n.close();
-            else
+            else {
                 stop();
+                autoHide.start();
+            }
         }
+    }
+
+    Timer {
+        id: autoHide
+        interval: 300
+        onTriggered: root.hide()
     }
 
     GlobalShortcut {
@@ -294,6 +302,10 @@ Scope {
                 anchors.fill: parent
                 focus: true
                 Keys.onEscapePressed: root.hide()
+                Keys.onDeletePressed: root.clearAll()
+                Keys.onPressed: event => {
+                    if (event.key === Qt.Key_Backspace) root.clearAll();
+                }
             }
 
             // Rebuilt on every open, so the cards cascade in again

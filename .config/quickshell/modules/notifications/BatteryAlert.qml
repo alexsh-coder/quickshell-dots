@@ -48,7 +48,7 @@ Scope {
             return;
         const t = Math.min(...hit);
         saved.warned = t;
-        notify.command = ["notify-send", "-a", "Battery",
+        notify.command = ["notify-send", "-a", "Battery", "-e",
             "-u", t <= 5 ? "critical" : "normal",
             "-i", t <= 10 ? "battery-caution" : "battery-low",
             "Low battery", `${pct}% remaining`];

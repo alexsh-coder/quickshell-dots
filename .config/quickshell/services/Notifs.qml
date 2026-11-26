@@ -16,6 +16,8 @@ Singleton {
     // Notification center is open: new ones land in its list instead of popping
     property bool centerOpen: false
     readonly property int maxHistory: 50
+    // Transient ones never stay in history: gone once their popup ends or the center closes
+    onCenterOpenChanged: if (!centerOpen) for (const n of list.filter(n => n.fleeting && !n.popup)) n.close()
 
     function add(n) {
         // Carried over by keepOnReload: back into history without popping
@@ -68,6 +70,8 @@ Singleton {
 
         property Notification notification
         property bool popup: false
+        property bool fleeting: false
+        onPopupChanged: if (!popup && fleeting) close()
         onNotificationChanged: if (!notification) forget()
         readonly property date time: new Date()
 
@@ -93,6 +97,7 @@ Singleton {
             summary = n.summary;
             body = n.body;
             urgency = n.urgency;
+            fleeting = n.transient;
             timeout = n.expireTimeout;
             actions = n.actions.map(a => ({ id: a.identifier, text: a.text }));
         }
