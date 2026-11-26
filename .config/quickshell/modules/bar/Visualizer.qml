@@ -15,7 +15,7 @@ Item {
     readonly property int gap: 2
     readonly property int fullWidth: count * barWidth + (count - 1) * gap
     readonly property list<real> values: Cava.downsample(count)
-    readonly property bool present: Mpris.players.values.some(p => p.trackTitle)
+    readonly property bool present: Players.music.some(p => p.trackTitle)
     signal fxRequested
 
     implicitWidth: Cava.active || present ? fullWidth : 0
@@ -71,7 +71,7 @@ Item {
                 root.fxRequested();
                 return;
             }
-            const p = Mpris.players.values.find(p => p.isPlaying) ?? Mpris.players.values[0];
+            const p = Players.music.find(p => p.isPlaying) ?? Players.music[0];
             if (p?.canTogglePlaying)
                 p.togglePlaying();
         }

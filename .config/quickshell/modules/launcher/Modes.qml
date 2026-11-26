@@ -163,7 +163,16 @@ Item {
 
     function copyGlyph(c) {
         state.glyphs = [c].concat(state.glyphs.filter(x => x !== c)).slice(0, 24);
-        Quickshell.execDetached(["wl-copy", "--", c]);
+        // Paste into the focused window once the launcher is gone
+        Quickshell.execDetached(["sh", "-c", `wl-copy -- "$1"
+            win=$(hyprctl activewindow -j)
+            sleep 0.2
+            case $(echo "$win" | jq -r .class) in
+                kitty|foot|Alacritty|com.mitchellh.ghostty|org.wezfurlong.wezterm|org.kde.konsole) mods="CTRL SHIFT" ;;
+                *) mods=CTRL ;;
+            esac
+            addr=$(echo "$win" | jq -r .address)
+            hyprctl dispatch 'hl.dsp.send_shortcut({mods="'"$mods"'", key="code:55", window="address:'"$addr"'"})' >/dev/null 2>&1`, "sh", c]);
     }
 
     function windowItems(q) {

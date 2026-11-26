@@ -10,7 +10,7 @@ import Quickshell.Services.Mpris
 Singleton {
     id: root
 
-    readonly property MprisPlayer player: Mpris.players.values.find(p => p.isPlaying) ?? Mpris.players.values[0] ?? null
+    readonly property MprisPlayer player: Players.music.find(p => p.isPlaying) ?? Players.music[0] ?? null
     readonly property string key: player ? [player.trackArtist, player.trackTitle].join("\n") : ""
 
     property var lines: []

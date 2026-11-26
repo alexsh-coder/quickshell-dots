@@ -8,7 +8,8 @@ shuffles them. Instead we recover the split tree from window geometry
 (guillotine cuts) and replay it: for each split, focus the leaf to split and
 move the new window in with force_split = 2 (always right/bottom). If dwindle
 picks the wrong orientation for the box, togglesplit fixes it (preserve_split
-keeps it). Split ratios are not restored.
+keeps it). Split ratios are then restored by resizing
+windows back to their original sizes.
 """
 import json
 import subprocess
@@ -61,13 +62,26 @@ def plan(wins):
     return [(first_leaf(b), first_leaf(a), d)] + plan(a) + plan(b)
 
 
+def restore_sizes(orig):
+    """Resizing one window moves its split, which also changes its
+    neighbours, so a few passes are needed to settle."""
+    for _ in range(4):
+        now = clients()
+        off = [c for c in orig if now[c["address"]]["size"] != c["size"]]
+        if not off:
+            return
+        for c in off:
+            w, h = c["size"]
+            dispatch(f'hl.dsp.window.resize({{ x = {w}, y = {h}, window = "address:{c["address"]}" }})')
+
+
 def main():
     target = int(sys.argv[1])
     source = int(sys.argv[2]) if len(sys.argv) > 2 else hypr_json("activeworkspace")["id"]
     if source == target:
         return
 
-    wins = [c for c in clients().values() if c["workspace"]["id"] == source]
+    wins = [c for c in clients().values() if c["workspace"].get("id") == source]
     if not wins:
         return
     tiled = [c for c in wins if not c["floating"]]
@@ -94,6 +108,7 @@ def main():
                     side_by_side = abs(w[0] - s[0]) > abs(w[1] - s[1])
                     if side_by_side != (d == "h"):
                         dispatch('hl.dsp.layout("togglesplit")')
+            restore_sizes(tiled)
         for c in floating:
             move(c["address"])
         if focused:

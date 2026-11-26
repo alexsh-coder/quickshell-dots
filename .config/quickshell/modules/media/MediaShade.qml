@@ -13,7 +13,7 @@ import qs.modules.bar.popouts
 Scope {
     id: root
 
-    readonly property var players: Mpris.players.values
+    readonly property var players: Players.music
     readonly property MprisPlayer player: players.find(p => p.isPlaying) ?? players[0] ?? null
     readonly property bool hasTrack: !!player && !!player.trackTitle
     readonly property real length: player?.length ?? 0

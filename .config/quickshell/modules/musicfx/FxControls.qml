@@ -9,7 +9,7 @@ Column {
 
     // Effect whose own strength slider is shown, opened by right-clicking it
     property string editing: ""
-    readonly property var names: ({ desktop: "Visualizer", glow: "Glow", blur: "Blur", zoom: "Zoom", shake: "Shake", glitch: "Glitch", pulse: "Pulse", ripple: "Ripple", bloom: "Bloom", vhs: "VHS", hue: "Hue" })
+    readonly property var names: ({ desktop: "Visualizer", glow: "Glow", blur: "Blur", zoom: "Zoom", shake: "Shake", glitch: "Glitch", pulse: "Pulse", ripple: "Ripple", bloom: "Bloom", vhs: "VHS", hue: "Hue", rgb: "RGB split" })
     readonly property var styleIcons: ({ bars: "graphic_eq", wave: "airwave", mirror: "align_vertical_center", ring: "donut_large", nation: "album", particles: "auto_awesome", line: "horizontal_rule", blob: "bubble_chart", dots: "blur_linear" })
     // A slider is held
     readonly property bool busy: intensitySlider.pressed || strengthSlider.pressed
@@ -26,6 +26,10 @@ Column {
     }
 
     signal customize
+
+    function styleName(s) {
+        return s ? s[0].toUpperCase() + s.slice(1) : "";
+    }
 
     spacing: 16
 
@@ -211,6 +215,7 @@ Column {
                 Tile { icon: "light_mode"; label: "Bloom"; key: "bloom" }
                 Tile { icon: "live_tv"; label: "VHS"; key: "vhs" }
                 Tile { icon: "palette"; label: "Hue"; key: "hue" }
+                Tile { icon: "gradient"; label: "RGB"; key: "rgb" }
             }
 
             // Strength of one effect, slides open under the grid
@@ -257,6 +262,85 @@ Column {
                         min: 0.1
                         value: MusicFx.gain(editor.key)
                         onMoved: v => MusicFx.setGain(editor.key, v)
+                    }
+
+                    // Glitch only: how the wallpaper tears
+                    Column {
+                        id: styleBox
+
+                        property bool open: false
+
+                        width: parent.width
+                        spacing: 4
+                        visible: editor.key === "glitch"
+
+                        Rectangle {
+                            width: parent.width
+                            height: 36
+                            radius: Theme.radius
+                            color: styleHead.containsMouse ? Theme.muted : root.tile
+                            Behavior on color { ColorAnimation { duration: Theme.anim } }
+
+                            Label { x: 12; anchors.verticalCenter: parent.verticalCenter; text: "Style"; font.pixelSize: 14 }
+                            Label {
+                                anchors.right: chev.left
+                                anchors.rightMargin: 4
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.styleName(MusicFx.glitchStyle)
+                                font.pixelSize: 14
+                                color: Theme.subtext
+                            }
+                            Icon {
+                                id: chev
+                                anchors.right: parent.right
+                                anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: styleBox.open ? "expand_less" : "expand_more"
+                                font.pixelSize: 20
+                                color: Theme.subtext
+                            }
+                            MouseArea {
+                                id: styleHead
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: styleBox.open = !styleBox.open
+                            }
+                        }
+
+                        Repeater {
+                            model: styleBox.open ? MusicFx.glitchStyles : []
+
+                            Rectangle {
+                                id: opt
+
+                                required property string modelData
+                                readonly property bool current: MusicFx.glitchStyle === modelData
+
+                                width: styleBox.width
+                                height: 32
+                                radius: Theme.radius
+                                color: current ? Qt.alpha(Theme.accent, 0.16) : optMouse.containsMouse ? Theme.muted : "transparent"
+
+                                Label {
+                                    x: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root.styleName(opt.modelData)
+                                    font.pixelSize: 14
+                                    color: opt.current ? Theme.accent : Theme.text
+                                }
+                                MouseArea {
+                                    id: optMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        MusicFx.set("glitchStyle", opt.modelData);
+                                        styleBox.open = false;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

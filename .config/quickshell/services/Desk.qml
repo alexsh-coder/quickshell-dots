@@ -171,6 +171,7 @@ Singleton {
             glitch: false,
             glitchTargets: ["wall", "ring", "lyrics"],
             glitchDrift: true,
+            glitchStyle: "wide",
             pulse: false,
             ripple: false,
             bloom: false,
@@ -178,6 +179,7 @@ Singleton {
             bloomContrast: 1,
             vhs: false,
             hue: false,
+            rgb: false,
             "gain.glow": 1,
             "gain.blur": 1,
             "gain.zoom": 1,
@@ -187,7 +189,8 @@ Singleton {
             "gain.ripple": 1,
             "gain.bloom": 1,
             "gain.vhs": 1,
-            "gain.hue": 1
+            "gain.hue": 1,
+            "gain.rgb": 1
         })
     readonly property var fxSchema: [
         { key: "glow", group: "Glow", label: "On", type: "bool" },
@@ -205,6 +208,7 @@ Singleton {
         { key: "glitch", group: "Glitch", label: "On", type: "bool" },
         { key: "glitchTargets", group: "Glitch", label: "Targets", values: ["wall", "ring", "lyrics"], multi: true },
         { key: "glitchDrift", group: "Glitch", label: "Drift on bass", type: "bool" },
+        { key: "glitchStyle", group: "Glitch", label: "Style", values: ["wide", "soft", "sparse", "thin", "clean", "gentle", "edges"] },
         { key: "gain.glitch", group: "Glitch", label: "Strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
         { key: "pulse", group: "Wallpaper", label: "Pulse", type: "bool" },
         { key: "gain.pulse", group: "Wallpaper", label: "Pulse strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
@@ -217,7 +221,9 @@ Singleton {
         { key: "vhs", group: "Wallpaper", label: "VHS", type: "bool" },
         { key: "gain.vhs", group: "Wallpaper", label: "VHS strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
         { key: "hue", group: "Wallpaper", label: "Hue", type: "bool" },
-        { key: "gain.hue", group: "Wallpaper", label: "Hue strength", min: 0.1, max: 2, step: 0.05, unit: "%" }
+        { key: "gain.hue", group: "Wallpaper", label: "Hue strength", min: 0.1, max: 2, step: 0.05, unit: "%" },
+        { key: "rgb", group: "Wallpaper", label: "RGB split", type: "bool" },
+        { key: "gain.rgb", group: "Wallpaper", label: "RGB split strength", min: 0.1, max: 2, step: 0.05, unit: "%" }
     ]
 
     readonly property var presets: adapter.presets
@@ -291,7 +297,7 @@ Singleton {
         const p = presets[idFor(path)];
         const out = Object.assign({}, fxDefaults, p ? p.fx : {});
         if (!p || !fxOn)
-            for (const k of ["glow", "blur", "zoom", "shake", "glitch", "pulse", "ripple", "bloom", "vhs", "hue"])
+            for (const k of ["glow", "blur", "zoom", "shake", "glitch", "pulse", "ripple", "bloom", "vhs", "hue", "rgb"])
                 out[k] = false;
         const v = (p?.widgets ?? []).find(w => w.type === "visualizer");
         out.cx = v?.x ?? 0.5;

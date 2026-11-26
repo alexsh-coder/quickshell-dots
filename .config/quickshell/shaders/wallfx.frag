@@ -1,7 +1,7 @@
 #version 440
 
 // Music effects over the wallpaper copy, each off at 0: rings rippling out from `center`, VHS wobble with
-// scanlines and grain, bloom on the highlights, a flash on kicks and a hue rotation.
+// scanlines and grain, bloom on the highlights, a flash on kicks, a hue rotation and a light red/cyan split.
 // Bloom reads `glow`, a blurred copy of the same image.
 
 layout(location = 0) in vec2 qt_TexCoord0;
@@ -24,6 +24,8 @@ layout(std140, binding = 0) uniform buf {
     // Extra saturation and contrast, with bloom
     float sat;
     float contrast;
+    // Red/cyan split in px at the corners, nothing in the middle
+    float rgb;
 };
 
 layout(binding = 1) uniform sampler2D source;
@@ -75,6 +77,14 @@ void main() {
         vec2 o = vec2(2.5 * vhs * px.x, 0.0);
         c.r = texture(source, uv + o).r;
         c.b = texture(source, uv - o).b;
+    }
+    if (rgb > 0.0) {
+        // Lens-like: outwards from the middle, growing towards the edges
+        vec2 d = uv - 0.5;
+        float l = length(d);
+        vec2 o = d / max(l, 1e-4) * rgb * 4.0 * l * l * px;
+        c.r = texture(source, uv + o).r;
+        c.gb = texture(source, uv - o).gb;
     }
 
     if (bloom > 0.0) {

@@ -2,6 +2,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 
 // Images are shown by awww, videos by mpvpaper on top of it (see scripts/wallpaper.sh).
@@ -18,6 +19,15 @@ Singleton {
     // Images that hold up inverted: the picker flips each between itself and its negative
     readonly property string monoDir: dir + "/Invertible/"
     readonly property string monoCache: Quickshell.cachePath("mono")
+    readonly property string thumbDir: Quickshell.cachePath("thumbs")
+    readonly property string fitDir: Quickshell.cachePath("fit")
+    // The largest screen in pixels: images are cut to it once, so switching never decodes a huge original
+    // (Hyprland's sizes: Qt rounds a fractional scale up)
+    readonly property string fitSize: {
+        const m = Hyprland.monitors.values;
+        const w = Math.max(0, ...m.map(x => x.width)), h = Math.max(0, ...m.map(x => x.height));
+        return w && h ? `${w}x${h}` : "";
+    }
     property var inverted: ({})
     // Images that are already black and white, left alone by bw mode
     property bool bw: false
@@ -93,6 +103,10 @@ Singleton {
     property string image: ""
     // Bumped when new posters land, so thumbnails that failed to load can retry
     property int posters: 0
+    // Pictures that have a small preview in thumbDir; the rest show the full file
+    property var thumbs: ({})
+    // Pictures that have a screen-sized copy in fitDir
+    property var fitted: ({})
 
     // mpvpaper's IPC socket (see scripts/wallpaper.sh)
     readonly property string socket: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/qs-wallpaper.sock"
@@ -186,12 +200,35 @@ Singleton {
     }
 
     function thumb(path) {
-        return isVideo(path) ? (bw && canGray(path) ? videoStill(path) : poster(path)) : still(path);
+        const src = isVideo(path) ? (bw && canGray(path) ? videoStill(path) : poster(path)) : rawStill(path);
+        return thumbs[src] ? thumbDir + "/" + Qt.md5(src) + ".jpg" : src;
     }
 
     // What awww is given for an image
     function still(path) {
+        const src = rawStill(path);
+        return fitted[src] ? fitPath(src) : src;
+    }
+
+    onFitSizeChanged: {
+        if (!fitSize || thumbScan.running)
+            return;
+        fitScan.running = false;
+        fitScan.running = true;
+    }
+
+    // Only on a real change: a new object rebinds every thumbnail and the picker reloads them all
+    function sameSet(a, b) {
+        const ka = Object.keys(a), kb = Object.keys(b);
+        return ka.length === kb.length && ka.every(k => k in b);
+    }
+
+    function rawStill(path) {
         return isMono(path) ? variant(path) : bw && canGray(path) ? grayPath(path) : path;
+    }
+
+    function fitPath(path) {
+        return fitDir + "/" + Qt.md5(path) + "-" + fitSize + ".jpg";
     }
 
 
@@ -199,7 +236,8 @@ Singleton {
     function refresh() {
         if (!switching.running)
             query.running = true;
-        scan.running = true;
+        if (!scan.running && !monoScan.running && !grayScan.running && !thumbScan.running && !fitScan.running)
+            changed.running = true;
     }
 
     // Starting from the cursor asks Hyprland where it is first
@@ -251,7 +289,7 @@ Singleton {
         const fxLive = MusicFx.wallpaperFx && Cava.active;
         const stack = origin !== "bottom" || fx !== 0 || point || video || isVideo(path) || grows.count > 0 || native.running || fxLive;
         current = path;
-        saved.setText(isVideo(path) || isMono(path) || bw && canGray(path) ? path : "");
+        saved.setText(path);
         switching.restart();
         if (stack) {
             clock = Date.now();
@@ -516,6 +554,9 @@ Singleton {
                     root.image = root.still(last);
                     if (root.image !== still)
                         Quickshell.execDetached([root.script, "set", root.image]);
+                } else if (last && !root.isVideo(last) && still === root.fitPath(root.rawStill(last))) {
+                    root.current = last;
+                    root.image = still;
                 } else if (still) {
                     root.current = root.image = still;
                 } else {
@@ -523,6 +564,18 @@ Singleton {
                     root.set(Quickshell.shellDir + "/data/wallpaper.jpg");
                 }
             }
+        }
+    }
+
+    // The full scan forks per file and stutters whatever is animating, so it only runs
+    // when something under the folders is newer than the last one
+    Process {
+        id: changed
+        command: ["sh", "-c", '[ ! -e "$1" ] || [ -n "$(find "$2" "$3" -newer "$1" -print -quit 2>/dev/null)" ]', "sh",
+            Quickshell.cachePath("scanned"), root.dir, root.videoDir]
+        onExited: code => {
+            if (code === 0)
+                scan.running = true;
         }
     }
 
@@ -550,12 +603,51 @@ Singleton {
                 for (const f of text.split("\n"))
                     if (f)
                         all[f] = true;
-                root.natural = all;
+                if (!root.sameSet(all, root.natural))
+                    root.natural = all;
             }
         }
+        onExited: thumbScan.running = true
     }
 
-    // The video, inverted or black-and-white image that's on, so it comes back after a restart
+    Process {
+        id: thumbScan
+        command: [root.script, "thumbs", root.thumbDir, root.dir, root.monoCache, root.posterDir]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const all = {};
+                for (const f of text.split("\n"))
+                    if (f)
+                        all[f] = true;
+                if (!root.sameSet(all, root.thumbs))
+                    root.thumbs = all;
+            }
+        }
+        onExited: if (root.fitSize) fitScan.running = true
+    }
+
+    Process {
+        id: stamp
+        command: ["touch", Quickshell.cachePath("scanned")]
+    }
+
+    Process {
+        id: fitScan
+        command: [root.script, "fits", root.fitDir, root.fitSize, root.dir, root.monoCache]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const all = {};
+                for (const f of text.split("\n"))
+                    if (f)
+                        all[f] = true;
+                if (!root.sameSet(all, root.fitted))
+                    root.fitted = all;
+            }
+        }
+        onExited: stamp.running = true
+    }
+
+    // The wallpaper that's on, so it comes back after a restart (awww only knows the copy it was given)
     FileView {
         id: saved
         path: Quickshell.statePath("wallpaper-video")
@@ -582,6 +674,8 @@ Singleton {
             inverted = JSON.parse(invertedFile.text() || "{}");
         } catch (e) {}
         bw = bwFile.text().trim() === "1";
+        // Once per start, in the background: the lists of thumbnails, copies and gray images live only in memory
+        scan.running = true;
         // The script keeps its own flag in the runtime dir, gone after a reboot
         Quickshell.execDetached([script, "bw", bw ? "on" : "off"]);
         refresh();

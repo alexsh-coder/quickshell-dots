@@ -19,6 +19,10 @@
 #   wallpaper.sh still VIDEO POSTER   make POSTER (and its gray copy in bw mode), print the one to show
 #   wallpaper.sh grays CACHE DIR      list the images under DIR that are already black and white and
 #                                     make black-and-white copies of the rest, so toggling is instant
+#   wallpaper.sh thumbs CACHE DIR...  small previews of every image under the DIRs, named by md5 of
+#                                     the path; prints the paths that have one
+#   wallpaper.sh fits CACHE WxH DIR...  copies of every image under the DIRs cut to the screen size, so
+#                                     nothing has to decode a huge original; prints the paths that have one
 set -u
 
 run=${XDG_RUNTIME_DIR:-/tmp}/qs-wallpaper
@@ -65,6 +69,22 @@ gray() {
     [ -s "$out" ] && [ "$out" -nt "$1" ] && return 0
     mkdir -p "$2"
     magick "$1[0]" -background black -flatten -alpha off -colorspace Gray -colorspace sRGB -type TrueColor -quality 95 "$out.$$.jpg" && mv -f "$out.$$.jpg" "$out"
+}
+
+thumb() {
+    local out=$2/$(printf '%s' "$1" | md5sum | cut -c1-32).jpg
+    if ! { [ -s "$out" ] && [ "$out" -nt "$1" ]; }; then
+        mkdir -p "$2"
+        magick "$1[0]" -background black -flatten -alpha off -thumbnail '576x324^' -quality 90 "$out.$$.jpg" && mv -f "$out.$$.jpg" "$out" || return 1
+    fi
+}
+
+fit() {
+    local out=$2/$(printf '%s' "$1" | md5sum | cut -c1-32)-$3.jpg
+    if ! { [ -s "$out" ] && [ "$out" -nt "$1" ]; }; then
+        mkdir -p "$2"
+        magick "$1[0]" -background black -flatten -alpha off -resize "$3^" -gravity center -extent "$3" -quality 95 "$out.$$.jpg" && mv -f "$out.$$.jpg" "$out" || return 1
+    fi
 }
 
 # Share of clearly coloured pixels (chroma over 12%) in a small copy, cached next to the variants;
@@ -248,8 +268,27 @@ grays)
         chroma "$f" "$2" && printf '%s\n' "$f"
     done
     ;;
+thumbs)
+    cache=$2
+    shift 2
+    find "$@" -type f 2>/dev/null | while IFS= read -r f; do
+        case "${f,,}" in
+        *.jpg | *.jpeg | *.png | *.webp | *.gif | *.bmp) thumb "$f" "$cache" && printf '%s\n' "$f" ;;
+        esac
+    done
+    ;;
+fits)
+    cache=$2
+    size=$3
+    shift 3
+    find "$@" -type f 2>/dev/null | while IFS= read -r f; do
+        case "${f,,}" in
+        *.jpg | *.jpeg | *.png | *.webp | *.bmp) fit "$f" "$cache" "$size" && printf '%s\n' "$f" ;;
+        esac
+    done
+    ;;
 *)
-    sed -n '2,21s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,25s/^# \{0,1\}//p' "$0" >&2
     exit 1
     ;;
 esac

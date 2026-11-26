@@ -17,7 +17,7 @@ Item {
     required property Item popouts
     property bool here: false
 
-    readonly property var players: Mpris.players.values
+    readonly property var players: Players.music
     // Picked by clicking the player name; otherwise whatever is playing
     property MprisPlayer chosen: null
     // Players without a track can't be shown, so they are skipped

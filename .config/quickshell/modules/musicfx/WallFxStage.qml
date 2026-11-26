@@ -26,7 +26,8 @@ Item {
             property real burst: glitchHost.burst
             property real seed: Glitch.seed
             property real tear: 60 * Glitch.gain
-            property real styles: 0
+            property real styles: 2
+            property real variant: Math.max(0, MusicFx.glitchStyles.indexOf(MusicFx.glitchStyle))
             property size px: Qt.size(1 / width, 1 / height)
             fragmentShader: Qt.resolvedUrl("../../shaders/glitch.frag.qsb")
         }
@@ -40,6 +41,7 @@ Item {
                 property real pulse: WallFx.pulse
                 property real bloom: WallFx.bloom
                 property real vhs: WallFx.vhs
+                property real rgb: WallFx.rgb
                 property real hue: WallFx.hue
                 property real hueMix: WallFx.hueMix
                 property real time: WallFx.time

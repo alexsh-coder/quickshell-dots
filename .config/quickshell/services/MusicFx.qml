@@ -29,16 +29,20 @@ Singleton {
     readonly property bool glitch: value("glitch")
     readonly property var glitchTargets: value("glitchTargets") ?? []
     readonly property bool glitchDrift: value("glitchDrift")
+    // How the wallpaper tears, glitch.frag's `variant`
+    readonly property var glitchStyles: ["wide", "soft", "sparse", "thin", "clean", "gentle", "edges"]
+    readonly property string glitchStyle: value("glitchStyle") ?? "wide"
     readonly property bool pulse: value("pulse")
     readonly property bool ripple: value("ripple")
     readonly property bool bloom: value("bloom")
     readonly property bool vhs: value("vhs")
     readonly property bool hue: value("hue")
+    readonly property bool rgb: value("rgb")
     // Centre of the radial glow: the preset's first visualizer
     readonly property real x: value("cx")
     readonly property real y: value("cy")
 
-    readonly property var wallpaperKeys: ["glow", "blur", "zoom", "shake", "glitch", "pulse", "ripple", "bloom", "vhs", "hue"]
+    readonly property var wallpaperKeys: ["glow", "blur", "zoom", "shake", "glitch", "pulse", "ripple", "bloom", "vhs", "hue", "rgb"]
     readonly property bool wallpaperFx: wallpaperKeys.some(k => root[k])
 
     // The transition between two wallpapers' settings

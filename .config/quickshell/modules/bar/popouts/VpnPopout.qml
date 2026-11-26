@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls as QQC
 import Quickshell.Widgets
 import qs.config
 import qs.components
@@ -254,14 +255,57 @@ Item {
             }
         }
 
-        Column {
+        Item {
+            id: listBox
+
             width: parent.width
-            spacing: 2
+            height: Math.min(Vpn.servers.length, 7) * 42 - 2
             visible: Vpn.servers.length > 0 && !root.managing
 
-            Repeater {
+            ListView {
+                id: serverList
+
+                width: parent.width
+                height: parent.height
+                spacing: 2
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
                 model: Vpn.servers
                 delegate: ServerRow {}
+
+                HoverHandler {
+                    id: listHover
+                }
+
+                // Thin bar in the gap right of the rows; shows while the pointer is near the right edge
+                QQC.ScrollBar.vertical: QQC.ScrollBar {
+                    id: vbar
+
+                    readonly property bool near: listHover.hovered && listHover.point.position.x > serverList.width - 56
+
+                    parent: listBox
+                    x: serverList.x + serverList.width + 2
+                    y: serverList.y + 4
+                    height: serverList.height - 8
+                    width: 8
+                    padding: 0
+                    policy: serverList.contentHeight > serverList.height ? QQC.ScrollBar.AlwaysOn : QQC.ScrollBar.AlwaysOff
+                    opacity: near || hovered || pressed ? 1 : 0
+                    Behavior on opacity {
+                        NumberAnimation { duration: 150 }
+                    }
+                    background: null
+                    contentItem: Rectangle {
+                        implicitWidth: 4
+                        radius: width / 2
+                        x: (vbar.width - width) / 2
+                        width: vbar.hovered || vbar.pressed ? 6 : 4
+                        color: vbar.pressed ? Theme.accent : Qt.alpha(Theme.subtext, vbar.hovered ? 0.7 : 0.4)
+                        Behavior on width {
+                            NumberAnimation { duration: 120 }
+                        }
+                    }
+                }
             }
         }
     }
@@ -275,7 +319,7 @@ Item {
         readonly property var info: Vpn.split(modelData)
         readonly property var delay: Vpn.delays[modelData]
 
-        width: parent.width
+        width: ListView.view.width
         height: 40
         radius: Theme.radius - 2
         color: current ? Qt.alpha(Theme.accent, 0.12) : mouse.containsMouse ? Theme.surface : Qt.alpha(Theme.surface, 0)
@@ -397,7 +441,7 @@ Item {
         width: parent.width
         height: 40
         radius: Theme.radius - 2
-        color: current ? Qt.alpha(Theme.accent, 0.12) : subHover.containsMouse ? Theme.surface : Qt.alpha(Theme.surface, 0)
+        color: current ? Qt.alpha(Theme.accent, 0.12) : subRowHover.hovered ? Theme.surface : Qt.alpha(Theme.surface, 0)
         Behavior on color { ColorAnimation { duration: Theme.anim } }
 
         Timer {
@@ -428,6 +472,11 @@ Item {
                 font.pixelSize: 11
                 color: sub.confirming ? Theme.urgent : Theme.subtext
             }
+        }
+
+        // Covers the delete button too, so the row stays lit over it
+        HoverHandler {
+            id: subRowHover
         }
 
         MouseArea {

@@ -90,6 +90,7 @@ Item {
             property real burst: content.burst
             property real seed: Glitch.seed
             property real styles: 0
+            property real variant: 0
             property real tear: Math.max(16, Math.min(root.width, root.height) * 0.08) * Glitch.gain
             property size px: Qt.size(1 / width, 1 / height)
             fragmentShader: Qt.resolvedUrl("../../shaders/glitch.frag.qsb")

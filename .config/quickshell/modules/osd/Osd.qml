@@ -22,7 +22,7 @@ Scope {
 
     readonly property PwNode sink: Pipewire.defaultAudioSink
     readonly property PwNode source: Pipewire.defaultAudioSource
-    readonly property MprisPlayer player: Mpris.players.values.find(p => p.isPlaying) ?? Mpris.players.values[0] ?? null
+    readonly property MprisPlayer player: Players.music.find(p => p.isPlaying) ?? Players.music[0] ?? null
 
     // Pipewire reports a burst of changes on startup and when the default device switches
     property bool armed: false

@@ -10,7 +10,7 @@ Singleton {
     id: root
 
     readonly property int bars: 48
-    readonly property bool active: Mpris.players.values.some(p => p.isPlaying)
+    readonly property bool active: Players.music.some(p => p.isPlaying)
     // Spectrum scaled by MusicFx.intensity, clamped to 0..1
     property list<real> values: Array(bars).fill(0)
     // Overall loudness and a punchy low-end envelope: fast attack, slow release

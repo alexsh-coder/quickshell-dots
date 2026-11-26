@@ -369,7 +369,7 @@ Item {
             width: parent.width
             height: root.rowHeight
             radius: Theme.radius - 2
-            color: row.net.connected ? Qt.alpha(Theme.accent, 0.12) : mouse.containsMouse || row.asked ? Theme.surface : Qt.alpha(Theme.surface, 0)
+            color: row.net.connected ? Qt.alpha(Theme.accent, 0.12) : rowHover.hovered || row.asked ? Theme.surface : Qt.alpha(Theme.surface, 0)
             Behavior on color { ColorAnimation { duration: Theme.anim } }
 
             NerdIcon {
@@ -451,6 +451,11 @@ Item {
                         onClicked: row.net.disconnect()
                     }
                 }
+            }
+
+            // Unlike MouseArea hover, child buttons don't steal it
+            HoverHandler {
+                id: rowHover
             }
 
             MouseArea {

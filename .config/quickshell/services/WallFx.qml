@@ -8,7 +8,7 @@ import Quickshell
 Singleton {
     id: root
 
-    readonly property bool on: (MusicFx.pulse || MusicFx.ripple || MusicFx.bloom || MusicFx.vhs || MusicFx.hue) && Cava.active
+    readonly property bool on: (MusicFx.pulse || MusicFx.ripple || MusicFx.bloom || MusicFx.vhs || MusicFx.hue || MusicFx.rgb) && Cava.active
 
     // Kick relative to the recent loudest one, so quiet tracks hit as hard
     property real hit: 0
@@ -27,6 +27,9 @@ Singleton {
     readonly property real sat: swell * 0.5 * MusicFx.value("bloomSat")
     readonly property real contrast: swell * MusicFx.value("bloomContrast")
     readonly property real vhs: MusicFx.vhs ? (0.35 + Math.min(1, Cava.level * 2) * 0.65) * MusicFx.gain("vhs") * MusicFx.fade : 0
+
+    // Light red/cyan split in px at the corners, breathing with the bass
+    readonly property real rgb: MusicFx.rgb ? (0.6 + swellBass * 2.4) * MusicFx.gain("rgb") * MusicFx.fade : 0
 
     property real hueDrift: 0
     property real hueKick: 0

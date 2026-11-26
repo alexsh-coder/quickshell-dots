@@ -37,11 +37,12 @@ Singleton {
 
     // "🇳🇱Нидерланды CDN" -> { flag: "🇳🇱", code: "NL", name: "Нидерланды CDN" }
     function split(tag) {
-        // Each regional indicator is a surrogate pair, so the flag is 4 UTF-16 units
-        const ri = i => (tag.codePointAt(i) ?? 0) - 0x1F1E6;
-        const a = ri(0), b = ri(2);
-        if (a >= 0 && a < 26 && b >= 0 && b < 26)
-            return { flag: tag.slice(0, 4), code: String.fromCharCode(65 + a, 65 + b), name: tag.slice(4).trim() };
+        // Flag emoji may sit anywhere in the tag
+        const m = tag.match(/[\u{1F1E6}-\u{1F1FF}]{2}/u);
+        if (m) {
+            const code = [...m[0]].map(c => String.fromCharCode(c.codePointAt(0) - 0x1F1E6 + 65)).join("");
+            return { flag: m[0], code: code, name: tag.replace(m[0], "").replace(/\s+/g, " ").trim() };
+        }
         return { flag: "", code: "", name: tag };
     }
 

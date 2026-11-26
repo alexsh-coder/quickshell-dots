@@ -35,7 +35,7 @@ def main():
             continue
         char, name = m.group(2), m.group(3)
         key = char.replace("️", "")
-        emoji.append([char, ru_names.get(key, name), " ".join(filter(None, [name, en_words.get(key), ru_words.get(key)])).lower()])
+        emoji.append([char, name, " ".join(filter(None, [name, en_words.get(key), ru_names.get(key), ru_words.get(key)])).lower()])
     nerd = [[v["code"], k] for k, v in json.loads(fetch("https://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/glyphnames.json")).items() if k != "METADATA"]
     OUT.write_text(json.dumps({"emoji": emoji, "nerd": nerd}, ensure_ascii=False, separators=(",", ":")))
     print(f"{len(emoji)} emoji, {len(nerd)} nerd glyphs -> {OUT}", file=sys.stderr)

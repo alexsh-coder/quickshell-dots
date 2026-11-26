@@ -1,5 +1,6 @@
 //@ pragma UseQApplication
 //@ pragma IconTheme Suru++-Extra
+//@ pragma Env QT_IMAGEIO_MAXALLOC=2048
 import Quickshell
 import qs.modules.bar
 import qs.modules.clipboard

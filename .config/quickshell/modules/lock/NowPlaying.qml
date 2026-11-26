@@ -8,7 +8,7 @@ import qs.services
 Item {
     id: root
 
-    readonly property MprisPlayer player: Mpris.players.values.find(p => p.isPlaying) ?? Mpris.players.values[0] ?? null
+    readonly property MprisPlayer player: Players.music.find(p => p.isPlaying) ?? Players.music[0] ?? null
     readonly property bool active: !!player && !!player.trackTitle
 
     readonly property int half: 24

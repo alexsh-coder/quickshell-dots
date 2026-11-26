@@ -167,7 +167,7 @@ Item {
         width: ListView.view.width
         height: root.rowHeight
         radius: Theme.radius - 2
-        color: dev.connected ? Qt.alpha(Theme.accent, 0.12) : mouse.containsMouse ? Theme.surface : "transparent"
+        color: dev.connected ? Qt.alpha(Theme.accent, 0.12) : rowHover.hovered ? Theme.surface : "transparent"
         Behavior on color { ColorAnimation { duration: Theme.anim } }
 
         Connections {
@@ -231,7 +231,7 @@ Item {
 
             // Forget, for paired devices that aren't connected
             RoundButton {
-                visible: row.dev.bonded && !row.dev.connected && !row.busy && mouse.containsMouse
+                visible: row.dev.bonded && !row.dev.connected && !row.busy && rowHover.hovered
                 icon: "delete"
                 danger: true
                 onClicked: row.dev.forget()
@@ -245,6 +245,11 @@ Item {
                 danger: true
                 onClicked: row.dev.disconnect()
             }
+        }
+
+        // Unlike MouseArea hover, child buttons don't steal it
+        HoverHandler {
+            id: rowHover
         }
 
         MouseArea {

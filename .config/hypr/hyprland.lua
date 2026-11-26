@@ -280,7 +280,7 @@ hl.config({
 
         follow_mouse  = 1,
         sensitivity   = ui.mouse_sensitivity or hardware.mouse_sensitivity or 0,
-        accel_profile = hardware.mouse_accel_profile or "",
+        accel_profile = hardware.mouse_accel_profile,
 
         touchpad = {
             tap_to_click   = ui.tap_to_click ~= false,
