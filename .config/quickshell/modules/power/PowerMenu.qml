@@ -245,6 +245,8 @@ Scope {
             text: root.uptime
             font.pixelSize: 15
             color: Theme.subtext
+            opacity: root.open && root.uptime ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
         }
     }
 }
