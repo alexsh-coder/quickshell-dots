@@ -446,7 +446,9 @@ Singleton {
         // so the scheme goes in a separate call first.
         // It signals the palette change before kdeglobals is written,
         // so running Qt apps (Telegram etc.) reload the old colors; signal again once it's on disk
-        kde.command = ["sh", "-c", 'plasma-apply-colorscheme "$2" && plasma-apply-colorscheme -a "$1" && kwriteconfig6 --file kdeglobals --group General --key AccentColor --notify "$3" && dbus-send --session --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:0 int32:0', "sh", c.toString(), Scheme.light ? "BreezeLight" : "BreezeDark", rgb];
+        // kded isn't autostarted outside Plasma; without it colors.css goes stale.
+        // GTK apps (Firefox/Zen) only re-read colors.css on a theme change, hence the theme flip
+        kde.command = ["sh", "-c", 'pgrep -x kded6 >/dev/null || { setsid -f kded6 >/dev/null 2>&1; sleep 1; }; plasma-apply-colorscheme "$2" && plasma-apply-colorscheme -a "$1" && kwriteconfig6 --file kdeglobals --group General --key AccentColor --notify "$3" && dbus-send --session --type=signal /KGlobalSettings org.kde.KGlobalSettings.notifyChange int32:0 int32:0; sleep 0.3; t=$(gsettings get org.gnome.desktop.interface gtk-theme) && gsettings set org.gnome.desktop.interface gtk-theme Adwaita && gsettings set org.gnome.desktop.interface gtk-theme "$t"', "sh", c.toString(), Scheme.light ? "BreezeLight" : "BreezeDark", rgb];
         kde.running = true;
     }
 
