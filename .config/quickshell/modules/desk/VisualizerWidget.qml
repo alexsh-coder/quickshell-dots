@@ -22,7 +22,26 @@ Item {
     readonly property color ink: Theme.hueShift(baseInk)
     readonly property real gain: (cfg.gain ?? 1)
     // Plain JS array: per-bar bindings index it, and indexing a list property copies the whole list
-    readonly property var values: Cava.values.map(v => Math.min(1, v * gain))
+    // cava, or one of the own analysers (scripts/spectrum.py, nation-fft.py), always resampled to n bands
+    readonly property string analyzer: cfg.analyzer ?? "cava"
+    property var external: Array(Cava.bars).fill(0)
+    readonly property var values: (analyzer === "cava" ? Cava.values : external).map(v => Math.min(1, v * gain))
+
+    Process {
+        running: root.active && root.analyzer !== "cava"
+        command: root.analyzer === "nation" ? ["python3", Quickshell.shellDir + "/scripts/nation-fft.py"] : ["python3", Quickshell.shellDir + "/scripts/spectrum.py", root.analyzer]
+        stdout: SplitParser {
+            onRead: data => {
+                const sp = data.split("|")[0].split(";").map(v => Number(v) / 1000);
+                if (sp.length < 2)
+                    return;
+                const out = [];
+                for (let i = 0; i < root.n; i++)
+                    out.push(root.spline(sp, i / (root.n - 1) * (sp.length - 1)));
+                root.external = out;
+            }
+        }
+    }
     readonly property int n: Cava.bars
     // Bars and mirror: the spectrum stretched or squeezed to the chosen count
     readonly property int count: Math.max(2, Math.round(cfg.count ?? n))
@@ -69,7 +88,7 @@ Item {
     }
 
     // Catmull-Rom through the levels at fractional index m
-    function spline(levels, m) {
+    function spline(levels, m, raw) {
         const i = Math.floor(m), f = m - i;
         const last = levels.length - 1;
         if (last < 0)
@@ -78,7 +97,7 @@ Item {
         const p0 = levels[Math.abs(Math.min(i - 1, last))], p1 = levels[Math.min(i, last)];
         const p2 = levels[Math.min(i + 1, last)], p3 = levels[Math.min(i + 2, last)];
         const v = 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (3 * p1 - p0 - 3 * p2 + p3) * f * f * f);
-        return Math.max(0, Math.min(1, v));
+        return raw ? v : Math.max(0, Math.min(1, v));
     }
 
     // Halo on the bass: the preset's glow, or the ring's own switch (lights its text and art too)
@@ -94,7 +113,7 @@ Item {
     Loader {
         anchors.fill: parent
         active: root.active
-        sourceComponent: ({ bars: bars, wave: wave, mirror: mirror, ring: ring, nation: nation, particles: particles })[root.style] ?? null
+        sourceComponent: ({ bars: bars, wave: wave, mirror: mirror, ring: ring, nation: nation, particles: particles, line: line, blob: blob, dots: dots })[root.style] ?? null
     }
 
     // Spectrum along the bottom (or top) of the rect
@@ -136,18 +155,25 @@ Item {
         Shape {
             id: shape
 
-            readonly property int res: 160
+            // One point every few px: a coarse polyline shows its corners on a wide strip
+            readonly property int res: Math.max(160, Math.round(root.w / 4))
             readonly property real peak: root.h - 4
             property var levels: []
             property var points: []
 
-            // Mirrored around the center, bass in the middle
+            // Mirrored around the center, bass in the middle. The spline's overshoot is eased into the
+            // floor instead of clipped, clipping leaves a kink where the curve meets it
             function sample(t) {
-                return root.spline(levels, Math.abs(t * 2 - 1) * (root.n - 1));
+                const v = Math.min(1, root.spline(levels, Math.abs(t * 2 - 1) * (levels.length - 1), true));
+                return (v + Math.sqrt(v * v + 0.0004)) / 2;
             }
 
             function rebuild() {
                 levels = root.smoothed(levels, root.cfg.smooth ?? 0.55);
+                draw();
+            }
+
+            function draw() {
                 // Hanging from the top edge when the widget says so
                 const base = root.fromTop ? 0 : root.h, dir = root.fromTop ? 1 : -1;
                 const pts = [Qt.point(0, base)];
@@ -167,8 +193,7 @@ Item {
             preferredRendererType: Shape.CurveRenderer
 
             ShapePath {
-                strokeWidth: root.cfg.thickness ?? 2
-                strokeColor: (root.cfg.thickness ?? 2) > 0 ? root.ink : "transparent"
+                strokeColor: "transparent"
                 fillGradient: LinearGradient {
                     x1: 0; y1: root.fromTop ? shape.peak : root.h - shape.peak
                     x2: 0; y2: root.fromTop ? 0 : root.h
@@ -176,6 +201,16 @@ Item {
                     GradientStop { position: 1; color: Qt.alpha(root.ink, (root.cfg.fillAlpha ?? 0.45) / 9) }
                 }
                 PathPolyline { path: shape.points }
+            }
+
+            // Only the top edge is stroked; stroking the closed fill drew its vertical sides at the edges
+            ShapePath {
+                strokeWidth: root.cfg.thickness ?? 2
+                strokeColor: (root.cfg.thickness ?? 2) > 0 ? root.ink : "transparent"
+                fillColor: "transparent"
+                joinStyle: ShapePath.RoundJoin
+                capStyle: ShapePath.RoundCap
+                PathPolyline { path: shape.points.slice(1, -1) }
             }
         }
     }
@@ -936,6 +971,289 @@ Item {
                         o[i] = (o[i] + dt * field.speed * field.rates[i] * field.sectors[i] / (Math.PI * 2)) % 4096;
                     field.offsets = Qt.vector4d(o[0], o[1], o[2], 0);
                 }
+            }
+        }
+    }
+
+    // A thin line across the middle of the rect, rippling up and down under the spectrum's envelope,
+    // bass in the middle, flowing sideways; echoes are the same line a few frames ago, and a blurred
+    // copy underneath glows brighter on the bass
+    Component {
+        id: line
+
+        Item {
+            id: lineItem
+
+            readonly property int res: 260
+            readonly property real amp: root.h / 2 - 6
+            readonly property bool echo: root.cfg.lineEcho ?? true
+            property var levels: []
+            property real phase: 0
+            // Newest first; the echoes read further back in it
+            property var history: []
+            readonly property var flat: [Qt.point(0, root.cy), Qt.point(root.w, root.cy)]
+
+            function rebuild() {
+                levels = root.smoothed(levels, root.cfg.smooth ?? 0.55);
+                const pts = [];
+                for (let i = 0; i <= res; i++) {
+                    const t = i / res;
+                    // Smoothstep taper so the ends lie flat without a kink
+                    const e = Math.min(1, Math.sin(Math.PI * t) * 1.6);
+                    const edge = e * e * (3 - 2 * e);
+                    const v = root.spline(levels, Math.abs(t * 2 - 1) * (root.n - 1));
+                    pts.push(Qt.point(t * root.w, root.cy + Math.sin(t * Math.PI * 22 + phase) * v * amp * edge));
+                }
+                history = [pts].concat(history.slice(0, echo ? 11 : 0));
+                // Echoes: older frames spreading outwards as they fade, like a ripple leaving the line
+                const out = [];
+                for (let k = 1; k <= 3; k++) {
+                    const src = history[k * 4 - 1] ?? history[history.length - 1];
+                    const sc = 1 + 0.18 * k;
+                    out.push(echo && src ? src.map(p => Qt.point(p.x, root.cy + (p.y - root.cy) * sc)) : flat);
+                }
+                echoes = out;
+            }
+            property var echoes: [flat, flat, flat]
+
+            Connections {
+                target: root
+                function onValuesChanged() { lineItem.rebuild(); }
+            }
+
+            // Drift speed: slow at rest, rushing on the bass and kicks, eased so it never jumps
+            property real speed: 1.2
+
+            FrameAnimation {
+                running: root.active && root.visible
+                onTriggered: {
+                    const dt = Math.min(frameTime, 0.05);
+                    const target = 1.2 + (Cava.bass * 2.5 + Cava.kick * 4) * root.gain;
+                    lineItem.speed += (target - lineItem.speed) * Math.min(1, dt * (target > lineItem.speed ? 12 : 2.5));
+                    lineItem.phase = (lineItem.phase + dt * lineItem.speed) % (Math.PI * 2);
+                }
+            }
+
+            // Glow: blurred copies of the main line under it, a tight one so thin or quiet lines
+            // still read as lit, and a wide soft one breathing with the bass
+            MultiEffect {
+                visible: root.cfg.lineGlow ?? true
+                anchors.fill: parent
+                source: mainLine
+                blurEnabled: true
+                blurMax: 12
+                blur: 1
+                brightness: 0.35
+                opacity: 0.9
+            }
+            MultiEffect {
+                visible: root.cfg.lineGlow ?? true
+                anchors.fill: parent
+                source: mainLine
+                blurEnabled: true
+                blurMax: 48
+                blur: 1
+                brightness: 0.3
+                opacity: 0.7 + Cava.bass * 0.3
+            }
+
+            Shape {
+                anchors.fill: parent
+                visible: lineItem.echo
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeWidth: Math.max(1, (root.cfg.thickness ?? 2) * 0.8)
+                    strokeColor: Qt.alpha(root.ink, 0.32)
+                    fillColor: "transparent"
+                    PathPolyline { path: lineItem.echoes[0] }
+                }
+                ShapePath {
+                    strokeWidth: Math.max(1, (root.cfg.thickness ?? 2) * 0.65)
+                    strokeColor: Qt.alpha(root.ink, 0.18)
+                    fillColor: "transparent"
+                    PathPolyline { path: lineItem.echoes[1] }
+                }
+                ShapePath {
+                    strokeWidth: Math.max(1, (root.cfg.thickness ?? 2) * 0.5)
+                    strokeColor: Qt.alpha(root.ink, 0.08)
+                    fillColor: "transparent"
+                    PathPolyline { path: lineItem.echoes[2] }
+                }
+            }
+
+            Shape {
+                id: mainLine
+
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeWidth: Math.max(1, root.cfg.thickness ?? 2)
+                    strokeColor: root.ink
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+                    joinStyle: ShapePath.RoundJoin
+                    PathPolyline { path: lineItem.history[0] ?? lineItem.flat }
+                }
+            }
+        }
+    }
+
+    // A liquid blob in the centre: spectrum bands drive a few low harmonics of its outline, so it
+    // morphs smoothly instead of tracing bars; layered skins drift at their own pace behind it
+    Component {
+        id: blob
+
+        Item {
+            id: blobItem
+
+            readonly property int res: 160
+            readonly property real reach: root.sh * 0.15 * root.k
+            property real base: reach
+            property real punch: 0
+            property real clock: 0
+            // Eased band energies, low to high
+            property var bands: [0, 0, 0, 0, 0, 0]
+            property var skins: [[], [], []]
+            Component.onCompleted: skins = [outline(2), outline(1), outline(0)]
+
+            function outline(layer) {
+                const b = bands, pts = [];
+                const lag = layer * 0.35, grow = 1 + layer * 0.045;
+                const r0 = base * grow * (1 + punch * 0.08 * (1 - layer * 0.4));
+                // Harmonic k gets band energy, its own phase speed and direction
+                const amps = [b[0] * 0.10 + 0.025, b[1] * 0.09 + 0.02, b[2] * 0.07 + 0.012, b[3] * 0.05, b[4] * 0.035, b[5] * 0.025];
+                const ks = [2, 3, 4, 5, 7, 9];
+                const sp = [0.31, -0.23, 0.41, -0.37, 0.53, -0.61];
+                for (let i = 0; i <= res; i++) {
+                    const a = i / res * Math.PI * 2;
+                    let d = 0;
+                    for (let j = 0; j < 6; j++)
+                        d += amps[j] * Math.sin(ks[j] * a + (clock - lag) * sp[j] * (j + 1) + j * 1.7 + layer * 2.1);
+                    const r = r0 * (1 + d * (1 - layer * 0.25));
+                    pts.push(Qt.point(root.cx + Math.cos(a) * r, root.cy + Math.sin(a) * r));
+                }
+                return pts;
+            }
+
+            FrameAnimation {
+                running: root.active && root.visible
+                onTriggered: {
+                    const dt = Math.min(frameTime, 0.05);
+                    const v = root.values, n = v.length || 1, out = [];
+                    const ease = Math.min(1, dt * (14 - (root.cfg.smooth ?? 0.55) * 10));
+                    for (let j = 0; j < 6; j++) {
+                        // Log-ish band edges so lows don't swallow everything
+                        const lo = Math.floor(n * (Math.pow(2, j) - 1) / 63), hi = Math.max(lo + 1, Math.floor(n * (Math.pow(2, j + 1) - 1) / 63));
+                        let s = 0;
+                        for (let i = lo; i < hi; i++) s += v[i] ?? 0;
+                        const t = Math.min(1, s / (hi - lo) * 1.4);
+                        out.push(blobItem.bands[j] + (t - blobItem.bands[j]) * ease);
+                    }
+                    blobItem.bands = out;
+                    blobItem.punch += (Cava.kick - blobItem.punch) * Math.min(1, dt * (Cava.kick > blobItem.punch ? 18 : 4));
+                    const target = blobItem.reach + Cava.bass * 0.18 * blobItem.reach;
+                    blobItem.base += (target - blobItem.base) * Math.min(1, dt * 6);
+                    blobItem.clock += dt * (root.cfg.blobSpin ?? 1) * (1 + Cava.level * 1.5);
+                    blobItem.skins = [blobItem.outline(2), blobItem.outline(1), blobItem.outline(0)];
+                }
+            }
+
+            Repeater {
+                model: 2
+
+                Shape {
+                    required property int index
+                    anchors.fill: parent
+                    preferredRendererType: Shape.CurveRenderer
+                    opacity: index === 0 ? 0.25 : 0.5
+
+                    ShapePath {
+                        strokeWidth: Math.max(0.8, (root.cfg.thickness ?? 2) * 0.4)
+                        strokeColor: root.ink
+                        fillColor: "transparent"
+                        joinStyle: ShapePath.RoundJoin
+                        PathPolyline { path: blobItem.skins[index].length ? blobItem.skins[index] : blobItem.skins[2] }
+                    }
+                }
+            }
+
+            Shape {
+                id: front
+                anchors.fill: parent
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeWidth: root.cfg.thickness ?? 2
+                    strokeColor: (root.cfg.thickness ?? 2) > 0 ? root.ink : "transparent"
+                    joinStyle: ShapePath.RoundJoin
+                    fillGradient: RadialGradient {
+                        centerX: root.cx; centerY: root.cy; centerRadius: blobItem.base * 1.3
+                        focalX: root.cx; focalY: root.cy
+                        GradientStop { position: 0; color: Qt.alpha(root.ink, (root.cfg.blobFill ?? 0.25) * 0.1) }
+                        GradientStop { position: 1; color: Qt.alpha(root.ink, root.cfg.blobFill ?? 0.25) }
+                    }
+                    PathPolyline { path: blobItem.skins[2] }
+                }
+            }
+
+            MultiEffect {
+                anchors.fill: parent
+                source: front
+                blurEnabled: true
+                blurMax: 32
+                blur: 1
+                brightness: 0.3
+                opacity: 0.5 + blobItem.punch * 0.4
+            }
+        }
+    }
+
+    // LED matrix: columns of dots light up from the bottom, with a falling peak dot on top of each
+    Component {
+        id: dots
+
+        Canvas {
+            id: grid
+
+            readonly property int cols: Math.max(4, Math.round(root.cfg.count ?? 48))
+            readonly property int rows: Math.max(2, Math.round(root.cfg.dotRows ?? 14))
+            property var peaks: []
+
+            renderStrategy: Canvas.Cooperative
+
+            Connections {
+                target: root
+                function onValuesChanged() { grid.requestPaint(); }
+            }
+            onColsChanged: peaks = []
+
+            onPaint: {
+                const ctx = getContext("2d");
+                ctx.reset();
+                const cw = width / cols, rh = height / rows;
+                const d = Math.max(1.5, Math.min(cw, rh) * 0.62);
+                const v = root.values, n = root.n, pk = peaks;
+                const on = root.ink.toString(), off = Qt.alpha(root.ink, 0.1).toString();
+                for (let c = 0; c < cols; c++) {
+                    // Bass in the middle, mirrored like the other strips
+                    const m = Math.abs(c / (cols - 1) * 2 - 1) * (n - 1), j = Math.floor(m), f = m - j;
+                    const lv = (v[j] ?? 0) * (1 - f) + (v[Math.min(j + 1, n - 1)] ?? 0) * f;
+                    const lit = Math.round(lv * rows);
+                    pk[c] = Math.max(lit, (pk[c] ?? 0) - 0.25);
+                    const x = (c + 0.5) * cw;
+                    for (let r = 0; r < rows; r++) {
+                        const y = height - (r + 0.5) * rh;
+                        const peak = r === Math.ceil(pk[c]) - 1 && r >= lit;
+                        ctx.globalAlpha = r < lit ? 0.45 + 0.55 * (r + 1) / rows : 1;
+                        ctx.fillStyle = r < lit || peak ? on : off;
+                        ctx.beginPath();
+                        ctx.arc(x, y, d / 2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                peaks = pk;
             }
         }
     }

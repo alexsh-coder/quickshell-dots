@@ -10,7 +10,7 @@ Column {
     // Effect whose own strength slider is shown, opened by right-clicking it
     property string editing: ""
     readonly property var names: ({ desktop: "Visualizer", glow: "Glow", blur: "Blur", zoom: "Zoom", shake: "Shake", glitch: "Glitch", pulse: "Pulse", ripple: "Ripple", bloom: "Bloom", vhs: "VHS", hue: "Hue" })
-    readonly property var styleIcons: ({ bars: "graphic_eq", wave: "airwave", mirror: "align_vertical_center", ring: "donut_large", nation: "album", particles: "auto_awesome" })
+    readonly property var styleIcons: ({ bars: "graphic_eq", wave: "airwave", mirror: "align_vertical_center", ring: "donut_large", nation: "album", particles: "auto_awesome", line: "horizontal_rule", blob: "bubble_chart", dots: "blur_linear" })
     // A slider is held
     readonly property bool busy: intensitySlider.pressed || strengthSlider.pressed
     // Tiles stay see-through over the blurred cover behind the panel

@@ -287,6 +287,12 @@ hl.config({
             natural_scroll = ui.natural_scroll ~= false,
         },
     },
+
+    gestures = {
+        workspace_swipe_distance           = 700,
+        workspace_swipe_cancel_ratio       = 0.25,
+        workspace_swipe_min_speed_to_force = 15,
+    },
 })
 
 hl.gesture({
@@ -393,9 +399,9 @@ end
 bind("scratch", "Windows|Scratchpad", mainMod .. " + S",         hl.dsp.workspace.toggle_special("magic"))
 bind("toscratch", "Windows|Move to scratchpad", mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
 
--- Music scratchpad: Super+M toggles special:music, launching a player if none is running
-bind("music", "Apps|Music", mainMod .. " + M", hl.dsp.exec_cmd("~/.config/hypr/scripts/music-toggle.sh"))
-bind("mediashade", "Shell|Media panel", mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("qs ipc call mediashade toggle"))
+-- Music scratchpad: Super+Shift+M toggles special:music, launching a player if none is running
+bind("music", "Apps|Music", mainMod .. " + SHIFT + M", hl.dsp.exec_cmd("~/.config/hypr/scripts/music-toggle.sh"))
+bind("mediashade", "Shell|Media panel", mainMod .. " + M", hl.dsp.exec_cmd("qs ipc call mediashade toggle"))
 
 -- Scroll through workspaces
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))

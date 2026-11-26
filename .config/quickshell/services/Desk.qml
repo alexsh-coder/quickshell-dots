@@ -11,7 +11,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property var styles: ["bars", "wave", "mirror", "ring", "nation", "particles"]
+    readonly property var styles: ["bars", "wave", "mirror", "ring", "nation", "particles", "line", "blob", "dots"]
     readonly property var colors: ["auto", "accent", "white", "black"]
     readonly property real aspect: (Quickshell.screens[0]?.width || 16) / (Quickshell.screens[0]?.height || 9)
 
@@ -20,7 +20,7 @@ Singleton {
             visualizer: {
                 name: "Visualizer",
                 icon: "graphic_eq",
-                props: { style: "bars", color: "auto", gain: 1, align: "bottom", count: 48, gap: 6, round: 1, fill: "fade", ease: 50, thickness: 2, fillAlpha: 0.45, smooth: 0.55, ringCount: 96, ringWidth: 4, ringSize: 1, ringLine: true, ringCenter: "none", nationCenter: "cover", ringGlow: false, pDensity: 1, pSpeed: 1, pSize: 1, spread: 1 },
+                props: { style: "bars", color: "auto", gain: 1, align: "bottom", count: 48, gap: 6, round: 1, fill: "fade", ease: 50, thickness: 2, fillAlpha: 0.45, smooth: 0.55, ringCount: 96, ringWidth: 4, ringSize: 1, ringLine: true, ringCenter: "none", nationCenter: "cover", ringGlow: false, pDensity: 1, pSpeed: 1, pSize: 1, spread: 1, lineEcho: true, lineGlow: true, blobFill: 0.25, blobSpin: 1, dotRows: 14, analyzer: "cava" },
                 schema: [
                     { key: "style", label: "Style", values: styles },
                     { key: "color", label: "Color", values: colors },
@@ -31,9 +31,16 @@ Singleton {
                     { key: "round", label: "Rounding", min: 0, max: 1, step: 0.05, unit: "%", only: ["bars", "mirror"] },
                     { key: "fill", label: "Fill", values: ["fade", "solid"], only: ["bars", "mirror"] },
                     { key: "ease", label: "Response", min: 0, max: 200, step: 10, unit: "ms", only: ["bars", "mirror"] },
-                    { key: "thickness", label: "Line", min: 0, max: 8, step: 0.5, unit: "px", only: ["wave"] },
+                    { key: "thickness", label: "Line", min: 0, max: 8, step: 0.5, unit: "px", only: ["wave", "line", "blob"] },
+                    { key: "analyzer", label: "Analyzer", values: ["cava", "pro", "vocal", "punch", "fluid", "sub", "nation"], only: ["bars", "wave", "mirror", "ring", "line", "blob", "dots", "particles"] },
                     { key: "fillAlpha", label: "Fill", min: 0, max: 1, step: 0.05, unit: "%", only: ["wave"] },
-                    { key: "smooth", label: "Smoothing", min: 0, max: 0.9, step: 0.05, unit: "%", only: ["wave"] },
+                    { key: "smooth", label: "Smoothing", min: 0, max: 0.9, step: 0.05, unit: "%", only: ["wave", "line", "blob"] },
+                    { key: "lineEcho", label: "Echoes", type: "bool", only: ["line"] },
+                    { key: "lineGlow", label: "Glow", type: "bool", only: ["line"] },
+                    { key: "blobFill", label: "Fill", min: 0, max: 1, step: 0.05, unit: "%", only: ["blob"] },
+                    { key: "blobSpin", label: "Spin", min: 0, max: 4, step: 0.1, unit: "%", only: ["blob"] },
+                    { key: "count", label: "Columns", min: 8, max: 96, step: 1, only: ["dots"] },
+                    { key: "dotRows", label: "Rows", min: 4, max: 32, step: 1, only: ["dots"] },
                     { key: "ringCount", label: "Spikes", min: 24, max: 256, step: 4, only: ["ring"] },
                     { key: "ringWidth", label: "Spike width", min: 1, max: 12, step: 0.5, unit: "px", only: ["ring"] },
                     { key: "ringSize", label: "Hole", min: 0.3, max: 2, step: 0.05, unit: "%", only: ["ring"] },
@@ -101,7 +108,7 @@ Singleton {
                 name: "Lyrics",
                 icon: "lyrics",
                 rect: { w: 0.5, h: 0.14 },
-                props: { layout: "lines", effect: ["glow"], lineAnim: "scroll", lineTime: 450, color: "auto", text: "white", size: 22, align: "center", context: 1, fade: 0.6, shrink: 0.75, halo: true, paused: 0.45, opacity: 1, wordAnim: "rise", wordScale: 2.5, wordTime: 320, wordCase: "as is", punct: false },
+                props: { layout: "lines", effect: ["glow"], lineAnim: "scroll", lineTime: 450, color: "auto", text: "white", size: 22, align: "center", context: 1, fade: 0.6, shrink: 0.75, halo: true, paused: 0.45, opacity: 1, wordAnim: "rise", wordScale: 2.5, wordTime: 320, wordCase: "as is", punct: false, shake: "off", drift: "off", textFx: [], noLyrics: "none", infoStyle: "arc", infoIcon: "eq", infoLabel: true, infoProgress: true, infoArc: "smile", swapTime: 6, swapAnim: "fade", swapSpeed: 600, infoScale: 1 },
                 schema: [
                     { key: "layout", label: "Layout", values: ["lines", "word"] },
                     { key: "effect", label: "Sung word (mix)", values: ["glow", "fill", "spot", "bounce", "lift", "underline"], multi: true, only: ["lines"] },
@@ -112,6 +119,19 @@ Singleton {
                     { key: "wordTime", label: "Change speed", min: 80, max: 800, step: 20, unit: "ms", only: ["word"] },
                     { key: "wordCase", label: "Case", values: ["as is", "upper", "lower"], only: ["word"] },
                     { key: "punct", label: "Punctuation", type: "bool", only: ["word"] },
+                    { key: "shake", label: "Shake", values: ["off", "float", "jitter", "beat"] },
+                    { key: "drift", label: "While sung", values: ["off", "shrink", "grow"] },
+                    { key: "textFx", label: "Extras (mix)", values: ["wave", "pulse", "tilt", "flicker"], multi: true },
+                    { key: "noLyrics", label: "No lyrics", values: ["none", "full", "title", "swap", "cycle"] },
+                    { key: "infoStyle", label: "Now playing look", values: ["arc", "minimal", "cover", "marquee"] },
+                    { key: "infoIcon", label: "Its icon", values: ["eq", "note", "disc", "none"] },
+                    { key: "infoLabel", label: "Now playing label", type: "bool" },
+                    { key: "infoProgress", label: "Progress line", type: "bool" },
+                    { key: "infoArc", label: "Its shape", values: ["smile", "arch", "flat"] },
+                    { key: "swapTime", label: "Swap every", min: 2, max: 30, step: 0.5, unit: "s" },
+                    { key: "swapAnim", label: "Swap", values: ["fade", "rise", "slide", "zoom", "blur"] },
+                    { key: "swapSpeed", label: "Swap speed", min: 150, max: 1500, step: 50, unit: "ms" },
+                    { key: "infoScale", label: "Info size", min: 0.5, max: 3, step: 0.05, unit: "%" },
                     { key: "size", label: "Text size", min: 12, max: 72, step: 1, unit: "px" },
                     { key: "color", label: "Sung line", values: colors },
                     { key: "text", label: "Other lines", values: ["white", "black", "accent"] },
@@ -299,6 +319,10 @@ Singleton {
             return Object.assign({ x: 0.5, y: y ?? 0.5 }, { w: 1, h: 0.32 });
         case "particles":
             return { x: x ?? 0.5, y: y ?? 0.5, w: 1, h: 1 };
+        case "line":
+            return { x: 0.5, y: y ?? 0.5, w: 1, h: 0.3 };
+        case "dots":
+            return { x: 0.5, y: 0.88, w: 0.6, h: 0.2 };
         default:
             return Object.assign({ x: x ?? 0.5, y: y ?? 0.5 }, sq(0.6));
         }
@@ -403,8 +427,8 @@ Singleton {
                 return false;
             // A visualizer moving between strip, round and field shapes gets that shape's rect
             if (w.type === "visualizer" && key === "style") {
-                const shape = s => s === "bars" || s === "wave" ? "strip" : s;
-                const group = s => ["ring", "nation"].includes(s) ? "round" : shape(s);
+                const shape = s => ["bars", "wave", "dots"].includes(s) ? "strip" : s;
+                const group = s => ["ring", "nation", "blob"].includes(s) ? "round" : s === "line" ? "mirror" : shape(s);
                 // A strip's centre is pinned to the bottom edge, so it isn't carried over
                 if (group(w.style) !== group(value))
                     Object.assign(w, shape(w.style) === "strip" ? styleRect(value) : styleRect(value, w.x, w.y));

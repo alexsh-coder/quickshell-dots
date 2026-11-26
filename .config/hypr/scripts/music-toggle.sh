@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Super+M: music scratchpad. Pulls any running player into special:music and
+# Super+Shift+M: music scratchpad. Pulls any running player into special:music and
 # toggles it; if no player is running, launches one (it lands there via rule).
 PLAYERS='^(Spotify|ytermusic|feishin|Supersonic|Cider|com.github.th-ch.youtube-music)$'
 
