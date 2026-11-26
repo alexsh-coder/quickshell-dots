@@ -366,6 +366,7 @@ bind("split", "Windows|Toggle split", mainMod .. " + J",      hl.dsp.layout("tog
 bind("lock", "System|Lock screen", mainMod .. " + L",         hl.dsp.global("quickshell:lock"))
 bind("exit", "System|Exit Hyprland", mainMod .. " + SHIFT + Escape", hl.dsp.exit())
 bind("power", "System|Power menu", "CTRL + ALT + Delete",  hl.dsp.exec_cmd("qs ipc call powermenu toggle"))
+bind("power2", "System|Power menu", mainMod .. " + SHIFT + P", hl.dsp.exec_cmd("qs ipc call powermenu toggle"))
 bind("btop", "System|Task manager", "CTRL + SHIFT + Escape", hl.dsp.exec_cmd(terminal .. " -e ~/.local/bin/btop"))
 bind("fullscreen", "Windows|Fullscreen", mainMod .. " + F", function()
     hl.dispatch(hl.dsp.window.fullscreen())
