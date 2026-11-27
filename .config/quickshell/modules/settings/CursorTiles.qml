@@ -13,6 +13,9 @@ Flow {
     signal picked(var value)
 
     spacing: 6
+    // Tiles stretch so each row fills the width
+    readonly property int columns: Math.max(1, Math.floor((width + spacing) / (132 + spacing)))
+    readonly property real tileWidth: (width - spacing * (columns - 1)) / columns
 
     Repeater {
         model: root.model
@@ -23,7 +26,7 @@ Flow {
             required property var modelData
             readonly property bool on: root.current === modelData.value
 
-            width: 132
+            width: root.tileWidth
             height: 74
             radius: 10
             color: on ? Qt.tint(Theme.surface, Qt.alpha(Theme.accent, 0.22)) : area.containsMouse ? Qt.tint(Theme.surface, Qt.alpha(Theme.accent, 0.1)) : Theme.surface

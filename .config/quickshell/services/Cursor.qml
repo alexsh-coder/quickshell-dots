@@ -103,8 +103,11 @@ Singleton {
             [/^capitaine-cursors(-light)?$/, m => ["Capitaine", "", m[1] ? "Light" : "Dark"]],
             [/^Vimix-(white-)?cursors$/, m => ["Vimix", "", m[1] ? "White" : "Dark"]],
             [/^(breeze_cursors|Breeze_Light)$/, m => ["Breeze", "", m[1] === "Breeze_Light" ? "Light" : "Dark"]],
+            [/^phinger-cursors-(dark|light)$/, m => ["Phinger", "", m[1] === "dark" ? "Dark" : "Light"]],
+            [/^macOS(-White)?$/, m => ["macOS", "", m[1] ? "White" : "Black"]],
             [/^Rice-(\w+)$/, m => ["Rice", m[1], ""]],
             [/^miku-cursor/, m => ["Anime", "Miku", ""]],
+            [/^stmc-(\w+)$/, m => ["Anime", m[1].charAt(0).toUpperCase() + m[1].slice(1), ""]],
             [/^(Koishi|nahida|furina|bocchi|nijika)$/, m => ["Anime", m[1].charAt(0).toUpperCase() + m[1].slice(1), ""]],
         ];
         for (const [re, f] of rules) {

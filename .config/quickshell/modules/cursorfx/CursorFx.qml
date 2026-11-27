@@ -311,6 +311,8 @@ PanelWindow {
         // Where the press was: the effect stays there as the pointer moves on
         property real ox: 0
         property real oy: 0
+        // Half the size of the shape pressed on, so the effect starts outside it (Fluent grows on hover)
+        property real start: 0.1
 
         anchors.fill: parent
         visible: (mode === "ripple" || mode === "burst") && t < 1
@@ -320,6 +322,8 @@ PanelWindow {
             function onClicked() {
                 press.ox = root.cx;
                 press.oy = root.cy;
+                const a = Cursor.base === "Rice-Fluent" ? unmorph.shapes[unmorph.group(Cursor.shape)] : null;
+                press.start = a ? Math.max(0.1, Math.max(a[0], a[1]) / 2) : 0.1;
                 play.restart();
             }
         }
@@ -334,7 +338,7 @@ PanelWindow {
         }
 
         Rectangle {
-            readonly property real r: press.px * (0.14 + 0.3 * press.t)
+            readonly property real r: press.px * (press.start + 0.04 + 0.3 * press.t)
 
             visible: press.mode === "ripple"
             x: press.ox - r
@@ -355,7 +359,7 @@ PanelWindow {
             Rectangle {
                 required property int index
                 readonly property real a: index / 6 * 2 * Math.PI + Math.PI / 6
-                readonly property real d: press.px * (0.16 + 0.32 * press.t)
+                readonly property real d: press.px * (press.start + 0.06 + 0.32 * press.t)
                 readonly property real r: press.px * 0.045 * (1 - press.t * 0.6)
 
                 x: press.ox + Math.cos(a) * d - r
