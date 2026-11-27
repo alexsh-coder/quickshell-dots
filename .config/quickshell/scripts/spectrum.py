@@ -51,7 +51,7 @@ def main():
         src = open(sys.argv[2], "rb")
     else:
         src = subprocess.Popen(
-            ["pw-record", "-P", f"{{ stream.capture.sink=true node.name=spectrum-{mode} }}", "--latency", "10ms",
+            ["pw-record", "--raw", "-P", f"{{ stream.capture.sink=true node.name=spectrum-{mode} }}", "--latency", "10ms",
              "--format", "s16", "--rate", str(RATE), "--channels", "1", "-"],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL).stdout
 

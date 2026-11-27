@@ -32,6 +32,9 @@ Singleton {
     // How the wallpaper tears, glitch.frag's `variant`
     readonly property var glitchStyles: ["wide", "soft", "sparse", "thin", "clean", "gentle", "edges"]
     readonly property string glitchStyle: value("glitchStyle") ?? "wide"
+    // How the Nation ring picks its ears, a variant of scripts/nation-fft.py
+    readonly property var nationStyles: ["classic", "lead", "duet", "wide", "calm", "drift", "kick"]
+    readonly property string nationStyle: value("nationStyle") ?? "classic"
     readonly property bool pulse: value("pulse")
     readonly property bool ripple: value("ripple")
     readonly property bool bloom: value("bloom")

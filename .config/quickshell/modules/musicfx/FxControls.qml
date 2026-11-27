@@ -149,13 +149,60 @@ Column {
                         // Either turns the visualizer on.
                         onClicked: mouse => {
                             if (mouse.button === Qt.RightButton) {
-                                if (!chip.selected)
+                                // Right on the active Nation opens its variants
+                                if (chip.selected && chip.modelData === "nation")
+                                    nationBox.open = !nationBox.open;
+                                else if (!chip.selected)
                                     MusicFx.toggleLayer(chip.modelData);
                             } else {
                                 MusicFx.setStyle(chip.modelData);
                             }
                             MusicFx.set("desktop", true);
                         }
+                    }
+                }
+            }
+        }
+
+        // Nation variants, opened by right-clicking the active Nation chip
+        Column {
+            id: nationBox
+
+            property bool open: false
+
+            width: parent.width
+            spacing: 4
+            visible: open && Desk.main?.style === "nation"
+
+            Repeater {
+                model: nationBox.visible ? MusicFx.nationStyles : []
+
+                Rectangle {
+                    id: nopt
+
+                    required property string modelData
+                    readonly property bool current: MusicFx.nationStyle === modelData
+
+                    width: nationBox.width
+                    height: 32
+                    radius: Theme.radius
+                    color: current ? Qt.alpha(Theme.accent, 0.16) : noptMouse.containsMouse ? Theme.muted : "transparent"
+
+                    Label {
+                        x: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: root.styleName(nopt.modelData)
+                        font.pixelSize: 14
+                        color: nopt.current ? Theme.accent : Theme.text
+                    }
+                    MouseArea {
+                        id: noptMouse
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                        onReleased: if (containsMouse) Sfx.tap("clickPop")
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: MusicFx.set("nationStyle", nopt.modelData)
                     }
                 }
             }

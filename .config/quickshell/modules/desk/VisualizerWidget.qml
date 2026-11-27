@@ -420,8 +420,15 @@ Item {
             }
 
             Process {
+                id: fft
+
+                readonly property string variant: MusicFx.nationStyle
+
                 running: root.active
                 command: ["python3", Quickshell.shellDir + "/scripts/nation-fft.py"]
+                stdinEnabled: true
+                onStarted: write(variant + "\n")
+                onVariantChanged: if (running) write(variant + "\n")
                 stdout: SplitParser {
                     onRead: data => rings.feed(data)
                 }
@@ -497,8 +504,10 @@ Item {
                 id: strip
                 sourceItem: paletteStrip
                 hideSource: true
-                width: 0
-                height: 0
+                // Hidden but sized: Qt 6.12 renders no texture for a zero-sized source
+                visible: false
+                width: paletteStrip.width
+                height: paletteStrip.height
             }
 
             component Stop: GradientStop {
