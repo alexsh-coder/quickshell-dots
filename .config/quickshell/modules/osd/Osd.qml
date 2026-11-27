@@ -16,6 +16,10 @@ Scope {
     property string kind: ""
     property string icon: ""
     property string text: ""
+    property string caption: ""
+    // "next" / "prev" while waiting for the player to publish the new track
+    property string skip: ""
+    property bool toggling: false
     property real value: 0
     property bool dim: false
     property bool glide: false
@@ -54,6 +58,7 @@ Scope {
         present("text");
         root.icon = icon;
         root.text = text;
+        root.caption = "";
         root.dim = false;
     }
 
@@ -78,7 +83,11 @@ Scope {
         if (!player)
             return;
         const title = [player.trackArtist, player.trackTitle].filter(s => s).join(" — ");
-        showText(player.isPlaying ? "play_arrow" : "pause", title || player.identity);
+        const skip = root.skip;
+        root.skip = "";
+        showText(skip === "next" ? "skip_next" : skip === "prev" ? "skip_previous"
+                 : player.isPlaying ? "pause" : "play_arrow", title || player.identity);
+        root.caption = skip === "next" ? "Next track" : skip === "prev" ? "Previous track" : "";
     }
 
     function stepVolume(a, delta) {
@@ -184,13 +193,24 @@ Scope {
             const p = root.player;
             if (!p)
                 return;
-            if (action === "next" && p.canGoNext)
+            if (action === "next" && p.canGoNext) {
+                root.skip = "next";
                 p.next();
-            else if (action === "prev" && p.canGoPrevious)
+                skipTimeout.restart();
+                return;
+            }
+            if (action === "prev" && p.canGoPrevious) {
+                root.skip = "prev";
                 p.previous();
-            else if (action === "play-pause" && p.canTogglePlaying)
+                skipTimeout.restart();
+                return;
+            }
+            if (action === "play-pause" && p.canTogglePlaying) {
+                root.toggling = true;
                 p.togglePlaying();
-            // The player needs a moment to publish the new track / state
+                skipTimeout.restart();
+                return;
+            }
             mediaDelay.restart();
         }
 
@@ -210,6 +230,36 @@ Scope {
         id: hideDelay
         interval: 900
         onTriggered: root.shown = false
+    }
+
+    // Show the skip once the new title arrives; prev may just restart the same track
+    Connections {
+        target: root.player
+        enabled: root.skip !== ""
+        function onTrackTitleChanged() {
+            skipTimeout.stop();
+            mediaDelay.restart();
+        }
+    }
+
+    // isPlaying lags behind togglePlaying(), so wait for it instead of a fixed delay
+    Connections {
+        target: root.player
+        enabled: root.toggling
+        function onIsPlayingChanged() {
+            root.toggling = false;
+            skipTimeout.stop();
+            root.showMedia();
+        }
+    }
+
+    Timer {
+        id: skipTimeout
+        interval: 1200
+        onTriggered: {
+            root.toggling = false;
+            root.showMedia();
+        }
     }
 
     Timer {
@@ -296,12 +346,22 @@ Scope {
                     }
                 }
 
-                Label {
+                Column {
                     visible: !pill.bar
                     anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, 420)
-                    elide: Text.ElideRight
-                    text: root.text
+
+                    Label {
+                        visible: root.caption !== ""
+                        text: root.caption
+                        font.pixelSize: 11
+                        color: Theme.accent
+                    }
+
+                    Label {
+                        width: Math.min(implicitWidth, 420)
+                        elide: Text.ElideRight
+                        text: root.text
+                    }
                 }
             }
 
