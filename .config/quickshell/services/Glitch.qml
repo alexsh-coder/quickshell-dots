@@ -44,7 +44,7 @@ Singleton {
     // Targets that would show it right now
     function candidates() {
         const shown = type => Desk.widgetsOn && Desk.widgets.some(w => w.type === type && !w.hidden);
-        return ["wall", "ring", "lyrics"].filter(t => has(t) && (t === "wall" ? !Wallpaper.video : shown(t === "ring" ? "visualizer" : "lyrics")));
+        return ["wall", "ring", "lyrics"].filter(t => has(t) && (t === "wall" || shown(t === "ring" ? "visualizer" : "lyrics")));
     }
 
     function fire(strength) {

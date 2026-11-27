@@ -118,10 +118,11 @@ play() {
     printf '%s' "$1" >"$run.video"
     # -p pauses it while nothing of the desktop is visible. mpv's default scaling of 4K videos
     # keeps an integrated GPU busy enough to drop frames; profile=fast takes a third of that
-    local sat=0
+    local sat=0 fx
+    fx=$(dirname "$(readlink -f "$0")")/../shaders/mpv-fx.glsl
     [ -f "$run.bw" ] && sat=-100
     setsid -f mpvpaper -p \
-        -o "no-audio loop hwdec=auto-safe profile=fast panscan=1.0 saturation=$sat input-ipc-server=$sock" \
+        -o "no-audio loop hwdec=auto-safe profile=fast panscan=1.0 saturation=$sat input-ipc-server=$sock glsl-shaders=$fx" \
         ALL "$1" </dev/null >/dev/null 2>&1
 }
 

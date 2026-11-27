@@ -4,12 +4,14 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import qs.services
 
-// Zoom and shake for a video wallpaper. mpvpaper draws it out of reach of Quickshell,
-// so the motion is sent to its mpv as video-zoom and video-pan over the IPC socket.
+// Zoom, shake, glitch and RGB split for a video wallpaper. mpvpaper draws it out of reach of Quickshell,
+// so the motion is sent to its mpv as video-zoom and video-pan over the IPC socket, and the rest as
+// options of shaders/mpv-fx.glsl.
 Scope {
     id: root
 
-    readonly property bool active: (MusicFx.zoom || MusicFx.shake) && Cava.active && Wallpaper.video
+    readonly property bool glitch: Glitch.has("wall") && Wallpaper.video
+    readonly property bool active: (MusicFx.zoom || MusicFx.shake || MusicFx.rgb || glitch) && Cava.active && Wallpaper.video
     readonly property var screen: Quickshell.screens[0]
     readonly property real refresh: Hyprland.monitorFor(screen)?.lastIpcObject?.refreshRate || 60
 
@@ -81,6 +83,17 @@ Scope {
         changed = send("video-zoom", round(Math.log2(1 + zoom))) || changed;
         changed = send("video-pan-x", round(panX)) || changed;
         changed = send("video-pan-y", round(panY)) || changed;
+        // Every change recompiles the shader, so the values are kept coarse
+        const fx = active ? {
+            glitch: glitch ? 1 : 0,
+            split: Math.round(Glitch.split * 2) / 2,
+            burst: Math.round(Glitch.burstFor("wall") * 100) / 100,
+            seed: Math.round(Glitch.seed * 1000) / 1000,
+            tear: Math.round(60 * Glitch.gain),
+            variant: Math.max(0, MusicFx.glitchStyles.indexOf(MusicFx.glitchStyle)),
+            rgb: Math.round(WallFx.rgb * 4) / 4
+        } : { glitch: 0, split: 0, burst: 0, rgb: 0 };
+        changed = send("glsl-shader-opts", Object.keys(fx).map(k => k + "=" + fx[k]).join(",")) || changed;
         if (changed)
             sock.flush();
     }
