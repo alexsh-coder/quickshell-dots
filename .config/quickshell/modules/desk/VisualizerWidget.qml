@@ -1129,10 +1129,11 @@ Item {
 
             function outline(layer) {
                 const b = bands, pts = [];
-                const lag = layer * 0.35, grow = 1 + layer * 0.045;
-                const r0 = base * grow * (1 + punch * 0.08 * (1 - layer * 0.4));
-                // Harmonic k gets band energy, its own phase speed and direction
-                const amps = [b[0] * 0.10 + 0.025, b[1] * 0.09 + 0.02, b[2] * 0.07 + 0.012, b[3] * 0.05, b[4] * 0.035, b[5] * 0.025];
+                const lag = layer * 0.18, grow = 1 + layer * 0.04;
+                const r0 = base * grow * (1 + punch * 0.1 * (1 - layer * 0.4));
+                // Harmonic k gets band energy, its own phase speed and direction; a kick deepens all of them
+                const hit = 1 + punch * 0.3;
+                const amps = [b[0] * 0.08 + 0.015, b[1] * 0.07 + 0.012, b[2] * 0.055 + 0.008, b[3] * 0.04, b[4] * 0.028, b[5] * 0.02].map(x => x * hit);
                 const ks = [2, 3, 4, 5, 7, 9];
                 const sp = [0.31, -0.23, 0.41, -0.37, 0.53, -0.61];
                 for (let i = 0; i <= res; i++) {
@@ -1151,20 +1152,22 @@ Item {
                 onTriggered: {
                     const dt = Math.min(frameTime, 0.05);
                     const v = root.values, n = v.length || 1, out = [];
-                    const ease = Math.min(1, dt * (14 - (root.cfg.smooth ?? 0.55) * 10));
+                    // Fast rise, slower fall: hits land at once instead of oozing in
+                    const fall = Math.min(1, dt * (14 - (root.cfg.smooth ?? 0.55) * 10)), rise = Math.min(1, dt * 30);
                     for (let j = 0; j < 6; j++) {
                         // Log-ish band edges so lows don't swallow everything
                         const lo = Math.floor(n * (Math.pow(2, j) - 1) / 63), hi = Math.max(lo + 1, Math.floor(n * (Math.pow(2, j + 1) - 1) / 63));
                         let s = 0;
                         for (let i = lo; i < hi; i++) s += v[i] ?? 0;
                         const t = Math.min(1, s / (hi - lo) * 1.4);
-                        out.push(blobItem.bands[j] + (t - blobItem.bands[j]) * ease);
+                        out.push(blobItem.bands[j] + (t - blobItem.bands[j]) * (t > blobItem.bands[j] ? rise : fall));
                     }
                     blobItem.bands = out;
-                    blobItem.punch += (Cava.kick - blobItem.punch) * Math.min(1, dt * (Cava.kick > blobItem.punch ? 18 : 4));
-                    const target = blobItem.reach + Cava.bass * 0.18 * blobItem.reach;
-                    blobItem.base += (target - blobItem.base) * Math.min(1, dt * 6);
-                    blobItem.clock += dt * (root.cfg.blobSpin ?? 1) * (1 + Cava.level * 1.5);
+                    blobItem.punch += (Cava.kick - blobItem.punch) * Math.min(1, dt * (Cava.kick > blobItem.punch ? 30 : 6));
+                    const target = blobItem.reach + Cava.bass * 0.25 * blobItem.reach;
+                    blobItem.base += (target - blobItem.base) * Math.min(1, dt * (target > blobItem.base ? 25 : 7));
+                    // The surface churns faster with the music and surges on kicks
+                    blobItem.clock += dt * (root.cfg.blobSpin ?? 1) * (1 + Cava.level * 3 + blobItem.punch * 4);
                     blobItem.skins = [blobItem.outline(2), blobItem.outline(1), blobItem.outline(0)];
                 }
             }
@@ -1214,7 +1217,8 @@ Item {
                 blurMax: 32
                 blur: 1
                 brightness: 0.3
-                opacity: 0.5 + blobItem.punch * 0.4
+                // Faint at rest, flashing on kicks
+                opacity: 0.2 + blobItem.punch * 0.6
             }
         }
     }
