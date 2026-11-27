@@ -13,6 +13,7 @@ Column {
     SectionTitle { text: "Battery" }
 
     SettingRow {
+        setting: "ecoOnBattery"
         label: "Battery saver"
         hint: Settings.hasBattery ? "Turns blur and shadows off while unplugged" + (Settings.eco ? " · on now" : "")
             : "Turns blur and shadows off while unplugged · no battery found"

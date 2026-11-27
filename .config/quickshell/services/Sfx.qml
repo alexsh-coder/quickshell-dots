@@ -14,14 +14,122 @@ Singleton {
     readonly property string dir: Qt.resolvedUrl("../sounds/")
 
     readonly property var packs: [
-        { value: "glass", label: "Glass" },
-        { value: "clicky", label: "Clicky" },
-        { value: "digital", label: "Digital" },
-        { value: "scifi", label: "Sci-fi" },
-        { value: "casino", label: "Casino" },
-        { value: "paper", label: "Paper" }
+        { value: "glass", label: "Glass", library: "interface-sounds" },
+        { value: "clicky", label: "Clicky", library: "ui-audio" },
+        { value: "digital", label: "Digital", library: "digital-audio" },
+        { value: "scifi", label: "Sci-fi", library: "sci-fi-sounds" },
+        { value: "casino", label: "Casino", library: "casino-audio" },
+        { value: "paper", label: "Paper", library: "rpg-audio" }
     ]
     readonly property string pack: packs.some(p => p.value === Settings.sfxPack) ? Settings.sfxPack : "glass"
+
+    // Every sound of the Kenney pack a preset was made from, to swap single events for
+    readonly property string library: packs.find(p => p.value === pack).library
+    readonly property var choices: libraryIndex[library] ?? []
+    property var libraryIndex: ({})
+    FileView {
+        id: indexFile
+        path: Quickshell.shellDir + "/sounds/library/index.json"
+        onLoaded: root.libraryIndex = JSON.parse(text())
+        // A hot reload hands the file back already read, with no onLoaded
+        Component.onCompleted: {
+            waitForJob();
+            if (text().length)
+                root.libraryIndex = JSON.parse(text());
+        }
+    }
+
+    // Library sounds picked for an event; several play in turns at random
+    // Which library sound each preset event was cut from, for its name in settings
+    property var presetIndex: ({})
+    FileView {
+        path: Quickshell.shellDir + "/sounds/presets.json"
+        onLoaded: root.presetIndex = JSON.parse(text())
+        Component.onCompleted: {
+            waitForJob();
+            if (text().length)
+                root.presetIndex = JSON.parse(text());
+        }
+    }
+
+    function presetName(name) {
+        return (presetIndex[pack]?.[name] ?? "").replace(/[_-]/g, " ");
+    }
+
+    function picked(name) {
+        const v = Settings.sfxPick[pack + "/" + name];
+        // Read back from settings.json a list is not a plain JS array
+        const list = !v ? [] : typeof v === "string" ? [v] : Array.from(v);
+        return list.filter(c => choices.includes(c));
+    }
+
+    // Adds or removes one; "" goes back to the preset's own
+    function pick(name, sound) {
+        const all = Object.assign({}, Settings.sfxPick);
+        const now = picked(name);
+        const next = !sound ? [] : now.includes(sound) ? now.filter(c => c !== sound) : now.concat(sound);
+        if (next.length)
+            all[pack + "/" + name] = next;
+        else
+            delete all[pack + "/" + name];
+        Settings.sfxPick = all;
+    }
+
+    function fileOf(name, sound) {
+        return sound ? dir + "library/" + library + "/" + sound + ".wav" : dir + pack + "/" + name + ".wav";
+    }
+
+    function filesOf(name) {
+        const p = picked(name);
+        return p.length ? p.map(c => fileOf(name, c)) : [fileOf(name, "")];
+    }
+
+    // One of the event's sounds at random, never the one it played last time
+    property var lastFile: ({})
+    function nextFile(name) {
+        const files = filesOf(name);
+        const rest = files.length > 1 ? files.filter(f => f !== lastFile[name]) : files;
+        const f = rest[Math.floor(Math.random() * rest.length)];
+        lastFile[name] = f;
+        return f;
+    }
+
+    // Loaded sound per file, made ahead so the first play has no gap
+    property var pool: ({})
+    function effectFor(file) {
+        if (!pool[file])
+            pool[file] = effect.createObject(root, { source: file });
+        return pool[file];
+    }
+
+    function preload() {
+        for (const n of Object.keys(map))
+            for (const f of filesOf(n))
+                effectFor(f);
+    }
+
+    onPackChanged: Qt.callLater(preload)
+    onChoicesChanged: Qt.callLater(preload)
+    Connections {
+        target: Settings
+        function onSfxPickChanged() {
+            Qt.callLater(root.preload);
+        }
+    }
+    Component.onCompleted: preload()
+
+    function audition(name, sound) {
+        tryOut.volume = map[name] * Settings.sfxVolume;
+        const src = sound === undefined ? nextFile(name) : fileOf(name, sound);
+        tryOut.stop();
+        if (tryOut.source.toString() !== src)
+            tryOut.source = src;
+        tryOut.play();
+    }
+
+    SoundEffect {
+        id: tryOut
+    }
 
     // Every pack has sounds/<pack>/<name>.wav, peak-normalized; the gain sets how loud each event is
     readonly property var map: ({
@@ -54,6 +162,20 @@ Singleton {
         osdOn: 0.4,
         osdOff: 0.4,
         osdText: 0.35
+    })
+
+    readonly property var eventLabels: ({
+        hover: "Hover", hoverPop: "Hover in popouts", slide: "Slider tick",
+        click: "Click", clickPop: "Click in popouts", toggleOn: "Switch on", toggleOff: "Switch off",
+        open: "Open", close: "Close",
+        popOpen: "Open", popSwitch: "Switch to another", popClose: "Close",
+        winOpen: "Window opens", winClose: "Window closes",
+        workspace: "Switch",
+        notify: "Notification", urgent: "Urgent notification",
+        osdVolume: "Volume", osdBright: "Brightness", osdOn: "Turned on", osdOff: "Turned off", osdText: "Layout and text",
+        type: "Key", typeBig: "Space, Backspace, Tab", typeEnter: "Enter",
+        lock: "Lock", unlock: "Unlock", error: "Wrong password",
+        shot: "Shutter"
     })
 
     // What can be switched off on its own in settings, and the events each one covers
@@ -117,15 +239,14 @@ Singleton {
         last[name] = now;
         if (!passive.includes(name))
             actions++;
-        const e = effects.find(e => e.name === name);
-        if (!e)
+        if (map[name] === undefined)
             return;
+        const e = effectFor(nextFile(name));
+        e.volume = map[name] * Settings.sfxVolume;
         e.stop();
         e.play();
     }
 
-    readonly property var effects: names.map(n => effect.createObject(root, { name: n }))
-    readonly property var names: Object.keys(map)
 
     Connections {
         target: Hyprland
@@ -144,8 +265,8 @@ Singleton {
         typingPanels = on ? rest.concat(panel) : rest;
     }
     // Keys only count as typing with somewhere to type into: a window on the focused workspace, or a shell panel
-    readonly property bool canType: typingPanels.length > 0
-        || (!!Hyprland.activeToplevel && Hyprland.activeToplevel.workspace === Hyprland.focusedWorkspace)
+    readonly property bool canType: !!(typingPanels.length > 0
+        || (Hyprland.activeToplevel && Hyprland.activeToplevel.workspace === Hyprland.focusedWorkspace))
 
     // Key presses from any keyboard; only whether it was a big key comes through
     Process {
@@ -163,10 +284,6 @@ Singleton {
 
     Component {
         id: effect
-        SoundEffect {
-            property string name
-            source: root.dir + root.pack + "/" + name + ".wav"
-            volume: root.map[name] * Settings.sfxVolume
-        }
+        SoundEffect {}
     }
 }

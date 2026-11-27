@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell.Services.Pipewire
 import qs.config
+import qs.services
 import qs.components
 
 Item {
@@ -37,6 +38,7 @@ Item {
     }
 
     MouseArea {
+        onReleased: if (containsMouse) Sfx.tap("click")
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
         onClicked: if (root.sink) root.sink.audio.muted = !root.muted

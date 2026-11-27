@@ -253,7 +253,7 @@ Scope {
                     width: flick.width - (Theme.pad + 8) * 2
                     height: current?.item?.implicitHeight ?? 0
 
-                    readonly property Item current: ({ wallpaper: wallpaperPage, display: displayPage, look: lookPage, input: inputPage, power: powerPage, keybinds: keybindsPage, remote: remotePage })[root.section] ?? null
+                    readonly property Item current: ({ wallpaper: wallpaperPage, display: displayPage, look: lookPage, sounds: soundsPage, input: inputPage, power: powerPage, keybinds: keybindsPage, remote: remotePage })[root.section] ?? null
 
                     Page { id: wallpaperPage; name: "wallpaper"; sourceComponent: WallpaperSection { width: wallpaperPage.width; shown: Settings.open && wallpaperPage.visible } }
                     Page { id: displayPage; name: "display"; sourceComponent: DisplaySection { width: displayPage.width; shown: Settings.open && displayPage.visible } }

@@ -173,6 +173,7 @@ Column {
     SectionTitle { text: "Night light" }
 
     SettingRow {
+        setting: "nightTemp"
         label: "Warmth"
         hint: "Colour temperature while night light is on (Super+Shift+N)"
 

@@ -45,6 +45,7 @@ Singleton {
     property alias sfxOff: adapter.sfxOff
     property alias sfxVolume: adapter.sfxVolume
     property alias sfxPack: adapter.sfxPack
+    property alias sfxPick: adapter.sfxPick
     readonly property var hypr: adapter.hypr
     readonly property var monitors: adapter.monitors
     readonly property var binds: adapter.binds
@@ -78,6 +79,44 @@ Singleton {
     })
 
     readonly property string luaPath: Quickshell.env("HOME") + "/.config/hypr/settings.lua"
+
+    // Shell settings with a reset button in the settings window; "hypr:<key>" names a Hyprland one
+    readonly property var defaults: ({
+        panelScale: 1,
+        motion: "m3",
+        nightTemp: 4000,
+        ecoOnBattery: false,
+        transitionFrom: "edge",
+        clickToChange: false,
+        transitionTime: 800,
+        slideshow: 0,
+        cursorTrail: "comet",
+        cursorClick: "pop",
+        cursorViz: false,
+        cursorIdle: 3,
+        vizStyle: "bars",
+        vizBars: 48,
+        vizRadius: 28,
+        vizHeight: 34,
+        vizSpin: false,
+        vizLead: 36,
+        sfx: true,
+        sfxVolume: 0.6,
+        sfxPack: "glass"
+    })
+
+    function isDefault(name) {
+        if (name.startsWith("hypr:"))
+            return adapter.hypr[name.slice(5)] === undefined;
+        return adapter[name] === defaults[name];
+    }
+
+    function reset(name) {
+        if (name.startsWith("hypr:"))
+            set(name.slice(5), hyprDefaults[name.slice(5)]);
+        else
+            adapter[name] = defaults[name];
+    }
 
     function get(key) {
         return adapter.hypr[key] ?? hyprDefaults[key];
@@ -287,6 +326,8 @@ Singleton {
             property real sfxVolume: 0.6
             // Folder under sounds/, one of Sfx.packs
             property string sfxPack: "glass"
+            // "<pack>/<event>": a sound from that pack's library in place of its own
+            property var sfxPick: ({})
             // Hyprland options by their settings.lua names; only those changed from hyprDefaults
             property var hypr: ({})
             property var monitors: ({})

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.SystemTray
 import qs.config
+import qs.services
 
 // System tray, icons turned symbolic in the accent (see tint.frag). Click activates, middle click is the secondary
 // action, right click opens the app's menu, wheel scrolls.
@@ -80,6 +81,7 @@ Row {
             }
 
             MouseArea {
+                onReleased: if (containsMouse) Sfx.tap("click")
                 id: mouse
                 anchors.fill: parent
                 anchors.margins: -6

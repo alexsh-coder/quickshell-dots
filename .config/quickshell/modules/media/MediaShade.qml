@@ -79,7 +79,11 @@ Scope {
 
         namespace: "mediashade"
         followMotion: true
-        onOpenChanged: if (!open) root.queue = false
+        onOpenChanged: {
+            Sfx.play(open ? "open" : "close");
+            if (!open)
+                root.queue = false;
+        }
 
         // Blurred cover over the whole shade; bigger than it, so the blur doesn't darken the edges
         Item {
@@ -314,14 +318,24 @@ Scope {
 
                     MouseArea {
                         id: seekArea
-                        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+
+                        // Ticks like a slider, only when the spot really moves
+                        property real lastTick: -1
+                        function seek(x) {
+                            const v = Math.max(0, Math.min(1, (x - 6) / bar.width));
+                            if (Math.abs(v - lastTick) >= 0.02) {
+                                lastTick = v;
+                                Sfx.play("slide", 45);
+                            }
+                            root.seekTo(v);
+                        }
                         anchors.fill: parent
                         anchors.margins: -6
                         hoverEnabled: true
                         enabled: root.seekable
                         cursorShape: Qt.PointingHandCursor
-                        onPressed: mouse => root.seekTo((mouse.x - 6) / bar.width)
-                        onPositionChanged: mouse => { if (pressed) root.seekTo((mouse.x - 6) / bar.width); }
+                        onPressed: mouse => seek(mouse.x)
+                        onPositionChanged: mouse => { if (pressed) seek(mouse.x); }
                     }
                 }
 

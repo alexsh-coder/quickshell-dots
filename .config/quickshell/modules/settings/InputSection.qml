@@ -15,6 +15,7 @@ Column {
 
     // English stays first; a second layout shows the switcher in the bar (Caps Lock switches)
     SettingRow {
+        setting: "hypr:kb_layout"
         label: "Second layout"
         hint: "Caps Lock switches between English and it"
         Dropdown {
@@ -25,6 +26,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:repeat_rate"
         label: "Repeat rate"
         hint: "Characters per second while a key is held"
         ValueSlider {
@@ -36,6 +38,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:repeat_delay"
         label: "Repeat delay"
         hint: "How long to hold a key before it repeats"
         ValueSlider {
@@ -49,6 +52,7 @@ Column {
     SectionTitle { text: "Mouse and touchpad" }
 
     SettingRow {
+        setting: "hypr:mouse_sensitivity"
         label: "Pointer speed"
         ValueSlider {
             from: -1; to: 1; step: 0.05
@@ -59,6 +63,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:natural_scroll"
         label: "Natural scrolling"
         hint: "Content follows the fingers on the touchpad"
         Toggle {
@@ -68,6 +73,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:tap_to_click"
         label: "Tap to click"
         Toggle {
             checked: Settings.get("tap_to_click")
@@ -135,6 +141,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:cursor_size"
         label: "Cursor size"
         Dropdown {
             current: Settings.get("cursor_size")
@@ -146,6 +153,7 @@ Column {
     SectionTitle { text: "Cursor effects" }
 
     SettingRow {
+        setting: "cursorTrail"
         label: "Trail"
         hint: "Drawn behind the pointer as it moves"
         Chips {
@@ -156,6 +164,7 @@ Column {
     }
 
     SettingRow {
+        setting: "cursorClick"
         label: "Click"
         hint: "What the pointer does on a press"
         Chips {
@@ -166,6 +175,7 @@ Column {
     }
 
     SettingRow {
+        setting: "cursorViz"
         label: "Music ring"
         hint: "Spectrum around the pointer while something plays"
         Toggle {
@@ -190,6 +200,7 @@ Column {
             Behavior on opacity { NumberAnimation { duration: Theme.anim } }
 
             SettingRow {
+                setting: "vizStyle"
                 label: "Look"
                 Chips {
                     current: Settings.vizStyle
@@ -198,6 +209,7 @@ Column {
                 }
             }
             SettingRow {
+                setting: "vizBars"
                 label: "Bars"
                 Chips {
                     current: Settings.vizBars
@@ -206,6 +218,7 @@ Column {
                 }
             }
             SettingRow {
+                setting: "vizRadius"
                 label: "Radius"
                 hint: "Gap between the pointer and the ring"
                 ValueSlider {
@@ -216,6 +229,7 @@ Column {
                 }
             }
             SettingRow {
+                setting: "vizHeight"
                 label: "Height"
                 hint: "How far the loudest bars reach"
                 ValueSlider {
@@ -226,6 +240,7 @@ Column {
                 }
             }
             SettingRow {
+                setting: "vizSpin"
                 label: "Spin"
                 Toggle {
                     checked: Settings.vizSpin
@@ -233,6 +248,7 @@ Column {
                 }
             }
             SettingRow {
+                setting: "vizLead"
                 label: "Keep up"
                 hint: "Draws the ring where the pointer is heading, so it doesn't trail behind"
                 Chips {
@@ -242,6 +258,7 @@ Column {
                 }
             }
             SettingRow {
+                setting: "cursorIdle"
                 label: "Hide when idle"
                 hint: "Fades out once the mouse rests, like the pointer does"
                 Chips {

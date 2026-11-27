@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import qs.config
+import qs.services
 import qs.components
 
 // Bottom of the lockscreen: sleep fires on click, the rest fill up while held
@@ -97,6 +98,7 @@ Row {
             }
 
             MouseArea {
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
                 id: mouse
                 anchors.fill: parent
                 anchors.margins: -6

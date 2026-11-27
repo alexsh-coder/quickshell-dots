@@ -75,6 +75,8 @@ Item {
                 Behavior on color { ColorAnimation { duration: Theme.anim } }
 
                 MouseArea {
+                    onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                    onReleased: if (containsMouse) Sfx.tap("click")
                     id: area
                     anchors.fill: parent
                     anchors.margins: -8

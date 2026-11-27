@@ -14,6 +14,7 @@ Column {
     SectionTitle { text: "Sounds" }
 
     SettingRow {
+        setting: "sfx"
         label: "Interface sounds"
         hint: "Everything below; the pack is Kenney's, CC0"
         Toggle {
@@ -28,6 +29,7 @@ Column {
         enabled: Settings.sfx
 
         SettingRow {
+            setting: "sfxPack"
             label: "Sound pack"
             Dropdown {
                 current: Sfx.pack
@@ -40,6 +42,7 @@ Column {
         }
 
         SettingRow {
+            setting: "sfxVolume"
             label: "Volume"
             ValueSlider {
                 from: 0; to: 1; step: 0.05
@@ -54,49 +57,92 @@ Column {
         Repeater {
             model: Sfx.groups
 
-            SettingRow {
-                id: row
+            Column {
+                id: group
 
                 required property var modelData
                 readonly property bool on: Sfx.enabled(modelData.id)
+                property bool expanded: false
 
-                label: modelData.label
-                hint: modelData.hint
+                width: parent.width
 
-                Row {
-                    spacing: 12
+                SettingRow {
+                    label: group.modelData.label
+                    hint: group.modelData.hint
+                    changed: !group.on
+                    onReset: Sfx.setEnabled(group.modelData.id, true)
 
-                    // Hear it before deciding
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 30
-                        height: 30
-                        radius: 15
-                        enabled: row.on
-                        opacity: enabled ? 1 : 0.4
-                        color: playArea.containsMouse ? Qt.tint(Theme.surface, Qt.alpha(Theme.accent, 0.16)) : Theme.surface
-                        Behavior on color { ColorAnimation { duration: Theme.anim } }
+                    Row {
+                        spacing: 12
 
-                        Icon {
-                            anchors.centerIn: parent
-                            text: "play_arrow"
-                            font.pixelSize: 18
+                        RoundButton {
+                            icon: "play_arrow"
+                            enabled: group.on
+                            hoverPreview: true
+                            onHovered: Sfx.audition(group.modelData.sample)
+                            onClicked: Sfx.play(group.modelData.sample, 0)
                         }
 
-                        MouseArea {
-                            id: playArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                            onClicked: Sfx.play(row.modelData.sample, 0)
+                        // Swap single sounds of the group
+                        RoundButton {
+                            icon: "tune"
+                            active: group.expanded
+                            enabled: group.on
+                            onClicked: group.expanded = !group.expanded
+                        }
+
+                        Toggle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            checked: group.on
+                            onToggled: Sfx.setEnabled(group.modelData.id, !checked)
                         }
                     }
+                }
 
-                    Toggle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        checked: row.on
-                        onToggled: Sfx.setEnabled(row.modelData.id, !checked)
+                Column {
+                    width: parent.width - 24
+                    x: 24
+                    visible: group.expanded && group.on
+
+                    Repeater {
+                        model: group.modelData.events
+
+                        SettingRow {
+                            id: ev
+
+                            required property string modelData
+                            readonly property var sounds: Sfx.picked(modelData)
+
+                            label: Sfx.eventLabels[modelData] ?? modelData
+                            changed: sounds.length > 0
+                            onReset: Sfx.pick(modelData, "")
+
+                            Row {
+                                spacing: 12
+
+                                RoundButton {
+                                    icon: "play_arrow"
+                                    hoverPreview: true
+                                    onHovered: Sfx.audition(ev.modelData)
+                                    onClicked: Sfx.audition(ev.modelData)
+                                }
+
+                                Dropdown {
+                                    minWidth: 190
+                                    hoverPreview: true
+                                    onHovered: v => Sfx.audition(ev.modelData, v)
+                                    multi: true
+                                    current: ev.sounds
+                                    model: [{ value: "", label: Sfx.presetName(ev.modelData) ? Sfx.presetName(ev.modelData) + " (preset)" : "Preset sound" }].concat(Sfx.choices.map(c => ({ value: c, label: c.replace(/[_-]/g, " ") })))
+                                    onPicked: v => {
+                                        const adding = v !== "" && !ev.sounds.includes(v);
+                                        Sfx.pick(ev.modelData, v);
+                                        if (adding || v === "")
+                                            Sfx.audition(ev.modelData, v);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

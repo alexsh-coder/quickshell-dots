@@ -67,7 +67,8 @@ PanelWindow {
 
     // Trigger under the pointer, for the hover pill
     property Item hovered: null
-    onHoveredChanged: if (hovered) Sfx.play("hover")
+    // Items that open a popout get its sound instead
+    onHoveredChanged: if (hovered && !triggers.some(t => t.item === hovered)) Sfx.play("hover")
     readonly property Item litItem: triggers.find(t => t.name === popouts.current)?.item ?? null
     // While a panel is open the pill marks its item, so it moves together with the panel
     // The clock is a pill of its own and lights up by itself, the visualizer needs none

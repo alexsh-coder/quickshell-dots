@@ -147,6 +147,8 @@ Rectangle {
                     }
 
                     MouseArea {
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                        onReleased: if (containsMouse) Sfx.tap("click")
                         id: closeArea
                         anchors.fill: parent
                         hoverEnabled: true
@@ -199,6 +201,8 @@ Rectangle {
                             }
 
                             MouseArea {
+                                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                                onReleased: if (containsMouse) Sfx.tap("click")
                                 id: menuArea
                                 anchors.fill: parent
                                 hoverEnabled: true
@@ -279,6 +283,7 @@ Rectangle {
                                 }
 
                                 MouseArea {
+                                    onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
                                     id: optionArea
                                     anchors.fill: parent
                                     hoverEnabled: true
@@ -410,6 +415,7 @@ Rectangle {
                                             }
 
                                             MouseArea {
+                                                onReleased: if (containsMouse) Sfx.tap("click")
                                                 id: actArea
                                                 anchors.fill: parent
                                                 hoverEnabled: true
@@ -538,6 +544,8 @@ Rectangle {
                             }
 
                             MouseArea {
+                                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                                onReleased: if (containsMouse) Sfx.tap("click")
                                 id: itemArea
                                 anchors.fill: parent
                                 hoverEnabled: true
@@ -563,6 +571,8 @@ Rectangle {
                                 }
 
                                 MouseArea {
+                                    onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                                    onReleased: if (containsMouse) Sfx.tap("click")
                                     id: eyeArea
                                     anchors.fill: parent
                                     hoverEnabled: true
@@ -732,6 +742,7 @@ Rectangle {
                             }
 
                             MouseArea {
+                                onReleased: if (containsMouse) Sfx.tap("click")
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {

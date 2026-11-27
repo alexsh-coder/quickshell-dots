@@ -332,12 +332,16 @@ PanelWindow {
                     }
 
                     TapHandler {
-                        onTapped: root.open(slot.modelData)
+                        onTapped: {
+                            Sfx.tap("click");
+                            root.open(slot.modelData);
+                        }
                     }
 
                     TapHandler {
                         acceptedButtons: Qt.RightButton
                         onTapped: {
+                            Sfx.tap("click");
                             menu.current = -1;
                             menuWindow.slot = slot;
                             root.menuEntry = slot.modelData;

@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 import qs.components
 
 // Small pill button: filled when on, outlined otherwise
@@ -44,6 +45,8 @@ Rectangle {
     }
 
     MouseArea {
+        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+        onReleased: if (containsMouse) Sfx.tap("click")
         id: area
         anchors.fill: parent
         hoverEnabled: true

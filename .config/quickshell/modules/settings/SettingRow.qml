@@ -1,6 +1,7 @@
 import QtQuick
 import qs.config
 import qs.components
+import qs.services
 
 // A setting: name and an optional hint on the left, its control (the children) on the right
 Item {
@@ -9,6 +10,10 @@ Item {
     property string label
     property string hint: ""
     default property alias control: slot.data
+    // Settings key this row edits; a reset button shows while it differs from the default
+    property string setting: ""
+    property bool changed: setting !== "" && !Settings.isDefault(setting)
+    signal reset()
 
     width: parent?.width ?? 0
     // Off rows grey out; enabled also stops their controls taking clicks
@@ -20,7 +25,7 @@ Item {
         id: text
 
         anchors.left: parent.left
-        anchors.right: slot.left
+        anchors.right: resetIcon.visible ? resetIcon.left : slot.left
         anchors.rightMargin: 16
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
@@ -38,6 +43,33 @@ Item {
             font.pixelSize: 12
             color: Theme.subtext
             wrapMode: Text.Wrap
+        }
+    }
+
+    Icon {
+        id: resetIcon
+
+        visible: root.changed
+        anchors.right: slot.left
+        anchors.rightMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
+        text: "restart_alt"
+        font.pixelSize: 20
+        color: resetArea.containsMouse ? Theme.accent : Theme.subtext
+
+        MouseArea {
+            id: resetArea
+            anchors.fill: parent
+            anchors.margins: -4
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+            onReleased: if (containsMouse) Sfx.tap("click")
+            onClicked: {
+                if (root.setting !== "")
+                    Settings.reset(root.setting);
+                root.reset();
+            }
         }
     }
 

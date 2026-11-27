@@ -139,6 +139,8 @@ Column {
 
                     MouseArea {
                         id: chipMouse
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                        onReleased: if (containsMouse) Sfx.tap("clickPop")
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -301,6 +303,8 @@ Column {
                             }
                             MouseArea {
                                 id: styleHead
+                                onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                                onReleased: if (containsMouse) Sfx.tap("clickPop")
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
@@ -331,6 +335,8 @@ Column {
                                 }
                                 MouseArea {
                                     id: optMouse
+                                    onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                                    onReleased: if (containsMouse) Sfx.tap("clickPop")
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
@@ -377,6 +383,8 @@ Column {
 
         MouseArea {
             id: customizeArea
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+            onReleased: if (containsMouse) Sfx.tap("clickPop")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
@@ -409,7 +417,10 @@ Column {
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: sw.toggled()
+            onClicked: {
+                Sfx.play(sw.checked ? "toggleOff" : "toggleOn");
+                sw.toggled();
+            }
         }
     }
 
@@ -458,6 +469,8 @@ Column {
 
         MouseArea {
             id: tileMouse
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+            onReleased: if (containsMouse) Sfx.tap("clickPop")
             anchors.fill: parent
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -494,8 +507,14 @@ Column {
 
         height: 20
 
+        property real lastTick: -1
         function setFrom(x) {
-            moved(min + Math.max(0, Math.min(1, x / width)) * (max - min));
+            const f = Math.max(0, Math.min(1, x / width));
+            if (Math.abs(f - lastTick) >= 0.02) {
+                lastTick = f;
+                Sfx.play("slide", 45);
+            }
+            moved(min + f * (max - min));
         }
 
         Rectangle {

@@ -34,11 +34,12 @@ Column {
 
     Process {
         id: others
-        command: ["find", Wallpaper.image.replace(/\/[^/]*$/, ""), "-maxdepth", "1", "-type", "f",
+        // The picked file's own folder: the shown image can be a cached copy next to black-and-white ones
+        command: ["find", Wallpaper.current.replace(/\/[^/]*$/, ""), "-maxdepth", "1", "-type", "f",
             "(", "-iname", "*.jpg", "-o", "-iname", "*.jpeg", "-o", "-iname", "*.png", "-o", "-iname", "*.webp", ")"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const list = text.split("\n").filter(p => p && p !== Wallpaper.image);
+                const list = text.split("\n").filter(p => p && p !== Wallpaper.current);
                 root.first = Wallpaper.image;
                 root.second = list.length ? list[Math.floor(Math.random() * list.length)] : Wallpaper.image;
             }
@@ -257,6 +258,7 @@ Column {
     }
 
     SettingRow {
+        setting: "transitionFrom"
         label: "Start from"
         hint: "The screen edge, or wherever the pointer is"
 
@@ -271,6 +273,7 @@ Column {
     }
 
     SettingRow {
+        setting: "clickToChange"
         visible: Settings.transitionFrom === "cursor"
         label: "Click to change"
         hint: "A click on the empty desktop brings a random wallpaper"
@@ -282,6 +285,7 @@ Column {
     }
 
     SettingRow {
+        setting: "transitionTime"
         label: "Default duration"
         hint: "For every transition without its own"
 
@@ -331,6 +335,7 @@ Column {
     SectionTitle { text: "Slideshow" }
 
     SettingRow {
+        setting: "slideshow"
         label: "Change wallpaper every"
         hint: "Picks a random one from the folder last shown in the picker"
 

@@ -10,7 +10,14 @@ Item {
     property bool dim: false
     readonly property bool pressed: drag.pressed
     signal moved(real v)
-    onMoved: Sfx.play("slide", 45)
+    // Tick only when the position really moves by a step, not on every pointer event
+    property real lastTick: -1
+    onMoved: v => {
+        if (Math.abs(v - lastTick) < 0.02)
+            return;
+        lastTick = v;
+        Sfx.play("slide", 45);
+    }
 
     implicitHeight: 24
 
@@ -54,7 +61,6 @@ Item {
 
     MouseArea {
         id: drag
-        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
 
         anchors.fill: parent
         anchors.margins: -6

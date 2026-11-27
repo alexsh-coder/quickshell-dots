@@ -55,11 +55,14 @@ Item {
         current = "";
     }
 
+    // Only a move from one open panel to another; opening and closing have their own sounds
+    property string shownBefore: ""
     onCurrentChanged: {
         if (current !== "media")
             fx = false;
-        if (open && !instant)
+        if (current !== "" && shownBefore !== "" && !instant)
             Sfx.play("popSwitch", 80);
+        shownBefore = current;
     }
 
     Timer {

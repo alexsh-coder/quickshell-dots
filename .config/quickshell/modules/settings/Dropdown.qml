@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls as QQC
+import QtQuick.Window
 import qs.config
 import qs.components
 import qs.services
@@ -11,9 +12,28 @@ Rectangle {
     property var model: []
     property var current
     property real minWidth: 160
+    // Rows call hovered() instead of the usual hover sound, e.g. to play the sound they name
+    property bool hoverPreview: false
+    // current is a list and rows tick on and off; the empty value clears it
+    property bool multi: false
     signal picked(var value)
+    signal hovered(var value)
+    // The closed button with hoverPreview on
+    signal buttonHovered()
 
-    readonly property var currentItem: (model ?? []).find(m => m.value === current) ?? null
+    // Several picked show up as their labels in a row
+    readonly property var currentItem: {
+        const all = model ?? [];
+        if (!multi)
+            return all.find(m => m.value === current) ?? null;
+        const on = Array.from(current ?? []);
+        if (!on.length)
+            return all.find(m => m.value === "") ?? null;
+        return { label: on.map(v => all.find(m => m.value === v)?.label ?? v).join(", ") };
+    }
+    function isOn(v) {
+        return multi ? ((current ?? []).length ? current.includes(v) : v === "") : current === v;
+    }
 
     implicitWidth: Math.max(minWidth, measure.implicitWidth + 24 + 28)
     implicitHeight: 34
@@ -63,7 +83,7 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+        onContainsMouseChanged: if (containsMouse) root.hoverPreview ? root.buttonHovered() : Sfx.play("hover")
         onClicked: {
             Sfx.tap("click");
             if (popup.opened)
@@ -79,14 +99,21 @@ Rectangle {
         readonly property int rowHeight: 32
         readonly property int maxRows: 8
 
-        y: root.height + 6
+        // Opens upward when there's no room below the button
+        property bool up: false
+        y: up ? -height - 6 : root.height + 6
+        onAboutToShow: {
+            const below = (root.Window.height || 0) - root.mapToItem(null, 0, root.height).y;
+            const above = root.mapToItem(null, 0, 0).y;
+            up = below < height + 12 && above > below;
+        }
         width: Math.max(root.width, measure.implicitWidth + 48)
         height: Math.min(root.model?.length ?? 0, maxRows) * rowHeight + 12
         padding: 6
         focus: true
-        closePolicy: QQC.Popup.CloseOnEscape | QQC.Popup.CloseOnPressOutside
+        closePolicy: QQC.Popup.CloseOnEscape | QQC.Popup.CloseOnPressOutsideParent
 
-        onOpened: list.positionViewAtIndex(Math.max(0, (root.model ?? []).indexOf(root.currentItem)), ListView.Center)
+        onOpened: list.positionViewAtIndex(Math.max(0, (root.model ?? []).findIndex(m => root.isOn(m.value))), ListView.Center)
 
         enter: Transition {
             NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.anim * 0.7 }
@@ -114,7 +141,7 @@ Rectangle {
                 id: row
 
                 required property var modelData
-                readonly property bool on: root.current === modelData.value
+                readonly property bool on: root.isOn(modelData.value)
 
                 width: ListView.view.width
                 height: popup.rowHeight
@@ -148,10 +175,19 @@ Rectangle {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                    onContainsMouseChanged: {
+                        if (!containsMouse)
+                            return;
+                        if (root.hoverPreview)
+                            root.hovered(row.modelData.value);
+                        else
+                            Sfx.play("hover");
+                    }
                     onClicked: {
-                        Sfx.tap("click");
-                        popup.close();
+                        if (!root.hoverPreview)
+                            Sfx.tap("click");
+                        if (!root.multi || row.modelData.value === "")
+                            popup.close();
                         root.picked(row.modelData.value);
                     }
                 }

@@ -266,10 +266,12 @@ Item {
         height: 40
 
         MouseArea {
-            onReleased: if (containsMouse) Sfx.tap("clickPop")
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
-            onClicked: sw.toggled()
+            onClicked: {
+                Sfx.play(sw.checked ? "toggleOff" : "toggleOn");
+                sw.toggled();
+            }
         }
 
         Row {

@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 import qs.components
 
 // One setting from a schema (see Desk.kinds): a slider for numbers, chips for choices, a switch for bools
@@ -54,6 +55,8 @@ Column {
             }
 
             MouseArea {
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                onReleased: if (containsMouse) Sfx.tap("click")
                 id: resetArea
                 anchors.fill: parent
                 hoverEnabled: true

@@ -17,6 +17,7 @@ Column {
     SectionTitle { text: "Shell" }
 
     SettingRow {
+        setting: "panelScale"
         label: "Panel scale"
         hint: "Bar, popups and widgets, on top of the screen's own scale"
 
@@ -68,6 +69,7 @@ Column {
     SectionTitle { text: "Windows" }
 
     SettingRow {
+        setting: "hypr:gaps_in"
         label: "Gaps between windows"
         ValueSlider {
             from: 0; to: 30; step: 1
@@ -78,6 +80,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:gaps_out"
         label: "Gaps around the screen"
         ValueSlider {
             from: 0; to: 60; step: 1
@@ -88,6 +91,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:border_size"
         label: "Border"
         ValueSlider {
             from: 0; to: 6; step: 1
@@ -98,6 +102,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:rounding"
         label: "Rounded corners"
         ValueSlider {
             from: 0; to: 30; step: 1
@@ -108,6 +113,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:inactive_opacity"
         label: "Unfocused windows"
         hint: "Opacity of windows without focus"
         ValueSlider {
@@ -119,6 +125,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:blur"
         label: "Blur"
         hint: "Behind see-through windows and panels"
         Toggle {
@@ -128,6 +135,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:shadows"
         label: "Shadows"
         Toggle {
             checked: Settings.get("shadows")
@@ -138,6 +146,7 @@ Column {
     SectionTitle { text: "Animations" }
 
     SettingRow {
+        setting: "motion"
         label: "Shell motion"
         Dropdown {
             current: Settings.motion
@@ -156,6 +165,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:animations"
         label: "Animations"
         Toggle {
             checked: Settings.get("animations")
@@ -164,6 +174,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:anim_speed"
         label: "Speed"
         enabled: Settings.get("animations")
         opacity: enabled ? 1 : 0.45
@@ -176,6 +187,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:window_style"
         label: "Windows open"
         enabled: Settings.get("animations")
         opacity: enabled ? 1 : 0.45
@@ -192,6 +204,7 @@ Column {
     }
 
     SettingRow {
+        setting: "hypr:workspace_style"
         label: "Workspaces switch"
         enabled: Settings.get("animations")
         opacity: enabled ? 1 : 0.45

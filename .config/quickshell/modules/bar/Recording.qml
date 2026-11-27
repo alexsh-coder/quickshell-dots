@@ -20,7 +20,10 @@ Rectangle {
     }
 
     TapHandler {
-        onTapped: Recorder.stop()
+        onTapped: {
+            Sfx.tap("click");
+            Recorder.stop();
+        }
     }
 
     Rectangle {
