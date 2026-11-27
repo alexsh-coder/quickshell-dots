@@ -215,7 +215,7 @@ Column {
 
                         MouseArea {
                             id: area
-                            onPressedChanged: if (pressed) Sfx.play("click")
+                            onReleased: if (containsMouse) Sfx.tap("click")
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             onClicked: Settings.transition = tile.modelData.name
@@ -243,7 +243,7 @@ Column {
                             }
 
                             MouseArea {
-                                onPressedChanged: if (pressed) Sfx.play("click")
+                                onReleased: if (containsMouse) Sfx.tap("click")
                                 anchors.fill: parent
                                 anchors.margins: -4
                                 cursorShape: Qt.PointingHandCursor

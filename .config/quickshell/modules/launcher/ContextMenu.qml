@@ -46,7 +46,7 @@ Rectangle {
             MouseArea {
                 id: item
                 onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                onPressedChanged: if (pressed) Sfx.play("click")
+                onReleased: if (containsMouse) Sfx.tap("click")
 
                 required property var modelData
                 required property int index

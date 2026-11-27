@@ -319,7 +319,7 @@ Item {
         MouseArea {
             id: area
             onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-            onPressedChanged: if (pressed) Sfx.play("click")
+            onReleased: if (containsMouse) Sfx.tap("click")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
@@ -361,7 +361,7 @@ Item {
             MouseArea {
                 id: iconMouse
                 onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                onPressedChanged: if (pressed) Sfx.play("click")
+                onReleased: if (containsMouse) Sfx.tap("click")
                 anchors.fill: parent
                 enabled: row.clickable
                 hoverEnabled: true
@@ -546,7 +546,7 @@ Item {
             MouseArea {
                 id: moreMouse
                 onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                onPressedChanged: if (pressed) Sfx.play("click")
+                onReleased: if (containsMouse) Sfx.tap("click")
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor

@@ -77,7 +77,7 @@ Flow {
                     }
                 }
                 onClicked: {
-                    Sfx.play("click");
+                    Sfx.tap("click");
                     root.picked(chip.modelData.value);
                 }
             }

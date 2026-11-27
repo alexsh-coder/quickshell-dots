@@ -97,8 +97,7 @@ Column {
                 font.pixelSize: 14
                 topPadding: 6
             }
-            Chips {
-                maxWidth: mon.width
+            Dropdown {
                 current: mon.res
                 model: mon.resolutions.map(r => ({ value: r, label: r.replace("x", "×") }))
                 onPicked: v => {
@@ -115,8 +114,7 @@ Column {
                 font.pixelSize: 14
                 topPadding: 8
             }
-            Chips {
-                maxWidth: mon.width
+            Dropdown {
                 current: mon.rate
                 model: mon.rates.map(r => ({ value: r, label: Math.round(Number(r) * 100) / 100 + " Hz" }))
                 onPicked: v => mon.rate = v
@@ -127,8 +125,7 @@ Column {
                 font.pixelSize: 14
                 topPadding: 8
             }
-            Chips {
-                maxWidth: mon.width
+            Dropdown {
                 current: mon.factors.find(s => Math.abs(s - mon.factor) < 0.001)
                 model: mon.factors.map(s => ({ value: s, label: Math.round(s * 100) + "%" }))
                 onPicked: v => mon.factor = v

@@ -48,7 +48,7 @@ Rectangle {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {
-            Sfx.play("click");
+            Sfx.tap("click");
             root.clicked();
         }
     }

@@ -11,6 +11,7 @@ Scope {
     id: root
 
     property bool locked: false
+    onLockedChanged: Sfx.typingIn("lock", locked)
     property bool unlocking: false
     property string password: ""
     property bool failed: false

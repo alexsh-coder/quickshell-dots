@@ -18,6 +18,7 @@ Scope {
     // Set on the first impact, so the buttons pop in as the shade lands
     readonly property bool landed: drop.landed
     property int selected: 0
+    onSelectedChanged: if (selected >= 0) Sfx.play("hover")
     property string uptime: ""
 
     readonly property var actions: [

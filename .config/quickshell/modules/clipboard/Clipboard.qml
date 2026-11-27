@@ -11,7 +11,10 @@ import qs.services
 Scope {
     id: root
 
-    onOpenChanged: Sfx.play(open ? "open" : "close")
+    onOpenChanged: {
+        Sfx.play(open ? "open" : "close");
+        Sfx.typingIn("clipboard", open);
+    }
 
     property bool open: false
     property bool mouseActive: false
@@ -166,7 +169,7 @@ Scope {
         }
 
         MouseArea {
-            onPressedChanged: if (pressed) Sfx.play("click")
+            onReleased: if (containsMouse) Sfx.tap("click")
             anchors.fill: parent
             onClicked: root.hide()
         }

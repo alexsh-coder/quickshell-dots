@@ -33,6 +33,7 @@ Scope {
         { name: "wallpaper", label: "Wallpaper", icon: "wallpaper" },
         { name: "display", label: "Display", icon: "monitor" },
         { name: "look", label: "Appearance", icon: "palette" },
+        { name: "sounds", label: "Sounds", icon: "volume_up" },
         { name: "input", label: "Input", icon: "keyboard" },
         { name: "power", label: "Power", icon: "battery_horiz_075" },
         { name: "keybinds", label: "Keybinds", icon: "keyboard_command_key" },
@@ -76,7 +77,7 @@ Scope {
         }
 
         MouseArea {
-            onPressedChanged: if (pressed) Sfx.play("click")
+            onReleased: if (containsMouse) Sfx.tap("click")
             anchors.fill: parent
             onClicked: Settings.open = false
         }
@@ -187,7 +188,7 @@ Scope {
                             MouseArea {
                                 id: area
                                 onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                                onPressedChanged: if (pressed) Sfx.play("click")
+                                onReleased: if (containsMouse) Sfx.tap("click")
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
@@ -257,6 +258,7 @@ Scope {
                     Page { id: wallpaperPage; name: "wallpaper"; sourceComponent: WallpaperSection { width: wallpaperPage.width; shown: Settings.open && wallpaperPage.visible } }
                     Page { id: displayPage; name: "display"; sourceComponent: DisplaySection { width: displayPage.width; shown: Settings.open && displayPage.visible } }
                     Page { id: lookPage; name: "look"; sourceComponent: LookSection { width: lookPage.width; shown: Settings.open && lookPage.visible } }
+                    Page { id: soundsPage; name: "sounds"; sourceComponent: SoundsSection { width: soundsPage.width; shown: Settings.open && soundsPage.visible } }
                     Page { id: inputPage; name: "input"; sourceComponent: InputSection { width: inputPage.width; shown: Settings.open && inputPage.visible } }
                     Page { id: powerPage; name: "power"; sourceComponent: PowerSection { width: powerPage.width; shown: Settings.open && powerPage.visible } }
                     Page { id: keybindsPage; name: "keybinds"; sourceComponent: KeybindsSection { width: keybindsPage.width; shown: Settings.open && keybindsPage.visible } }

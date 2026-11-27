@@ -117,7 +117,7 @@ Item {
 
         MouseArea {
             id: area
-            onPressedChanged: if (pressed) Sfx.play("click")
+            onPressedChanged: if (!pressed && containsMouse) Sfx.tap("click")
 
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
@@ -252,7 +252,7 @@ Item {
                         MouseArea {
                             id: closeArea
                             onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                            onPressedChanged: if (pressed) Sfx.play("click")
+                            onReleased: if (containsMouse) Sfx.tap("click")
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: root.entry.close()
@@ -326,7 +326,7 @@ Item {
                             MouseArea {
                                 id: buttonArea
                                 onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                                onPressedChanged: if (pressed) Sfx.play("click")
+                                onReleased: if (containsMouse) Sfx.tap("click")
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor

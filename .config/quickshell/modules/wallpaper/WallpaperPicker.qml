@@ -328,7 +328,7 @@ Scope {
         color: "transparent"
 
         MouseArea {
-            onPressedChanged: if (pressed) Sfx.play("click")
+            onReleased: if (containsMouse) Sfx.tap("click")
             anchors.fill: parent
             onClicked: root.hide()
         }
@@ -697,7 +697,7 @@ Scope {
                                 MouseArea {
                                     id: invertArea
                                     onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                                    onPressedChanged: if (pressed) Sfx.play("click")
+                                    onReleased: if (containsMouse) Sfx.tap("click")
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     onClicked: Wallpaper.invert(tile.filePath)
@@ -725,7 +725,7 @@ Scope {
                                 MouseArea {
                                     id: grayArea
                                     onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                                    onPressedChanged: if (pressed) Sfx.play("click")
+                                    onReleased: if (containsMouse) Sfx.tap("click")
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     onClicked: Wallpaper.toggleGray()
@@ -753,7 +753,7 @@ Scope {
                                 MouseArea {
                                     id: editArea
                                     onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                                    onPressedChanged: if (pressed) Sfx.play("click")
+                                    onReleased: if (containsMouse) Sfx.tap("click")
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     onClicked: root.customize()

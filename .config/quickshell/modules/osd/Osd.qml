@@ -93,25 +93,38 @@ Scope {
     Connections {
         target: root.sink?.audio ?? null
         enabled: root.armed && !OsdGate.volume
-        function onVolumesChanged() { root.showVolume(); }
-        function onMutedChanged() { root.showVolume(); }
+        function onVolumesChanged() {
+            Sfx.play("osdVolume", 50);
+            root.showVolume();
+        }
+        function onMutedChanged() {
+            Sfx.play(root.sink.audio.muted ? "osdOff" : "osdOn");
+            root.showVolume();
+        }
     }
 
     Connections {
         target: root.source?.audio ?? null
         enabled: root.armed && !OsdGate.mic
-        function onMutedChanged() { root.showMic(); }
+        function onMutedChanged() {
+            Sfx.play(root.source.audio.muted ? "osdOff" : "osdOn");
+            root.showMic();
+        }
     }
 
     Connections {
         target: Brightness
         enabled: !OsdGate.brightness
-        function onStepped() { root.showBar("brightness", "light_mode", Brightness.value, false); }
+        function onStepped() {
+            Sfx.play("osdBright", 50);
+            root.showBar("brightness", "light_mode", Brightness.value, false);
+        }
     }
 
     Connections {
         target: NightMode
         function onSwitched() {
+            Sfx.play(NightMode.enabled ? "osdOn" : "osdOff");
             root.showText(NightMode.enabled ? "bedtime" : "bedtime_off",
                           NightMode.enabled ? "Night mode on" : "Night mode off");
         }
@@ -120,14 +133,21 @@ Scope {
     Connections {
         target: Caffeine
         function onSwitched() {
+            Sfx.play(Caffeine.enabled ? "osdOn" : "osdOff");
             root.showText("coffee", Caffeine.enabled ? "Caffeine on" : "Caffeine off");
         }
     }
 
     Connections {
         target: Keyboard
-        function onLayoutSwitched() { root.showText("keyboard", Keyboard.layout); }
-        function onCapsToggled() { root.showText("keyboard_capslock", Keyboard.caps ? "Caps on" : "Caps off"); }
+        function onLayoutSwitched() {
+            Sfx.play("osdText");
+            root.showText("keyboard", Keyboard.layout);
+        }
+        function onCapsToggled() {
+            Sfx.play(Keyboard.caps ? "osdOn" : "osdOff");
+            root.showText("keyboard_capslock", Keyboard.caps ? "Caps on" : "Caps off");
+        }
     }
 
     IpcHandler {

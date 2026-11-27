@@ -56,7 +56,7 @@ Flow {
             MouseArea {
                 id: area
                 onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                onPressedChanged: if (pressed) Sfx.play("click")
+                onReleased: if (containsMouse) Sfx.tap("click")
 
                 // Flipped and back after a cursor theme change, so the new theme shows under the pointer
                 property bool kicked: false

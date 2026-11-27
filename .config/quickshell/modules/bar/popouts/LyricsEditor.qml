@@ -626,7 +626,7 @@ Item {
                     MouseArea {
                         id: saveMouse
                         onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
-                        onPressedChanged: if (pressed) Sfx.play("clickPop")
+                        onReleased: if (containsMouse) Sfx.tap("clickPop")
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
@@ -890,7 +890,7 @@ Item {
                                 }
 
                                 MouseArea {
-                                    onPressedChanged: if (pressed) Sfx.play("clickPop")
+                                    onReleased: if (containsMouse) Sfx.tap("clickPop")
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
@@ -1206,7 +1206,7 @@ Item {
                     MouseArea {
                         id: optMouse
                         onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
-                        onPressedChanged: if (pressed) Sfx.play("clickPop")
+                        onReleased: if (containsMouse) Sfx.tap("clickPop")
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
@@ -1286,7 +1286,7 @@ Item {
         MouseArea {
             id: pillMouse
             onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
-            onPressedChanged: if (pressed) Sfx.play("clickPop")
+            onReleased: if (containsMouse) Sfx.tap("clickPop")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor

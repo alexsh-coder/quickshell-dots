@@ -42,7 +42,7 @@ Singleton {
     property alias vizSpin: adapter.vizSpin
     property alias vizLead: adapter.vizLead
     property alias sfx: adapter.sfx
-    property alias sfxHover: adapter.sfxHover
+    property alias sfxOff: adapter.sfxOff
     property alias sfxVolume: adapter.sfxVolume
     property alias sfxPack: adapter.sfxPack
     readonly property var hypr: adapter.hypr
@@ -281,9 +281,9 @@ Singleton {
             property bool vizSpin: false
             // How far ahead (ms) the ring is drawn, making up for the frame it renders behind the pointer
             property int vizLead: 36
-            // Interface sounds; hover ticks can be left out on their own
+            // Interface sounds; groups from Sfx.groups listed in sfxOff stay quiet
             property bool sfx: true
-            property bool sfxHover: true
+            property var sfxOff: []
             property real sfxVolume: 0.6
             // Folder under sounds/, one of Sfx.packs
             property string sfxPack: "glass"

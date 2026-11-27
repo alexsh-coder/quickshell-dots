@@ -16,6 +16,7 @@ Item {
     property string hint: ""
     // Keyboard selection, only while the panel is pinned open from the keyboard
     property int selected: -1
+    onSelectedChanged: if (selected >= 0) Sfx.play("hoverPop")
     property string uptime: ""
 
     readonly property var actions: [
@@ -170,7 +171,7 @@ Item {
 
                 MouseArea {
                     id: mouse
-                    onPressedChanged: if (pressed) Sfx.play("clickPop")
+                    onPressedChanged: if (!pressed && containsMouse) Sfx.tap("clickPop")
 
                     anchors.fill: parent
                     hoverEnabled: true

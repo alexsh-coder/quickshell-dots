@@ -17,7 +17,7 @@ Column {
     SettingRow {
         label: "Second layout"
         hint: "Caps Lock switches between English and it"
-        Chips {
+        Dropdown {
             current: Settings.get("kb_layout").split(",")[1] ?? ""
             model: [["", "None"], ["ru", "Russian"], ["ua", "Ukrainian"], ["by", "Belarusian"], ["kz", "Kazakh"], ["de", "German"], ["fr", "French"], ["es", "Spanish"], ["it", "Italian"], ["pl", "Polish"], ["pt", "Portuguese"], ["tr", "Turkish"]].map(l => ({ value: l[0], label: l[1] }))
             onPicked: v => Settings.set("kb_layout", v ? "us," + v : "us")
@@ -98,7 +98,7 @@ Column {
         readonly property bool tiles: Cursor.current?.family === "Anime"
         visible: styles.length > 1
         label: "Style"
-        Chips {
+        Dropdown {
             visible: !styleRow.tiles
             current: Cursor.current?.style
             model: styleRow.styles.map(v => ({ value: v, label: v }))
@@ -136,7 +136,7 @@ Column {
 
     SettingRow {
         label: "Cursor size"
-        Chips {
+        Dropdown {
             current: Settings.get("cursor_size")
             model: [20, 24, 28, 32, 40, 48].map(v => ({ value: v, label: String(v) }))
             onPicked: v => Settings.set("cursor_size", v)

@@ -477,7 +477,7 @@ Scope {
         MouseArea {
             id: area
             onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-            onPressedChanged: if (pressed) Sfx.play("click")
+            onReleased: if (containsMouse) Sfx.tap("click")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: button.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor

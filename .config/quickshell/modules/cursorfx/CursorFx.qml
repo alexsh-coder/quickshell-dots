@@ -19,7 +19,7 @@ PanelWindow {
     readonly property real ax: (Cursor.px - (monitor?.x ?? 0)) / ui
     readonly property real ay: (Cursor.py - (monitor?.y ?? 0)) / ui
     readonly property bool here: cx >= 0 && cy >= 0 && cx < width && cy < height
-    readonly property color tint: Theme.accent
+    readonly property color tint: Accent.cursorTarget
 
     // Hyprland stacks layers by when they were mapped, so a panel opened later covers this one:
     // it gets remapped on top whenever another layer opens

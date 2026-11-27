@@ -550,7 +550,7 @@ Scope {
 
             MouseArea {
                 onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
-                onPressedChanged: if (pressed) Sfx.play("click")
+                onReleased: if (containsMouse) Sfx.tap("click")
                 anchors.fill: parent
                 hoverEnabled: true
                 // The ring itself is the pointer here

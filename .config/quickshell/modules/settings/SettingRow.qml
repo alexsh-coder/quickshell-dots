@@ -11,6 +11,9 @@ Item {
     default property alias control: slot.data
 
     width: parent?.width ?? 0
+    // Off rows grey out; enabled also stops their controls taking clicks
+    opacity: enabled ? 1 : 0.45
+    Behavior on opacity { NumberAnimation { duration: Theme.anim } }
     implicitHeight: Math.max(48, text.implicitHeight + 16, slot.childrenRect.height + 16)
 
     Column {

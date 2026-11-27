@@ -11,7 +11,10 @@ import qs.services
 Scope {
     id: root
 
-    onOpenChanged: Sfx.play(open ? "open" : "close")
+    onOpenChanged: {
+        Sfx.play(open ? "open" : "close");
+        Sfx.typingIn("launcher", open);
+    }
 
     property bool open: false
     // Rows replay their entrance on this instead of being recreated, which stalled the first frames
@@ -467,7 +470,7 @@ Scope {
         }
 
         MouseArea {
-            onPressedChanged: if (pressed) Sfx.play("click")
+            onReleased: if (containsMouse) Sfx.tap("click")
             anchors.fill: parent
             onClicked: root.hide()
         }
@@ -602,7 +605,7 @@ Scope {
                     Behavior on height { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
 
                     MouseArea {
-                        onPressedChanged: if (pressed) Sfx.play("click")
+                        onReleased: if (containsMouse) Sfx.tap("click")
                         anchors.fill: parent
                         onClicked: root.copyAnswer()
                     }

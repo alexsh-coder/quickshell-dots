@@ -428,7 +428,7 @@ Item {
                     MouseArea {
                         id: rowMouse
                         onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
-                        onPressedChanged: if (pressed) Sfx.play("clickPop")
+                        onReleased: if (containsMouse) Sfx.tap("clickPop")
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: row.playing ? Qt.ArrowCursor : Qt.PointingHandCursor

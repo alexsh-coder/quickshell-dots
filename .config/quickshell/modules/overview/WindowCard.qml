@@ -131,7 +131,7 @@ Item {
     }
 
     MouseArea {
-        onPressedChanged: if (pressed) Sfx.play("click")
+        onReleased: if (containsMouse) Sfx.tap("click")
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
         cursorShape: Qt.BlankCursor
