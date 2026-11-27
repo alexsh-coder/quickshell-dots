@@ -19,10 +19,9 @@ Item {
 
     readonly property var players: Players.music
     // Picked by clicking the player name; otherwise whatever is playing
-    property MprisPlayer chosen: null
     // Players without a track can't be shown, so they are skipped
-    readonly property var withTrack: players.filter(p => !!p.trackTitle)
-    readonly property MprisPlayer player: (withTrack.includes(chosen) ? chosen : null) ?? withTrack.find(p => p.isPlaying) ?? withTrack[0] ?? players[0] ?? null
+    readonly property var withTrack: Players.withTrack
+    readonly property MprisPlayer player: Players.current
     readonly property bool hasTrack: !!player && !!player.trackTitle
     readonly property real length: player?.length ?? 0
     readonly property bool seekable: (player?.canSeek ?? false) && (player?.positionSupported ?? false) && length > 0
@@ -57,7 +56,7 @@ Item {
         if (!withTrack.length)
             return;
         const i = withTrack.indexOf(player);
-        chosen = withTrack[(i + 1) % withTrack.length];
+        Players.chosen = withTrack[(i + 1) % withTrack.length];
     }
 
     function fmt(s) {
@@ -300,7 +299,7 @@ Item {
 
                             Icon {
                                 anchors.verticalCenter: parent.verticalCenter
-                                visible: root.players.length > 1
+                                visible: root.withTrack.length > 1
                                 text: "unfold_more"
                                 font.pixelSize: 14
                                 color: Theme.subtext
@@ -313,7 +312,7 @@ Item {
                             onReleased: if (containsMouse) Sfx.tap("clickPop")
                             anchors.fill: playerName
                             anchors.margins: -4
-                            enabled: root.players.length > 1
+                            enabled: root.withTrack.length > 1
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.cycle()

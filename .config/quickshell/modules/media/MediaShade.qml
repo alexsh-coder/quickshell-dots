@@ -14,7 +14,7 @@ Scope {
     id: root
 
     readonly property var players: Players.music
-    readonly property MprisPlayer player: players.find(p => p.isPlaying) ?? players[0] ?? null
+    readonly property MprisPlayer player: Players.current
     readonly property bool hasTrack: !!player && !!player.trackTitle
     readonly property real length: player?.length ?? 0
     readonly property bool seekable: (player?.canSeek ?? false) && (player?.positionSupported ?? false) && length > 0
