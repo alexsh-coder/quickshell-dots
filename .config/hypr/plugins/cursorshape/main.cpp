@@ -3,7 +3,8 @@
 // With `hyprctl cursorpop 1` a press also plays the theme's pop_<shape> cursor (Rice-Fluent has them)
 #define WLR_USE_UNSTABLE
 #include <hyprland/src/plugins/PluginAPI.hpp>
-#include <hyprland/src/managers/EventManager.hpp>
+#include <hyprland/src/ipc/s1/S1.hpp>
+#include <hyprland/src/ipc/s2/S2.hpp>
 #include <hyprland/src/event/EventBus.hpp>
 #include <hyprland/src/pointer/cursor/CursorManager.hpp>
 #include <hyprland/src/Compositor.hpp>
@@ -17,7 +18,7 @@ static std::string    last = "-";
 static CHyprSignalListener clickListener;
 static CCursorManager*     manager;
 static bool                popOn;
-static SP<SHyprCtlCommand> popCommand;
+static SP<IPC::Socket1::SCommand> popCommand;
 // Back to the plain pointer waits a moment, so brushing past a link's edge doesn't flicker
 static constexpr int       SETTLE = 70;
 static wl_event_source*    settleTimer;
@@ -27,7 +28,7 @@ static void post(const std::string& name) {
     if (name == last)
         return;
     last = name;
-    g_pEventManager->postEvent({"cursorshape", name});
+    IPC::Socket2::sock()->postEvent({"cursorshape", name});
 }
 
 using NameFn    = void (*)(CCursorManager*, const std::string&);
@@ -94,14 +95,14 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE h) {
     surfaceHook = hook("setCursorSurface", (void*)&onSurface);
     clickListener = Event::bus()->m_events.input.mouse.button.listen([](IPointer::SButtonEvent e, Event::SCallbackInfo&) {
         const bool down = e.state == WL_POINTER_BUTTON_STATE_PRESSED;
-        g_pEventManager->postEvent({"cursorclick", down ? "1" : "0"});
+        IPC::Socket2::sock()->postEvent({"cursorclick", down ? "1" : "0"});
         // Straight to the original: the pop isn't a shape change of its own
         if (down && popOn && manager && !last.empty() && last != "-")
             ((NameFn)nameHook->m_original)(manager, "pop_" + last);
     });
-    popCommand = HyprlandAPI::registerHyprCtlCommand(handle, {"cursorpop", false, [](eHyprCtlOutputFormat, std::string arg) {
-        popOn = arg.ends_with("1");
-        return std::string{"ok"};
+    popCommand = HyprlandAPI::registerHyprCtlCommand(handle, {"cursorpop", IPC::Socket1::COMMAND_MATCH_PREFIX, [](const IPC::Socket1::SRequest& req) {
+        popOn = req.command.ends_with("1");
+        return IPC::Socket1::SResponse{"ok"};
     }});
     return {"cursorshape", "Cursor shape changes as IPC events", "rice", "1.0"};
 }
