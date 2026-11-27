@@ -52,6 +52,16 @@ Column {
             }
         }
 
+        SettingRow {
+            setting: "sfxMuteMusic"
+            label: "Quiet during music"
+            hint: "No sounds while a music player is playing"
+            Toggle {
+                checked: Settings.sfxMuteMusic
+                onToggled: Settings.sfxMuteMusic = !checked
+            }
+        }
+
         SectionTitle { text: "Play on" }
 
         Repeater {

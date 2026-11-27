@@ -10,7 +10,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property bool on: Settings.sfx
+    readonly property bool on: Settings.sfx && !(Settings.sfxMuteMusic && Players.music.some(p => p.isPlaying))
     readonly property string dir: Qt.resolvedUrl("../sounds/")
 
     readonly property var packs: [

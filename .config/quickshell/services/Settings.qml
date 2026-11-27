@@ -43,6 +43,7 @@ Singleton {
     property alias vizLead: adapter.vizLead
     property alias sfx: adapter.sfx
     property alias sfxOff: adapter.sfxOff
+    property alias sfxMuteMusic: adapter.sfxMuteMusic
     property alias sfxVolume: adapter.sfxVolume
     property alias sfxPack: adapter.sfxPack
     property alias sfxPick: adapter.sfxPick
@@ -102,6 +103,7 @@ Singleton {
         vizLead: 36,
         sfx: true,
         sfxVolume: 0.6,
+        sfxMuteMusic: false,
         sfxPack: "glass"
     })
 
@@ -323,6 +325,8 @@ Singleton {
             // Interface sounds; groups from Sfx.groups listed in sfxOff stay quiet
             property bool sfx: true
             property var sfxOff: []
+            // Quiet while a music player is playing
+            property bool sfxMuteMusic: false
             property real sfxVolume: 0.6
             // Folder under sounds/, one of Sfx.packs
             property string sfxPack: "glass"
