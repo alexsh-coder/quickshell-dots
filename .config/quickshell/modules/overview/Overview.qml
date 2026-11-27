@@ -12,6 +12,8 @@ import qs.services
 Scope {
     id: root
 
+    onShownChanged: Sfx.play(shown ? "open" : "close")
+
     // closed -> loading (waiting for hyprctl and a screen frame) -> open -> closing
     property string phase: "closed"
     readonly property bool shown: phase !== "closed"
@@ -547,6 +549,8 @@ Scope {
             }
 
             MouseArea {
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                onPressedChanged: if (pressed) Sfx.play("click")
                 anchors.fill: parent
                 hoverEnabled: true
                 // The ring itself is the pointer here

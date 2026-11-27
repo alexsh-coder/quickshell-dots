@@ -1,6 +1,7 @@
 import QtQuick
 import qs.config
 import qs.components
+import qs.services
 
 // Round icon button of the media popout: a Material icon or a Nerd Font glyph
 Item {
@@ -51,6 +52,8 @@ Item {
 
     MouseArea {
         id: btnMouse
+        onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+        onPressedChanged: if (pressed) Sfx.play("clickPop")
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor

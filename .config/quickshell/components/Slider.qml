@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 
 // Thick pill slider, 0..1. Emits moved() while dragging or scrolling
 Item {
@@ -9,6 +10,7 @@ Item {
     property bool dim: false
     readonly property bool pressed: drag.pressed
     signal moved(real v)
+    onMoved: Sfx.play("slide", 45)
 
     implicitHeight: 24
 
@@ -52,6 +54,7 @@ Item {
 
     MouseArea {
         id: drag
+        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
 
         anchors.fill: parent
         anchors.margins: -6

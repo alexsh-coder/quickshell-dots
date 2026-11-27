@@ -6,6 +6,7 @@ import qs.services
 
 MouseArea {
     id: root
+    onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
 
     required property DesktopEntry modelData
     required property int index

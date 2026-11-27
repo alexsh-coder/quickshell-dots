@@ -1,5 +1,6 @@
 import QtQuick
 import qs.config
+import qs.services
 
 Rectangle {
     id: root
@@ -28,6 +29,9 @@ Rectangle {
         id: mouse
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.toggled()
+        onClicked: {
+            Sfx.play(root.checked ? "toggleOff" : "toggleOn");
+            root.toggled();
+        }
     }
 }

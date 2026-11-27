@@ -13,6 +13,9 @@ import qs.modules.bar.popouts
 Scope {
     id: root
 
+    readonly property bool sfxOpen: QuickSettings.open
+    onSfxOpenChanged: Sfx.play(sfxOpen ? "open" : "close")
+
     property ShellScreen screen: Quickshell.screens[0]
     property string page: "quick"
     // Kept while the back row fades out
@@ -93,6 +96,7 @@ Scope {
         }
 
         MouseArea {
+            onPressedChanged: if (pressed) Sfx.play("click")
             anchors.fill: parent
             onClicked: host.close()
         }
@@ -173,6 +177,8 @@ Scope {
 
                     MouseArea {
                         id: backMouse
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                        onPressedChanged: if (pressed) Sfx.play("click")
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor

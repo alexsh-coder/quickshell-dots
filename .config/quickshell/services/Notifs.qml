@@ -24,6 +24,8 @@ Singleton {
         const pop = !n.lastGeneration && root.shouldPop(n.urgency);
         const entry = entryComp.createObject(root, { notification: n, popup: pop });
         list = [entry, ...list];
+        if (pop)
+            Sfx.play(n.urgency === NotificationUrgency.Critical ? "urgent" : "notify", 300);
         for (const old of list.slice(maxHistory))
             old.close();
     }

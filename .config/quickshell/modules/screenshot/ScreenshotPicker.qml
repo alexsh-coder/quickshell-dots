@@ -23,6 +23,8 @@ Scope {
             return;
         shown = false;
         result = geom;
+        if (geom)
+            Sfx.play("shot");
         // A frame for the overlay to leave the screen before grim shoots it
         writeTimer.restart();
     }

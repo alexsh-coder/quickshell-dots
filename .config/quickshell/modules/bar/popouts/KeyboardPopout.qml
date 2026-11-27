@@ -76,6 +76,8 @@ Item {
 
                 MouseArea {
                     id: mouse
+                    onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                    onPressedChanged: if (pressed) Sfx.play("clickPop")
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor

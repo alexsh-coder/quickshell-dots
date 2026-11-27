@@ -2,9 +2,12 @@ import QtQuick
 import Quickshell
 import qs.config
 import qs.components
+import qs.services
 
 MouseArea {
     id: root
+    onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+    onPressedChanged: if (pressed) Sfx.play("click")
 
     required property var modelData
     required property int index

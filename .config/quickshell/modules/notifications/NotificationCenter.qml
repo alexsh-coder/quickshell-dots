@@ -13,6 +13,8 @@ import qs.services
 Scope {
     id: root
 
+    onOpenChanged: Sfx.play(open ? "open" : "close")
+
     property bool open: false
     property ShellScreen screen: Quickshell.screens[0]
 
@@ -223,6 +225,7 @@ Scope {
 
                 MouseArea {
                     id: tabArea
+                    onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -473,6 +476,8 @@ Scope {
 
         MouseArea {
             id: area
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+            onPressedChanged: if (pressed) Sfx.play("click")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: button.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor

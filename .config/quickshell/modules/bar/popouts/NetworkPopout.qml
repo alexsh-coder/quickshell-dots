@@ -246,6 +246,8 @@ Item {
 
                     MouseArea {
                         id: chipMouse
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                        onPressedChanged: if (pressed) Sfx.play("clickPop")
 
                         anchors.fill: parent
                         hoverEnabled: true
@@ -444,6 +446,8 @@ Item {
 
                     MouseArea {
                         id: unlink
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                        onPressedChanged: if (pressed) Sfx.play("clickPop")
                         anchors.fill: parent
                         anchors.margins: -4
                         hoverEnabled: true
@@ -460,6 +464,8 @@ Item {
 
             MouseArea {
                 id: mouse
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                onPressedChanged: if (pressed) Sfx.play("clickPop")
                 anchors.fill: parent
                 z: -1
                 hoverEnabled: true
@@ -572,6 +578,8 @@ Item {
 
         MouseArea {
             id: btnMouse
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+            onPressedChanged: if (pressed) Sfx.play("clickPop")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor

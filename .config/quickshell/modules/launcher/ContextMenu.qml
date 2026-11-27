@@ -1,6 +1,7 @@
 import QtQuick
 import qs.config
 import qs.components
+import qs.services
 
 // Actions for one app, opened by right click or the Menu key
 Rectangle {
@@ -44,6 +45,8 @@ Rectangle {
 
             MouseArea {
                 id: item
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                onPressedChanged: if (pressed) Sfx.play("click")
 
                 required property var modelData
                 required property int index

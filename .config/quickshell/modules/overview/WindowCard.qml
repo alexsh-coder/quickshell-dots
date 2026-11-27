@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Widgets
 import qs.config
+import qs.services
 
 // One window on the ring. Drawn at the window's real size; the projective matrix from
 // Overview places it either exactly over the real window or on the ring.
@@ -130,6 +131,7 @@ Item {
     }
 
     MouseArea {
+        onPressedChanged: if (pressed) Sfx.play("click")
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
         cursorShape: Qt.BlankCursor

@@ -4,6 +4,7 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import qs.config
 import qs.components
+import qs.services
 
 // Lock and suspend fire on click; logout, reboot and shutdown fill up while held
 Item {
@@ -169,6 +170,7 @@ Item {
 
                 MouseArea {
                     id: mouse
+                    onPressedChanged: if (pressed) Sfx.play("clickPop")
 
                     anchors.fill: parent
                     hoverEnabled: true

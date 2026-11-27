@@ -5,10 +5,13 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.config
 import qs.components
+import qs.services
 
 // Clipboard history (cliphist) in the launcher's style
 Scope {
     id: root
+
+    onOpenChanged: Sfx.play(open ? "open" : "close")
 
     property bool open: false
     property bool mouseActive: false
@@ -163,6 +166,7 @@ Scope {
         }
 
         MouseArea {
+            onPressedChanged: if (pressed) Sfx.play("click")
             anchors.fill: parent
             onClicked: root.hide()
         }
@@ -249,6 +253,7 @@ Scope {
 
                 ListView {
                     id: resultsView
+                    onCurrentIndexChanged: if (root.open) Sfx.play("hover", 25)
 
                     width: parent.width
                     height: Math.min(count, root.maxRows) * root.rowHeight

@@ -33,6 +33,7 @@ Scope {
         password = "";
         unlocking = false;
         locked = true;
+        Sfx.play("lock");
     }
 
     function input(text) {
@@ -64,10 +65,12 @@ Scope {
         onCompleted: result => {
             if (result === PamResult.Success) {
                 root.unlocking = true;
+                Sfx.play("unlock");
                 release.restart();
             } else {
                 root.password = "";
                 root.failed = true;
+                Sfx.play("error");
                 root.rejected();
             }
         }

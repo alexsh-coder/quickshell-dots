@@ -213,6 +213,7 @@ Item {
                         }
 
                         MouseArea {
+                            onPressedChanged: if (pressed) Sfx.play("clickPop")
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             onClicked: PowerProfiles.profile = opt.modelData.value
@@ -265,6 +266,7 @@ Item {
         height: 40
 
         MouseArea {
+            onPressedChanged: if (pressed) Sfx.play("clickPop")
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
             onClicked: sw.toggled()

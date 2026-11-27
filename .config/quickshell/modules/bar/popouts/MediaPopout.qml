@@ -309,6 +309,8 @@ Item {
 
                         MouseArea {
                             id: playerMouse
+                            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                            onPressedChanged: if (pressed) Sfx.play("clickPop")
                             anchors.fill: playerName
                             anchors.margins: -4
                             enabled: root.players.length > 1
@@ -469,6 +471,8 @@ Item {
 
                         MouseArea {
                             id: playMouse
+                            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                            onPressedChanged: if (pressed) Sfx.play("clickPop")
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor

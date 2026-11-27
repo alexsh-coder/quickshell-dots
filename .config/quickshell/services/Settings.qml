@@ -41,6 +41,10 @@ Singleton {
     property alias vizHeight: adapter.vizHeight
     property alias vizSpin: adapter.vizSpin
     property alias vizLead: adapter.vizLead
+    property alias sfx: adapter.sfx
+    property alias sfxHover: adapter.sfxHover
+    property alias sfxVolume: adapter.sfxVolume
+    property alias sfxPack: adapter.sfxPack
     readonly property var hypr: adapter.hypr
     readonly property var monitors: adapter.monitors
     readonly property var binds: adapter.binds
@@ -277,6 +281,12 @@ Singleton {
             property bool vizSpin: false
             // How far ahead (ms) the ring is drawn, making up for the frame it renders behind the pointer
             property int vizLead: 36
+            // Interface sounds; hover ticks can be left out on their own
+            property bool sfx: true
+            property bool sfxHover: true
+            property real sfxVolume: 0.6
+            // Folder under sounds/, one of Sfx.packs
+            property string sfxPack: "glass"
             // Hyprland options by their settings.lua names; only those changed from hyprDefaults
             property var hypr: ({})
             property var monitors: ({})

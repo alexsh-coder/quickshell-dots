@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Hyprland
 import qs.config
+import qs.services
 
 Item {
     id: root
@@ -17,6 +18,8 @@ Item {
     property int first: 1
 
     onActiveIdChanged: {
+        if (activeId > 0)
+            Sfx.play("workspace", 80);
         if (activeId < 1)
             return;
         // Exactly one dot to the right of the active one, rest on the left

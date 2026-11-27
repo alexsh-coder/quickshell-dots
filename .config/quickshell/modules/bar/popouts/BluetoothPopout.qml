@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Bluetooth
 import qs.config
 import qs.components
+import qs.services
 
 Item {
     id: root
@@ -254,6 +255,8 @@ Item {
 
         MouseArea {
             id: mouse
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+            onPressedChanged: if (pressed) Sfx.play("clickPop")
             anchors.fill: parent
             z: -1
             hoverEnabled: true
@@ -287,6 +290,8 @@ Item {
 
         MouseArea {
             id: btnMouse
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+            onPressedChanged: if (pressed) Sfx.play("clickPop")
             anchors.fill: parent
             anchors.margins: -4
             hoverEnabled: true

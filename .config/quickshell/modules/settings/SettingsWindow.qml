@@ -11,6 +11,9 @@ import qs.services
 Scope {
     id: root
 
+    readonly property bool sfxOpen: Settings.open
+    onSfxOpenChanged: Sfx.play(sfxOpen ? "open" : "close")
+
     property ShellScreen screen: Quickshell.screens[0]
     property string section: "wallpaper"
     // Sections are built on first view and dropped a minute after the card closes
@@ -73,6 +76,7 @@ Scope {
         }
 
         MouseArea {
+            onPressedChanged: if (pressed) Sfx.play("click")
             anchors.fill: parent
             onClicked: Settings.open = false
         }
@@ -182,6 +186,8 @@ Scope {
 
                             MouseArea {
                                 id: area
+                                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                                onPressedChanged: if (pressed) Sfx.play("click")
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor

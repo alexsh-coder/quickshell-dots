@@ -314,6 +314,7 @@ Scope {
 
                     MouseArea {
                         id: seekArea
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
                         anchors.fill: parent
                         anchors.margins: -6
                         hoverEnabled: true
@@ -525,6 +526,8 @@ Scope {
 
         MouseArea {
             id: area
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+            onPressedChanged: if (pressed) Sfx.play("click")
             anchors.fill: parent
             hoverEnabled: true
             enabled: rb.enabled

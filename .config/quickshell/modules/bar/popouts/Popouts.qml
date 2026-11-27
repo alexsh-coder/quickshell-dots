@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 import qs.config
+import qs.services
 
 // One panel that slides out from behind the bar and morphs between pages:
 // it glides to the hovered item, resizes to the page and cross-fades content
@@ -54,7 +55,12 @@ Item {
         current = "";
     }
 
-    onCurrentChanged: if (current !== "media") fx = false
+    onCurrentChanged: {
+        if (current !== "media")
+            fx = false;
+        if (open && !instant)
+            Sfx.play("popSwitch", 80);
+    }
 
     Timer {
         id: closeTimer
@@ -74,6 +80,7 @@ Item {
     // Started by hand: a Behavior would start before its easing binding sees the new open,
     // running the opening with the closing curve and back
     onOpenChanged: {
+        Sfx.play(open ? "popOpen" : "popClose");
         revealAnim.stop();
         revealAnim.to = open ? 1 : 0;
         // Taller panels travel further, so they take longer, just not in proportion

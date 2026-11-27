@@ -65,6 +65,64 @@ Column {
         }
     }
 
+    SectionTitle { text: "Sounds" }
+
+    SettingRow {
+        label: "Interface sounds"
+        hint: "Clicks, panels, notifications, lock"
+        Toggle {
+            checked: Settings.sfx
+            onToggled: Settings.sfx = !checked
+        }
+    }
+
+    SettingRow {
+        label: "Sound pack"
+        enabled: Settings.sfx
+        opacity: enabled ? 1 : 0.45
+        Chips {
+            current: Settings.sfxPack
+            model: Sfx.packs
+            onPicked: v => {
+                Settings.sfxPack = v;
+                preview.restart();
+            }
+        }
+    }
+
+    // Plays the picked pack's notification once its sounds have loaded
+    Timer {
+        id: preview
+        interval: 250
+        onTriggered: Sfx.play("notify", 0)
+    }
+
+    SettingRow {
+        label: "Hover ticks"
+        hint: "Bar items and list moves"
+        enabled: Settings.sfx
+        opacity: enabled ? 1 : 0.45
+        Toggle {
+            checked: Settings.sfxHover
+            onToggled: Settings.sfxHover = !checked
+        }
+    }
+
+    SettingRow {
+        label: "Volume"
+        enabled: Settings.sfx
+        opacity: enabled ? 1 : 0.45
+        ValueSlider {
+            from: 0; to: 1; step: 0.05
+            value: Settings.sfxVolume
+            format: v => Math.round(v * 100) + "%"
+            onMoved: v => {
+                Settings.sfxVolume = v;
+                Sfx.play("click", 120);
+            }
+        }
+    }
+
     SectionTitle { text: "Windows" }
 
     SettingRow {

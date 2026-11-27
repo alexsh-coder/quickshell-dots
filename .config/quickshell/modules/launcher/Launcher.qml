@@ -11,6 +11,8 @@ import qs.services
 Scope {
     id: root
 
+    onOpenChanged: Sfx.play(open ? "open" : "close")
+
     property bool open: false
     // Rows replay their entrance on this instead of being recreated, which stalled the first frames
     signal entered()
@@ -465,6 +467,7 @@ Scope {
         }
 
         MouseArea {
+            onPressedChanged: if (pressed) Sfx.play("click")
             anchors.fill: parent
             onClicked: root.hide()
         }
@@ -599,6 +602,7 @@ Scope {
                     Behavior on height { NumberAnimation { duration: Theme.anim; easing.type: Easing.OutCubic } }
 
                     MouseArea {
+                        onPressedChanged: if (pressed) Sfx.play("click")
                         anchors.fill: parent
                         onClicked: root.copyAnswer()
                     }
@@ -664,6 +668,7 @@ Scope {
 
                 ListView {
                     id: resultsView
+                    onCurrentIndexChanged: if (root.open) Sfx.play("hover", 25)
 
                     width: parent.width
                     // "=" means math only, the app list steps aside

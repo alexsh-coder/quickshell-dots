@@ -57,6 +57,7 @@ Flow {
 
             MouseArea {
                 id: area
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
 
                 // Flipped and back after a cursor theme change, so the new theme shows under the pointer
                 property bool kicked: false
@@ -75,7 +76,10 @@ Flow {
                         }
                     }
                 }
-                onClicked: root.picked(chip.modelData.value)
+                onClicked: {
+                    Sfx.play("click");
+                    root.picked(chip.modelData.value);
+                }
             }
         }
     }

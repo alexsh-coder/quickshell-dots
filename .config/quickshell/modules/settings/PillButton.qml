@@ -1,6 +1,7 @@
 import QtQuick
 import qs.config
 import qs.components
+import qs.services
 
 Rectangle {
     id: root
@@ -42,9 +43,13 @@ Rectangle {
 
     MouseArea {
         id: area
+        onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: root.clicked()
+        onClicked: {
+            Sfx.play("click");
+            root.clicked();
+        }
     }
 }

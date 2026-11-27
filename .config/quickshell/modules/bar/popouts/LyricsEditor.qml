@@ -625,6 +625,8 @@ Item {
 
                     MouseArea {
                         id: saveMouse
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                        onPressedChanged: if (pressed) Sfx.play("clickPop")
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
@@ -888,6 +890,7 @@ Item {
                                 }
 
                                 MouseArea {
+                                    onPressedChanged: if (pressed) Sfx.play("clickPop")
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
@@ -1103,6 +1106,7 @@ Item {
 
                     MouseArea {
                         id: tapMouse
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
@@ -1201,6 +1205,8 @@ Item {
 
                     MouseArea {
                         id: optMouse
+                        onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+                        onPressedChanged: if (pressed) Sfx.play("clickPop")
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
@@ -1233,6 +1239,7 @@ Item {
 
         MouseArea {
             id: nudgeMouse
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
@@ -1278,6 +1285,8 @@ Item {
 
         MouseArea {
             id: pillMouse
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hoverPop")
+            onPressedChanged: if (pressed) Sfx.play("clickPop")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor

@@ -170,6 +170,7 @@ Column {
                             color: resetArea.containsMouse ? Theme.accent : Theme.subtext
                             MouseArea {
                                 id: resetArea
+                                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor

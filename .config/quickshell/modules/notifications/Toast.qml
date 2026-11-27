@@ -4,6 +4,7 @@ import Quickshell.Services.Notifications
 import Quickshell.Widgets
 import qs.config
 import qs.components
+import qs.services
 
 Item {
     id: root
@@ -116,6 +117,7 @@ Item {
 
         MouseArea {
             id: area
+            onPressedChanged: if (pressed) Sfx.play("click")
 
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
@@ -249,6 +251,8 @@ Item {
 
                         MouseArea {
                             id: closeArea
+                            onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                            onPressedChanged: if (pressed) Sfx.play("click")
                             anchors.fill: parent
                             hoverEnabled: true
                             onClicked: root.entry.close()
@@ -321,6 +325,8 @@ Item {
 
                             MouseArea {
                                 id: buttonArea
+                                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                                onPressedChanged: if (pressed) Sfx.play("click")
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor

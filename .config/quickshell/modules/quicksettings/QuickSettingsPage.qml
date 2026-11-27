@@ -318,6 +318,8 @@ Item {
 
         MouseArea {
             id: area
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+            onPressedChanged: if (pressed) Sfx.play("click")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
@@ -358,6 +360,8 @@ Item {
 
             MouseArea {
                 id: iconMouse
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                onPressedChanged: if (pressed) Sfx.play("click")
                 anchors.fill: parent
                 enabled: row.clickable
                 hoverEnabled: true
@@ -402,6 +406,7 @@ Item {
         // Popout page behind the chevron
         property string page: ""
         signal clicked
+        onClicked: Sfx.play(on ? "toggleOff" : "toggleOn")
 
         readonly property bool hovered: area.containsMouse || moreMouse.containsMouse
         readonly property int inset: 8
@@ -497,6 +502,7 @@ Item {
 
         MouseArea {
             id: area
+            onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
@@ -539,6 +545,8 @@ Item {
 
             MouseArea {
                 id: moreMouse
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                onPressedChanged: if (pressed) Sfx.play("click")
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor

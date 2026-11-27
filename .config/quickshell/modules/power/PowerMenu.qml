@@ -5,11 +5,14 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import qs.config
 import qs.components
+import qs.services
 
 // Ctrl+Alt+Del: a shade that drops from the top and bounces off the bottom edge.
 // Lock and suspend fire on click; logout, reboot and shutdown fill up while held
 Scope {
     id: root
+
+    onOpenChanged: Sfx.play(open ? "open" : "close")
 
     readonly property bool open: drop.open
     // Set on the first impact, so the buttons pop in as the shade lands
