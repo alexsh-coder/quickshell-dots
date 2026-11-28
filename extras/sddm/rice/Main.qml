@@ -30,7 +30,6 @@ Rectangle {
     property int sessionIndex: Math.max(0, sessionModel.lastIndex)
     property var sessions: []
     readonly property var user: users[userIndex] ?? { name: userModel.lastUser, realName: "" }
-    property bool editingUser: false
     readonly property string userName: user.name
     readonly property bool caps: keyboard.capsLock
     readonly property color lineTint: failed ? urgent : caps ? warm : accent
@@ -104,19 +103,6 @@ Rectangle {
             return;
         userIndex = (userIndex + d + users.length) % users.length;
         password = "";
-        failed = false;
-    }
-
-    function editUser(event) {
-        const k = event.key;
-        if (k === Qt.Key_Return || k === Qt.Key_Enter || k === Qt.Key_Escape || k === Qt.Key_Down)
-            editingUser = false;
-        else if (k === Qt.Key_Left)
-            stepUser(-1);
-        else if (k === Qt.Key_Right || k === Qt.Key_Space)
-            stepUser(1);
-        else
-            return;
         failed = false;
     }
 
@@ -255,7 +241,7 @@ Rectangle {
 
         Item { width: 1; height: 36 }
 
-        // Login: Tab and Shift+Tab move between it and the password, arrows step through the accounts
+        // Login: clicks or Left/Right step through the accounts, Up/Down through the sessions, typing always goes to the password
         Item {
             anchors.horizontalCenter: parent.horizontalCenter
             width: 440
@@ -269,37 +255,56 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "chevron_left"
                     font.pixelSize: 18
-                    color: Qt.rgba(1, 1, 1, 0.45)
-                    opacity: root.editingUser && root.users.length > 1 ? 1 : 0
-                    Behavior on opacity { NumberAnimation { duration: 220 } }
+                    color: prevArea.containsMouse ? root.accent : Qt.rgba(1, 1, 1, 0.45)
+                    visible: root.users.length > 1
+                    Behavior on color { ColorAnimation { duration: 220 } }
+
+                    MouseArea {
+                        id: prevArea
+                        anchors.fill: parent
+                        anchors.margins: -8
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.stepUser(-1)
+                    }
                 }
 
                 Text {
                     id: nameText
                     anchors.verticalCenter: parent.verticalCenter
                     text: root.userName
-                    color: root.editingUser || userArea.containsMouse ? root.accent : Qt.rgba(1, 1, 1, 0.7)
+                    color: userArea.containsMouse ? root.accent : Qt.rgba(1, 1, 1, 0.7)
                     font.family: root.font
                     font.pixelSize: 16
                     Behavior on color { ColorAnimation { duration: 220 } }
+
+                    MouseArea {
+                        id: userArea
+                        anchors.fill: parent
+                        anchors.margins: -8
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.stepUser(1)
+                    }
                 }
 
                 Icon {
                     anchors.verticalCenter: parent.verticalCenter
                     text: "chevron_right"
                     font.pixelSize: 18
-                    color: Qt.rgba(1, 1, 1, 0.45)
-                    opacity: root.editingUser && root.users.length > 1 ? 1 : 0
-                    Behavior on opacity { NumberAnimation { duration: 220 } }
-                }
-            }
+                    color: nextArea.containsMouse ? root.accent : Qt.rgba(1, 1, 1, 0.45)
+                    visible: root.users.length > 1
+                    Behavior on color { ColorAnimation { duration: 220 } }
 
-            MouseArea {
-                id: userArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.editingUser = !root.editingUser
+                    MouseArea {
+                        id: nextArea
+                        anchors.fill: parent
+                        anchors.margins: -8
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.stepUser(1)
+                    }
+                }
             }
         }
 
@@ -313,15 +318,9 @@ Rectangle {
                 anchors.fill: parent
                 time: root.time
                 count: root.password.length
-                tint: root.editingUser ? Qt.rgba(1, 1, 1, 0.35) : root.lineTint
+                tint: root.lineTint
 
                 Behavior on tint { ColorAnimation { duration: 260 } }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.IBeamCursor
-                onClicked: root.editingUser = false
             }
         }
 
@@ -398,19 +397,11 @@ Rectangle {
         Component.onCompleted: forceActiveFocus()
         Keys.onPressed: event => {
             event.accepted = true;
-            if (event.key === Qt.Key_Up && !root.editingUser) {
-                root.editingUser = true;
-                return;
-            }
-            if (event.key === Qt.Key_Tab || event.key === Qt.Key_Backtab) {
-                root.editingUser = !root.editingUser;
-                return;
-            }
-            if (root.editingUser) {
-                root.editUser(event);
-                return;
-            }
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+            if (event.key === Qt.Key_Left || event.key === Qt.Key_Right)
+                root.stepUser(event.key === Qt.Key_Left ? -1 : 1);
+            else if ((event.key === Qt.Key_Up || event.key === Qt.Key_Down) && root.sessions.length > 1)
+                root.sessionIndex = (root.sessionIndex + (event.key === Qt.Key_Up ? -1 : 1) + root.sessions.length) % root.sessions.length;
+            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 root.submit();
             else if (event.key === Qt.Key_Backspace)
                 root.erase(event.modifiers & Qt.ControlModifier);
