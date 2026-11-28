@@ -26,6 +26,7 @@ Row {
 
             required property var modelData
             property real progress: 0
+            readonly property bool labelShown: mouse.containsMouse || progress > 0
             readonly property color tone: mouse.containsMouse || progress > 0 ? Theme.accent : Qt.rgba(1, 1, 1, 0.6)
 
             implicitWidth: Math.max(64, col.implicitWidth)
@@ -74,6 +75,14 @@ Row {
                     font.pixelSize: 12
                     color: btn.tone
                     Behavior on color { ColorAnimation { duration: Theme.anim } }
+
+                    // Hidden until hover, slides down from under the icon
+                    opacity: btn.labelShown ? 1 : 0
+                    transform: Translate {
+                        y: btn.labelShown ? 0 : -8
+                        Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                    }
+                    Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                 }
 
             }

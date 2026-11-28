@@ -28,7 +28,8 @@
   "error": "error_005",
   "lock": "minimize_006",
   "unlock": "confirmation_001",
-  "shot": "switch3"
+  "shot": "switch3",
+  "dockHover": "drop_003"
  },
  "clicky": {
   "typeEnter": "switch2",
@@ -59,7 +60,8 @@
   "error": "error_008",
   "lock": "switch25",
   "unlock": "switch26",
-  "shot": "mouseclick1"
+  "shot": "mouseclick1",
+  "dockHover": "mouserelease1"
  },
  "digital": {
   "typeEnter": "pepSound1",
@@ -90,7 +92,8 @@
   "error": "lowRandom",
   "lock": "zapThreeToneDown",
   "unlock": "powerUp2",
-  "shot": "zap1"
+  "shot": "zap1",
+  "dockHover": "twoTone2"
  },
  "scifi": {
   "typeEnter": "laserRetro_001",
@@ -121,7 +124,8 @@
   "error": "impactMetal_004",
   "lock": "forceField_004",
   "unlock": "laserLarge_002",
-  "shot": "laserSmall_000"
+  "shot": "laserSmall_000",
+  "dockHover": "forceField_003"
  },
  "casino": {
   "typeEnter": "chips-stack-3",
@@ -152,7 +156,8 @@
   "error": "die-throw-4",
   "lock": "cards-pack-open-2",
   "unlock": "chips-handle-4",
-  "shot": "card-place-3"
+  "shot": "card-place-3",
+  "dockHover": "chips-handle-1"
  },
  "paper": {
   "typeEnter": "bookPlace2",
@@ -183,6 +188,7 @@
   "error": "dropLeather",
   "lock": "doorClose_4",
   "unlock": "handleCoins",
-  "shot": "drawKnife1"
+  "shot": "drawKnife1",
+  "dockHover": "cloth1"
  }
 }

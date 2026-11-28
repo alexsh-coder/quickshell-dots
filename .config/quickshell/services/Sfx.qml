@@ -143,6 +143,7 @@ Singleton {
         popSwitch: 0.22,
         popClose: 0.25,
         hoverPop: 0.15,
+        dockHover: 0.2,
         clickPop: 0.4,
         slide: 0.2,
         workspace: 0.3,
@@ -165,7 +166,7 @@ Singleton {
     })
 
     readonly property var eventLabels: ({
-        hover: "Hover", hoverPop: "Hover in popouts", slide: "Slider tick",
+        hover: "Hover", hoverPop: "Hover in popouts", dockHover: "Hover in dock", slide: "Slider tick",
         click: "Click", clickPop: "Click in popouts", toggleOn: "Switch on", toggleOff: "Switch off",
         open: "Open", close: "Close",
         popOpen: "Open", popSwitch: "Switch to another", popClose: "Close",
@@ -180,7 +181,7 @@ Singleton {
 
     // What can be switched off on its own in settings, and the events each one covers
     readonly property var groups: [
-        { id: "hover", label: "Hover", hint: "Moving over buttons, list rows and bar items", events: ["hover", "hoverPop", "slide"], sample: "hover" },
+        { id: "hover", label: "Hover", hint: "Moving over buttons, list rows and bar items", events: ["hover", "hoverPop", "dockHover", "slide"], sample: "hover" },
         { id: "clicks", label: "Clicks and switches", hint: "Buttons, chips, toggles, sliders", events: ["click", "clickPop", "toggleOn", "toggleOff"], sample: "click" },
         { id: "panels", label: "Panels", hint: "Launcher, overview, settings, menus opening and closing", events: ["open", "close"], sample: "open" },
         { id: "popouts", label: "Bar popouts", hint: "Media, volume, power and the rest under the bar", events: ["popOpen", "popSwitch", "popClose"], sample: "popOpen" },
@@ -210,9 +211,11 @@ Singleton {
     }
 
     property var last: ({})
+    // A panel sliding out under a still pointer makes its buttons "hovered"; that stays silent
+    property bool popMoving: false
     // Counts sounds of something happening, so a click can stand down when its press already made one
     property int actions: 0
-    readonly property var passive: ["hover", "hoverPop", "slide", "click", "clickPop", "type", "typeBig", "typeEnter"]
+    readonly property var passive: ["hover", "hoverPop", "dockHover", "slide", "click", "clickPop", "type", "typeBig", "typeEnter"]
 
     // A click that plays only if what it did (opened, closed, switched something) made no sound of its own
     function tap(name) {
@@ -230,6 +233,8 @@ Singleton {
         const now = Date.now();
         // Typing reshuffles lists (launcher results), which would tick on every key
         if (name === "hover" && now - Math.max(last.type ?? 0, last.typeBig ?? 0, last.typeEnter ?? 0) < 250)
+            return;
+        if (name === "hoverPop" && popMoving)
             return;
         // A dragged slider already ticks; the OSD it sets off stays quiet
         if ((name === "osdVolume" || name === "osdBright") && now - (last.slide ?? 0) < 200)

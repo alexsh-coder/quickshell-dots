@@ -13,7 +13,13 @@ import qs.services
 Scope {
     id: root
 
-    onOpenChanged: Sfx.play(open ? "open" : "close")
+    // Picking a wallpaper closes the panel with its own sound instead of the close one
+    property bool picked: false
+    onOpenChanged: {
+        if (open || !picked)
+            Sfx.play(open ? "open" : "close");
+        picked = false;
+    }
 
     property bool open: false
     property int tagIndex: 0
@@ -156,6 +162,7 @@ Scope {
         if (n === 0 || now - lastStep < 200)
             return;
         lastStep = now;
+        Sfx.play("clickPop");
         const cur = files.indexOf("file://" + Wallpaper.current);
         Wallpaper.set(files.get(cur < 0 ? 0 : (cur + by + n) % n, "filePath"), by > 0 ? "right" : "left");
     }
@@ -164,6 +171,7 @@ Scope {
         if (tags.length < 2)
             return;
         slideDir = by;
+        Sfx.play("hover");
         tagIndex = (tagIndex + by + tags.length) % tags.length;
     }
 
@@ -179,8 +187,10 @@ Scope {
         // video takes as long as its player needs to start, so that switch reports when it's done
         restore.interval = Wallpaper.isVideo(path) && path !== Wallpaper.current ? 4000 : Wallpaper.video ? 1500 : 900;
         Wallpaper.set(path);
+        Sfx.play("toggleOn");
         if (keepOpen)
             return;
+        picked = true;
         open = false;
         // Windows stay hidden until the wallpaper transition has played out
         restore.restart();
@@ -553,6 +563,7 @@ Scope {
                         preferredHighlightEnd: (width + root.thumbW) / 2
                         highlightMoveDuration: 260
                         onCountChanged: root.syncIndex()
+                        onCurrentIndexChanged: if (root.open) Sfx.play("hover", 25)
 
                         delegate: Item {
                             id: tile

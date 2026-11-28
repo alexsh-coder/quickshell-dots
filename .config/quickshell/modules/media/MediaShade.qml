@@ -316,6 +316,21 @@ Scope {
                         }
                     }
 
+                    Rectangle {
+                        readonly property real d: 14
+
+                        width: d
+                        height: d
+                        radius: d / 2
+                        color: Theme.text
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: Math.max(0, Math.min(bar.width - d, bar.width * bar.frac - d / 2))
+                        opacity: seekArea.pressed || seekArea.containsMouse ? 1 : 0
+                        scale: seekArea.pressed ? 1.15 : 1
+                        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                    }
+
                     MouseArea {
                         id: seekArea
 

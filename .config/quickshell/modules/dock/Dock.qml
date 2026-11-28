@@ -331,6 +331,10 @@ PanelWindow {
                         }
                     }
 
+                    HoverHandler {
+                        onHoveredChanged: if (hovered && root.dragFrom < 0) Sfx.play("dockHover")
+                    }
+
                     TapHandler {
                         onTapped: {
                             Sfx.tap("click");

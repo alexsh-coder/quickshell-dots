@@ -104,6 +104,11 @@ PanelWindow {
             pending = null;
             return popouts.show(t.name, t.item);
         }
+        // From the other half of the bar the panel only closes
+        if (popouts.far(t.name, t.item)) {
+            pending = null;
+            return popouts.leave();
+        }
         // Switching to another item waits for the pointer to settle on it
         popouts.stay();
         if (pending !== t) {

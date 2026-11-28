@@ -28,19 +28,36 @@ Item {
     property real drawnCenter: center
     readonly property Item page: ({ keyboard: keyboardPage, network: networkPage, vpn: vpnPage, bluetooth: bluetoothPage, volume: volumePage, power: powerPage, calendar: calendarPage, battery: batteryPage, media: mediaPage })[shownName] ?? null
 
+    // Item on the other half of the screen than the open panel: the panel must not glide across
+    function far(name, item) {
+        if (!open || pinned || name === current)
+            return false;
+        return (item.mapToItem(root, item.width / 2, 0).x < root.width / 2) !== (center < root.width / 2);
+    }
+
+    // Opening requested while the panel is still closing on the far side, waits for it to tuck away
+    property var queued: null
+
     function show(name, item) {
+        const x = item.mapToItem(root, item.width / 2, 0).x;
+        if (!open && reveal > 0 && Math.abs(x - drawnCenter) > 40) {
+            queued = { name: name, item: item };
+            return;
+        }
+        queued = null;
         closeTimer.stop();
         if (pinned && name !== current)
             return;
         // Opening anew (or over a closing panel) starts on the new page, with no fade from the old one
         instant = !open;
-        center = item.mapToItem(root, item.width / 2, 0).x;
+        center = x;
         shownName = name;
         current = name;
         instant = false;
     }
 
     function leave() {
+        queued = null;
         if (open && !pinned && !busy && !closeTimer.running)
             closeTimer.start();
     }
@@ -50,6 +67,7 @@ Item {
     }
 
     function close() {
+        queued = null;
         closeTimer.stop();
         pinned = false;
         current = "";
@@ -79,6 +97,14 @@ Item {
     // 0 = tucked behind the bar, 1 = fully out. The panel keeps its real height,
     // so its corners stay round the whole way
     property real reveal: 0
+    onRevealChanged: {
+        Sfx.popMoving = reveal > 0 && reveal < 1;
+        if (reveal === 0 && queued) {
+            const q = queued;
+            queued = null;
+            show(q.name, q.item);
+        }
+    }
 
     // Started by hand: a Behavior would start before its easing binding sees the new open,
     // running the opening with the closing curve and back

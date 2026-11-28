@@ -111,6 +111,8 @@ Variants {
                 id: tabArea
                 anchors.fill: parent
                 hoverEnabled: true
+                onContainsMouseChanged: if (containsMouse) Sfx.play("hover")
+                onReleased: if (containsMouse) Sfx.tap("click")
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     edge.peek = false;
